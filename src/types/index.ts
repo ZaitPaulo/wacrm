@@ -567,3 +567,72 @@ export interface AutomationLog {
   created_at: string;
   contact?: Contact;
 }
+
+// ============================================================
+// Inventory (compraventa de vehículos) — migración 032.
+// ============================================================
+export type VehicleStatus = 'available' | 'reserved' | 'sold' | 'hidden';
+
+export interface InventoryVehicle {
+  id: string;
+  account_id: string;
+  brand: string;
+  model: string;
+  year: number;
+  license_plate: string | null;
+  vin: string | null;
+  price: number;
+  mileage: number | null;
+  transmission: string | null;
+  fuel_type: string | null;
+  body_type: string | null;
+  color: string | null;
+  condition: string;
+  doors: number | null;
+  status: VehicleStatus;
+  /** JSONB libre: objeto atributo→valor o arreglo de etiquetas. */
+  features: Record<string, unknown> | unknown[];
+  images: string[];
+  internal_notes: string | null;
+  /** Documento del knowledge base (RAG) enlazado; lo gestiona el sync. */
+  kb_document_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Documentos del proceso de compra/venta — migraciones 033/034.
+// ============================================================
+export type DocumentCategory = 'person' | 'vehicle' | 'purchase' | 'sale';
+
+export interface DocumentRecord {
+  id: string;
+  account_id: string;
+  /** Contacto/lead vinculado (null si el doc es solo del vehículo). */
+  contact_id: string | null;
+  /** Vehículo del inventario vinculado (null para docs de persona). */
+  vehicle_id: string | null;
+  category: DocumentCategory;
+  uploaded_by: string | null;
+  file_name: string;
+  /** Ruta del objeto en Storage (para signed URL y borrado). */
+  file_path: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  created_at: string;
+  /**
+   * Datos del vehículo hidratados por queries que embeben
+   * `inventory_vehicles(brand, model, year)`. Ausente en otras.
+   */
+  inventory_vehicles?: {
+    brand: string;
+    model: string;
+    year: number;
+    license_plate?: string | null;
+  } | null;
+  /**
+   * Datos del contacto hidratados por queries que embeben
+   * `contacts(name, phone)`. Ausente en otras.
+   */
+  contacts?: { name: string | null; phone: string } | null;
+}

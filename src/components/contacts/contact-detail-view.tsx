@@ -18,6 +18,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ContactDocuments } from './contact-documents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -486,7 +487,21 @@ export function ContactDetailView({
                 >
                   Deals
                 </TabsTrigger>
+                <TabsTrigger
+                  value="documents"
+                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
+                >
+                  Documents
+                </TabsTrigger>
               </TabsList>
+
+              {/* Documents Tab */}
+              <TabsContent
+                value="documents"
+                className="flex-1 overflow-y-auto px-4 py-3"
+              >
+                <ContactDocuments contactId={contactId} accountId={accountId} />
+              </TabsContent>
 
               {/* Details Tab */}
               <TabsContent value="details" className="flex-1 overflow-y-auto px-4 py-3">
