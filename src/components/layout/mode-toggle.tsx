@@ -2,6 +2,7 @@
 
 import { Moon, Sun } from "lucide-react";
 
+import { useT } from "@/hooks/use-locale";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
@@ -15,13 +16,18 @@ import { cn } from "@/lib/utils";
  */
 export function ModeToggle({ className }: { className?: string }) {
   const { mode, toggleMode } = useTheme();
-  const goingTo = mode === "dark" ? "light" : "dark";
+  const t = useT();
+  // Two whole phrases rather than an interpolated mode name: languages
+  // disagree about adjective placement and gender agreement, so
+  // "Switch to {mode} mode" does not survive translation intact.
+  const label =
+    mode === "dark" ? t.modeToggle.switchToLight : t.modeToggle.switchToDark;
   return (
     <button
       type="button"
       onClick={toggleMode}
-      aria-label={`Switch to ${goingTo} mode`}
-      title={`Switch to ${goingTo} mode`}
+      aria-label={label}
+      title={label}
       className={cn(
         "flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
         className,

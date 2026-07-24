@@ -708,6 +708,14 @@ export function TemplateManager() {
                 </Select>
               </div>
 
+              {/* NOT the UI language. This is the locale the template is
+                  registered under with Meta (e.g. `en_US`, `es_MX`), and
+                  it must stay independent of whatever language the
+                  operator has the interface set to — coupling the two
+                  would submit the wrong locale to Meta and, since a
+                  template's language is fixed once it exists there, the
+                  mistake is not reversible. See
+                  `openspec/changes/add-i18n-es-en/design.md`. */}
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Language</Label>
                 <Input

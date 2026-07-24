@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquare } from 'lucide-react'
 import type { ConversationsSeriesPoint } from '@/lib/dashboard/types'
+import { useLocale } from '@/hooks/use-locale'
+import { formatDate, interpolate, type Locale } from '@/lib/i18n'
 import { EmptyState } from './empty-state'
 import { Skeleton } from './skeleton'
 import { cn } from '@/lib/utils'
@@ -28,6 +30,7 @@ const VB_H = 240
 const PADDING = { top: 16, right: 16, bottom: 28, left: 40 }
 
 export function ConversationsChart({ series, loading, range, onRangeChange }: ConversationsChartProps) {
+  const { t, locale } = useLocale()
   const data = series[range]
 
   // Memoise the max so per-day hover math doesn't recompute it.
@@ -49,8 +52,12 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
     <section className="flex h-full flex-col rounded-xl border border-border bg-card">
       <header className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Conversations Over Time</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">Daily message volume by direction</p>
+          <h2 className="text-sm font-semibold text-foreground">
+            {t.dashboard.conversationsChart.title}
+          </h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {t.dashboard.conversationsChart.subtitle}
+          </p>
         </div>
         <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1">
           {[7, 30, 90].map((r) => (
@@ -65,7 +72,9 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {r} days
+              {interpolate(t.dashboard.conversationsChart.rangeDays, {
+                count: r,
+              })}
             </button>
           ))}
         </div>
@@ -77,17 +86,29 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
         ) : data.every((p) => p.incoming === 0 && p.outgoing === 0) ? (
           <EmptyState
             icon={MessageSquare}
-            title="No message activity in this range"
-            hint="Send or receive messages to start populating this chart."
+            title={t.dashboard.conversationsChart.emptyTitle}
+            hint={t.dashboard.conversationsChart.emptyHint}
           />
         ) : (
-          <LineSvg data={data} maxY={maxY} ticks={niceTicks} />
+          <LineSvg
+            data={data}
+            maxY={maxY}
+            ticks={niceTicks}
+            locale={locale}
+            ariaLabel={t.dashboard.conversationsChart.ariaLabel}
+          />
         )}
       </div>
 
       <footer className="flex items-center gap-4 border-t border-border px-5 py-3 text-xs text-muted-foreground">
-        <LegendDot color="#3b82f6" label="Incoming" />
-        <LegendDot color="#7c3aed" label="Outgoing" />
+        <LegendDot
+          color="#3b82f6"
+          label={t.dashboard.conversationsChart.incoming}
+        />
+        <LegendDot
+          color="#7c3aed"
+          label={t.dashboard.conversationsChart.outgoing}
+        />
       </footer>
     </section>
   )
@@ -101,10 +122,16 @@ function LineSvg({
   data,
   maxY,
   ticks,
+  locale,
+  ariaLabel,
 }: {
   data: ConversationsSeriesPoint[]
   maxY: number
   ticks: number[]
+  locale: Locale
+  /** Passed in rather than read from the dictionary here: `t` is
+   *  already the tick variable throughout this component's SVG math. */
+  ariaLabel: string
 }) {
   // Hover state: both the snapped index AND the tooltip's pixel
   // offset inside the wrapper div. They're stored together so the
@@ -195,7 +222,7 @@ function LineSvg({
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         className="h-[240px] w-full"
         role="img"
-        aria-label="Conversations per day"
+        aria-label={ariaLabel}
       >
         {/* Y-axis gridlines + labels */}
         {ticks.map((t) => {
@@ -233,7 +260,7 @@ function LineSvg({
               textAnchor="middle"
               className="fill-muted-foreground text-[10px]"
             >
-              {shortDayLabel(p.day)}
+              {shortDayLabel(p.day, locale)}
             </text>
           ) : null,
         )}
@@ -283,7 +310,9 @@ function LineSvg({
           className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded-md border border-border bg-popover px-2.5 py-1.5 text-[11px] shadow-lg"
           style={{ left: `${hover.tooltipLeftPx}px` }}
         >
-          <div className="font-medium text-popover-foreground">{longDayLabel(hovered.day)}</div>
+          <div className="font-medium text-popover-foreground">
+            {longDayLabel(hovered.day, locale)}
+          </div>
           <div className="mt-1 flex flex-col gap-0.5">
             <span className="flex items-center gap-1.5 text-blue-300">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
@@ -309,18 +338,28 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   )
 }
 
-function shortDayLabel(key: string): string {
-  // key is YYYY-MM-DD; return "Apr 17"-style. Using Date with an
-  // appended time avoids timezone-shift surprises across midnight.
+// These used to pass `undefined` as the locale, which follows the
+// *browser's* language rather than the one chosen in the app — so a
+// Spanish UI could still render English axis labels. Both now take the
+// active locale explicitly.
+
+function shortDayLabel(key: string, locale: Locale): string {
+  // key is YYYY-MM-DD; return "Apr 17"-style. Building the Date from
+  // parts avoids timezone-shift surprises across midnight.
   const [y, m, d] = key.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return formatDate(new Date(y, m - 1, d), locale, {
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
-function longDayLabel(key: string): string {
+function longDayLabel(key: string, locale: Locale): string {
   const [y, m, d] = key.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+  return formatDate(new Date(y, m - 1, d), locale, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 /**

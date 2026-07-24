@@ -1,42 +1,51 @@
 "use client";
 
-import { Check, Moon, Palette, SunMoon, Sun } from "lucide-react";
+import { Check, Globe, Moon, Palette, SunMoon, Sun } from "lucide-react";
 
+import { useLocale } from "@/hooks/use-locale";
 import { useTheme } from "@/hooks/use-theme";
+import type { Dictionary } from "@/lib/dictionaries/es";
+import { LOCALE_META, interpolate, type Locale } from "@/lib/i18n";
 import { MODES, THEMES, type Mode, type ThemeId } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { SettingsPanelHead } from "./settings-panel-head";
 
 /**
- * Appearance panel — light/dark mode + accent-color picker.
+ * Appearance panel — light/dark mode, accent-color picker, and the
+ * interface language.
  *
- * Two independent controls: a mode toggle (light / dark) and the
- * accent grid. Either applies + persists immediately. No save button:
- * each change is a single attribute swap on <html>, there's nothing
- * to roll back.
+ * Three independent controls. Each applies + persists immediately;
+ * there is no save button, because every change is a single swap on
+ * <html> with nothing to roll back.
  *
- * Persistence: localStorage only (device-scoped). The boot script in
- * layout.tsx replays both choices before first paint on subsequent
- * loads.
+ * Language lives here rather than in the header because it is a
+ * preference of the same kind as the other two, and because this is
+ * where users already come looking for how the app presents itself.
+ *
+ * Persistence is device-scoped for all three, which is what the panel
+ * description promises — theme and mode via localStorage (replayed by
+ * the boot script in layout.tsx), language via a cookie the server
+ * reads while rendering.
  */
 export function AppearancePanel() {
   const { theme, setTheme, mode, setMode } = useTheme();
+  const { t, locale, setLocale } = useLocale();
   return (
     <section className="max-w-3xl animate-in fade-in-50 duration-200">
       <SettingsPanelHead
-        title="Appearance"
-        description="Set the mode and accent colour used across the app. Saved to this device — try it, it changes live."
+        title={t.settings.appearance.title}
+        description={t.settings.appearance.description}
       />
 
       <div className="space-y-4">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <SunMoon className="size-4 text-muted-foreground" />
-          Mode
+          {t.settings.appearance.mode}
         </h3>
 
         <div
           role="radiogroup"
-          aria-label="Color mode"
+          aria-label={t.settings.appearance.colorMode}
           className="grid max-w-md grid-cols-2 gap-3"
         >
           {MODES.map((m) => (
@@ -45,6 +54,32 @@ export function AppearancePanel() {
               mode={m}
               isActive={m === mode}
               onPick={() => setMode(m)}
+              t={t}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-8 space-y-4">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Globe className="size-4 text-muted-foreground" />
+          {t.settings.appearance.language}
+        </h3>
+
+        <div
+          role="radiogroup"
+          aria-label={t.settings.appearance.languageGroup}
+          className="grid max-w-md grid-cols-2 gap-3"
+        >
+          {LOCALE_META.map((l) => (
+            <LanguageCard
+              key={l.id}
+              id={l.id}
+              name={l.name}
+              englishName={l.englishName}
+              isActive={l.id === locale}
+              onPick={() => setLocale(l.id)}
+              t={t}
             />
           ))}
         </div>
@@ -53,19 +88,18 @@ export function AppearancePanel() {
       <div className="mt-8 space-y-4">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Palette className="size-4 text-muted-foreground" />
-          Accent color
+          {t.settings.appearance.accentColor}
         </h3>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {THEMES.map((t) => (
+          {THEMES.map((theme_) => (
             <ThemeCard
-              key={t.id}
-              id={t.id}
-              name={t.name}
-              tagline={t.tagline}
-              swatch={t.swatch}
-              isActive={t.id === theme}
-              onPick={() => setTheme(t.id)}
+              key={theme_.id}
+              id={theme_.id}
+              swatch={theme_.swatch}
+              isActive={theme_.id === theme}
+              onPick={() => setTheme(theme_.id)}
+              t={t}
             />
           ))}
         </div>
@@ -74,24 +108,89 @@ export function AppearancePanel() {
   );
 }
 
-function ModeCard({
-  mode,
+function LanguageCard({
+  id,
+  name,
+  englishName,
   isActive,
   onPick,
+  t,
 }: {
-  mode: Mode;
+  id: Locale;
+  name: string;
+  englishName: string;
   isActive: boolean;
   onPick: () => void;
+  t: Dictionary;
 }) {
-  const isLight = mode === "light";
-  const Icon = isLight ? Sun : Moon;
   return (
     <button
       type="button"
       role="radio"
       onClick={onPick}
       aria-checked={isActive}
-      aria-label={`Use ${mode} mode`}
+      aria-label={interpolate(t.settings.appearance.useLanguage, { name })}
+      className={cn(
+        "flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors",
+        isActive
+          ? "border-primary/60 ring-2 ring-primary/40"
+          : "border-border hover:border-border hover:bg-muted/40",
+      )}
+    >
+      <span
+        aria-hidden
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold uppercase text-foreground"
+      >
+        {id}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-foreground">
+          {name}
+        </span>
+        {/* The English name as a subtitle, so the option stays findable
+            for someone who landed in a language they don't read. */}
+        {englishName !== name && (
+          <span className="block truncate text-xs text-muted-foreground">
+            {englishName}
+          </span>
+        )}
+      </span>
+      {isActive && (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
+          <Check className="h-3 w-3" />
+          {t.common.active}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function ModeCard({
+  mode,
+  isActive,
+  onPick,
+  t,
+}: {
+  mode: Mode;
+  isActive: boolean;
+  onPick: () => void;
+  t: Dictionary;
+}) {
+  const isLight = mode === "light";
+  const Icon = isLight ? Sun : Moon;
+  // The visible name comes from the dictionary rather than the raw
+  // `mode` id, which also drops the `capitalize` class the English
+  // lowercase ids needed.
+  const label = isLight
+    ? t.settings.appearance.light
+    : t.settings.appearance.dark;
+  return (
+    <button
+      type="button"
+      role="radio"
+      onClick={onPick}
+      aria-checked={isActive}
+      aria-label={interpolate(t.settings.appearance.useMode, { mode: label })}
       className={cn(
         "flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors",
         isActive
@@ -105,13 +204,13 @@ function ModeCard({
       >
         <Icon className="h-4 w-4" />
       </span>
-      <span className="flex-1 text-sm font-semibold capitalize text-foreground">
-        {mode}
+      <span className="flex-1 text-sm font-semibold text-foreground">
+        {label}
       </span>
       {isActive && (
         <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
           <Check className="h-3 w-3" />
-          Active
+          {t.common.active}
         </span>
       )}
     </button>
@@ -120,25 +219,28 @@ function ModeCard({
 
 function ThemeCard({
   id,
-  name,
-  tagline,
   swatch,
   isActive,
   onPick,
+  t,
 }: {
   id: ThemeId;
-  name: string;
-  tagline: string;
   swatch: string;
   isActive: boolean;
   onPick: () => void;
+  t: Dictionary;
 }) {
+  // Name and tagline moved out of `lib/themes.ts` and into the
+  // dictionary: they are prose, and this panel is the one place they
+  // are read. The catalog keeps what is genuinely presentational —
+  // the id, the swatch, and the picker order.
+  const { name, tagline } = t.settings.appearance.themes[id];
   return (
     <button
       type="button"
       onClick={onPick}
       aria-pressed={isActive}
-      aria-label={`Use ${name} theme`}
+      aria-label={interpolate(t.settings.appearance.useTheme, { name })}
       className={cn(
         "flex flex-col gap-3 rounded-lg border bg-card p-4 text-left transition-colors",
         isActive
@@ -158,7 +260,7 @@ function ThemeCard({
         {isActive && (
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
             <Check className="h-3 w-3" />
-            Active
+            {t.common.active}
           </span>
         )}
       </div>
@@ -177,7 +279,9 @@ function ThemeCard({
         <span className="w-3 bg-muted" />
         <span className="w-3 bg-card" />
       </div>
-      <span className="sr-only">Theme id: {id}</span>
+      <span className="sr-only">
+        {interpolate(t.settings.appearance.themeId, { id })}
+      </span>
     </button>
   );
 }

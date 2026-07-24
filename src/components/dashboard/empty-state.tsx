@@ -1,5 +1,8 @@
+"use client"
+
 import { BarChart3 } from 'lucide-react'
 import type { ComponentType } from 'react'
+import { useT } from '@/hooks/use-locale'
 import { cn } from '@/lib/utils'
 
 /**
@@ -7,9 +10,14 @@ import { cn } from '@/lib/utils'
  * without a minimum amount of data. Kept minimal and uniform so the
  * three empty states on the dashboard don't each feel like a
  * different widget.
+ *
+ * `title` defaults from the dictionary rather than a literal, so the
+ * fallback copy follows the active language like everything else. It
+ * needed `"use client"` to reach the hook; every caller is already a
+ * client component, so nothing moves across the boundary.
  */
 export function EmptyState({
-  title = 'Not enough data yet',
+  title,
   hint,
   icon: Icon = BarChart3,
   className,
@@ -19,6 +27,8 @@ export function EmptyState({
   icon?: ComponentType<{ className?: string }>
   className?: string
 }) {
+  const t = useT()
+  const heading = title ?? t.dashboard.emptyState.notEnoughData
   return (
     <div
       className={cn(
@@ -29,7 +39,7 @@ export function EmptyState({
       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Icon className="h-5 w-5" />
       </div>
-      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <p className="text-sm font-medium text-muted-foreground">{heading}</p>
       {hint && <p className="max-w-xs text-xs text-muted-foreground">{hint}</p>}
     </div>
   )

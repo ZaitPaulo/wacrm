@@ -55,13 +55,44 @@ export type ActivityKind =
   | 'automation'
   | 'contact'
 
-export interface ActivityItem {
+interface ActivityItemBase {
   id: string
-  kind: ActivityKind
-  /** Primary line of text rendered in the feed. Pre-formatted. */
-  text: string
   /** ISO timestamp the item happened at, drives relative-time + sort. */
   at: string
   /** Optional deep-link for the whole row (not all items have a target). */
   href?: string
 }
+
+/**
+ * Activity rows carry the *facts* about what happened, not a finished
+ * sentence. `loadActivity` used to build English prose here ("New
+ * message from Ana"), which left the feed untranslatable — by the time
+ * the component saw it, there was no key left to look up.
+ *
+ * The phrasing now belongs to `activity-feed.tsx`, which composes it
+ * from the dictionary. Adding a kind means adding a variant here and a
+ * matching branch there; the compiler's exhaustiveness check on the
+ * discriminated union enforces that pairing.
+ */
+export type ActivityItem =
+  | (ActivityItemBase & { kind: 'message'; who: string | null })
+  | (ActivityItemBase & { kind: 'contact'; who: string | null })
+  | (ActivityItemBase & {
+      kind: 'deal'
+      dealTitle: string
+      /** Null when the deal has no stage — the copy differs. */
+      stageName: string | null
+    })
+  | (ActivityItemBase & {
+      kind: 'broadcast'
+      broadcastName: string
+      /** Raw DB status; only 'sent' gets its own phrasing. */
+      status: string
+      recipients: number
+    })
+  | (ActivityItemBase & {
+      kind: 'automation'
+      automationName: string | null
+      who: string | null
+      failed: boolean
+    })

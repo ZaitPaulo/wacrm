@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { cookies } from "next/headers";
 import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { LocaleProvider } from "@/hooks/use-locale";
 import { ThemedToaster } from "@/components/themed-toaster";
+import { LOCALE_COOKIE, resolveLocale } from "@/lib/i18n";
 import {
   DEFAULT_MODE,
   DEFAULT_THEME,
@@ -75,14 +78,25 @@ const THEME_BOOT_SCRIPT = `
 })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Resolve the UI language on the server so the very first HTML
+  // response already carries the right `lang` and the right copy.
+  // This is why the locale needs no boot script: unlike theme, the
+  // server can know the answer, so there is no wrong-language frame
+  // to paint over after hydration.
+  //
+  // Reading cookies opts the layout out of static rendering. That
+  // costs nothing here — every page behind this layout is
+  // authenticated and already renders per-request.
+  const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
+
   return (
     <html
-      lang="en"
+      lang={locale}
       data-theme={DEFAULT_THEME}
       data-mode={DEFAULT_MODE}
       className={`${inter.variable} h-full antialiased`}
@@ -104,8 +118,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-full bg-background text-foreground font-sans">
         <ThemeProvider>
-          {children}
-          <ThemedToaster />
+          <LocaleProvider initialLocale={locale}>
+            {children}
+            <ThemedToaster />
+          </LocaleProvider>
         </ThemeProvider>
       </body>
     </html>

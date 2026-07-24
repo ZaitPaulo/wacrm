@@ -12,6 +12,9 @@ import {
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { ActivityItem, ActivityKind } from '@/lib/dashboard/types'
+import { useLocale } from '@/hooks/use-locale'
+import type { Dictionary } from '@/lib/dictionaries/es'
+import { interpolate } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { EmptyState } from './empty-state'
 import { Skeleton } from './skeleton'
@@ -38,7 +41,48 @@ const KIND_THEME: Record<ActivityKind, KindTheme> = {
   automation: { icon: Zap, badge: 'bg-rose-500/10 text-rose-400' },
 }
 
+/**
+ * Turns an activity row's facts into a sentence in the active language.
+ *
+ * The switch is exhaustive over `ActivityItem['kind']`, so adding a
+ * kind to the union without handling it here fails the build rather
+ * than silently rendering an empty row.
+ */
+function activityText(item: ActivityItem, t: Dictionary): string {
+  const a = t.dashboard.activity
+  switch (item.kind) {
+    case 'message':
+      return interpolate(a.message, { who: item.who ?? a.unknownContact })
+    case 'contact':
+      return interpolate(a.contact, { who: item.who ?? a.unknownContact })
+    case 'deal':
+      return item.stageName
+        ? interpolate(a.dealInStage, {
+            title: item.dealTitle,
+            stage: item.stageName,
+          })
+        : interpolate(a.dealUpdated, { title: item.dealTitle })
+    case 'broadcast':
+      return item.status === 'sent'
+        ? interpolate(a.broadcastSent, {
+            name: item.broadcastName,
+            count: item.recipients,
+          })
+        : interpolate(a.broadcastOther, {
+            name: item.broadcastName,
+            status: item.status,
+            count: item.recipients,
+          })
+    case 'automation':
+      return interpolate(item.failed ? a.automationFailed : a.automationTriggered, {
+        name: item.automationName ?? a.unnamedAutomation,
+        who: item.who ?? a.someContact,
+      })
+  }
+}
+
 export function ActivityFeed({ items, loading }: ActivityFeedProps) {
+  const { t, formatRelativeTime } = useLocale()
   // Start at 5 — a quick scan of the most recent events without
   // dominating vertical real estate. User expands explicitly via the
   // footer control when they want deeper history.
@@ -56,12 +100,14 @@ export function ActivityFeed({ items, loading }: ActivityFeedProps) {
   return (
     <section className="rounded-xl border border-border bg-card">
       <header className="flex items-center justify-between border-b border-border px-5 py-4">
-        <h2 className="text-sm font-semibold text-foreground">Recent Activity</h2>
+        <h2 className="text-sm font-semibold text-foreground">
+          {t.dashboard.activity.title}
+        </h2>
         <Link
           href="/inbox"
           className="text-xs font-medium text-primary hover:text-primary/80"
         >
-          View all →
+          {t.dashboard.activity.viewAll}
         </Link>
       </header>
 
@@ -75,8 +121,8 @@ export function ActivityFeed({ items, loading }: ActivityFeedProps) {
         <div className="p-5">
           <EmptyState
             icon={Inbox}
-            title="No activity yet"
-            hint="Activity from messages, deals, broadcasts, and automations will appear here."
+            title={t.dashboard.activity.emptyTitle}
+            hint={t.dashboard.activity.emptyHint}
           />
         </div>
       ) : (
@@ -100,10 +146,10 @@ export function ActivityFeed({ items, loading }: ActivityFeedProps) {
                     <Icon className="h-3.5 w-3.5" />
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                    {it.text}
+                    {activityText(it, t)}
                   </span>
                   <span className="flex-shrink-0 text-xs text-muted-foreground tabular-nums">
-                    {relativeTime(it.at)}
+                    {relativeTime(it.at, formatRelativeTime)}
                   </span>
                 </div>
               )
@@ -122,11 +168,15 @@ export function ActivityFeed({ items, loading }: ActivityFeedProps) {
           </ul>
           <footer className="flex items-center justify-between border-t border-border px-5 py-3 text-xs">
             <span className="text-muted-foreground tabular-nums">
-              Showing {visible.length} of {totalLoaded}
-              {totalLoaded === 50 ? '+' : ''}
+              {interpolate(t.dashboard.activity.showing, {
+                visible: visible.length,
+                total: `${totalLoaded}${totalLoaded === 50 ? '+' : ''}`,
+              })}
             </span>
             <div className="flex items-center gap-1">
-              <span className="mr-1 text-muted-foreground">Show</span>
+              <span className="mr-1 text-muted-foreground">
+                {t.dashboard.activity.show}
+              </span>
               {PAGE_SIZES.map((size, i) => {
                 const disabled = !isSizeUseful(size, i)
                 return (
@@ -155,13 +205,20 @@ export function ActivityFeed({ items, loading }: ActivityFeedProps) {
   )
 }
 
-function relativeTime(iso: string): string {
+/**
+ * The previous implementation hand-built "5m ago" / "2d ago", which was
+ * English by construction and had no way to become anything else. The
+ * locale-bound formatter covers the same ladder — seconds through years
+ * — and phrases it in the active language.
+ *
+ * The NaN guard stays: an unparseable timestamp should render an empty
+ * cell, not "Invalid Date".
+ */
+function relativeTime(
+  iso: string,
+  format: (value: Date | string | number) => string,
+): string {
   const then = new Date(iso).getTime()
   if (Number.isNaN(then)) return ''
-  const diffSec = Math.round((Date.now() - then) / 1000)
-  if (diffSec < 60) return `${Math.max(1, diffSec)}s ago`
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`
-  if (diffSec < 2_592_000) return `${Math.floor(diffSec / 86400)}d ago`
-  return new Date(iso).toLocaleDateString()
+  return format(then)
 }
