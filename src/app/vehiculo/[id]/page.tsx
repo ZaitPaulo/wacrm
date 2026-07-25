@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
+import { WhatsAppIcon } from '@/components/storefront/whatsapp-icon'
 import { getShowcaseVehicle } from '@/lib/showcase/data'
 import { getBaseUrl } from '@/lib/showcase/site-url'
 import { featuresToList, whatsappHref, formatPrice } from '@/lib/showcase/format'
@@ -13,6 +13,7 @@ import {
   CONDITIONS,
 } from '@/lib/inventory/specs'
 import { Gallery } from '@/components/storefront/gallery'
+import { StoreNav } from '@/components/storefront/store-nav'
 import { StoreFooter } from '@/components/storefront/footer'
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +34,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (v.transmission) parts.push(labelOf(TRANSMISSIONS, v.transmission))
   if (v.fuel_type) parts.push(labelOf(FUEL_TYPES, v.fuel_type))
   const description = `${parts.join(' · ')}. Disponible en ${name}. Contáctanos por WhatsApp.`
+
   return {
     metadataBase: new URL(base),
     title: { absolute: title },
@@ -54,6 +56,17 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   }
 }
 
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-xs font-semibold uppercase tracking-wider text-[#44474d]">
+        {label}
+      </span>
+      <span className="text-lg text-[#191c1e]">{value}</span>
+    </div>
+  )
+}
+
 export default async function VehiclePage({ params }: Params) {
   const { id } = await params
   const [data, base] = await Promise.all([getShowcaseVehicle(id), getBaseUrl()])
@@ -62,16 +75,21 @@ export default async function VehiclePage({ params }: Params) {
   const { account, vehicle: v } = data
   const feats = featuresToList(v.features)
 
-  const specs: [string, string][] = [
-    ['Año', String(v.year)],
-    ['Kilometraje', v.mileage != null ? `${formatPrice(v.mileage)} km` : '—'],
+  const specRows: [string, string][] = [
     ['Transmisión', labelOf(TRANSMISSIONS, v.transmission)],
     ['Combustible', labelOf(FUEL_TYPES, v.fuel_type)],
     ['Carrocería', labelOf(BODY_TYPES, v.body_type)],
     ['Color', v.color || '—'],
-    ['Condición', labelOf(CONDITIONS, v.condition)],
     ['Puertas', v.doors != null ? String(v.doors) : '—'],
+    ['Condición', labelOf(CONDITIONS, v.condition)],
   ]
+
+  const waDigits = account.public_whatsapp?.replace(/\D/g, '') || null
+  const testDriveHref = waDigits
+    ? `https://wa.me/${waDigits}?text=${encodeURIComponent(
+        `Hola, quiero agendar una prueba de manejo del ${v.brand} ${v.model} ${v.year}.`,
+      )}`
+    : null
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -104,70 +122,113 @@ export default async function VehiclePage({ params }: Params) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="flex min-h-screen flex-col bg-[#f7f9fb] text-[#191c1e]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="mx-auto max-w-6xl px-4 py-6">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-slate-900"
-        >
-          <ArrowLeft className="size-4" />
-          Volver al catálogo
-        </Link>
-      </div>
+      <StoreNav account={account} />
 
-      <main className="mx-auto max-w-6xl px-4 pb-14">
-        <div className="grid gap-8 lg:grid-cols-2">
-          <Gallery images={v.images ?? []} alt={`${v.brand} ${v.model} ${v.year}`} />
+      <main className="mx-auto w-full max-w-[1280px] flex-grow space-y-12 px-6 py-10 lg:px-12">
+        {/* Hero split */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Galería (8 cols) */}
+          <div className="lg:col-span-8">
+            <Gallery images={v.images ?? []} alt={`${v.brand} ${v.model} ${v.year}`} />
+          </div>
 
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              {v.brand} {v.model} {v.year}
-            </h1>
-            <p className="mt-2 text-3xl font-extrabold">${formatPrice(v.price)}</p>
+          {/* Info + acciones (4 cols) */}
+          <div className="flex flex-col gap-6 lg:col-span-4">
+            <div>
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#e6e8ea] px-3 py-1 text-xs font-semibold text-[#191c1e]">
+                <span className="size-2 rounded-full bg-[#0070ea]" />
+                Disponible
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight text-[#191c1e] sm:text-4xl">
+                {v.brand} {v.model} {v.year}
+              </h1>
+              <p className="mt-2 text-2xl font-semibold text-[#0d1c32]">
+                ${formatPrice(v.price)}
+              </p>
+            </div>
 
-            <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {specs.map(([k, val]) => (
-                <div key={k} className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-                  <dt className="text-xs text-slate-500">{k}</dt>
-                  <dd className="mt-0.5 text-sm font-semibold text-slate-900">{val}</dd>
-                </div>
-              ))}
-            </dl>
+            {/* Stats clave */}
+            <div className="grid grid-cols-2 gap-4 border-y border-[#c5c6cd] py-6">
+              <Stat label="Año" value={String(v.year)} />
+              <Stat
+                label="Kilometraje"
+                value={v.mileage != null ? `${formatPrice(v.mileage)} km` : '—'}
+              />
+              <Stat label="Combustible" value={labelOf(FUEL_TYPES, v.fuel_type)} />
+              <Stat label="Condición" value={labelOf(CONDITIONS, v.condition)} />
+            </div>
 
-            {feats.length > 0 && (
-              <div className="mt-6">
-                <h2 className="mb-2 text-sm font-semibold text-slate-900">
-                  Características
-                </h2>
-                <ul className="flex flex-wrap gap-2">
-                  {feats.map((f, i) => (
-                    <li
-                      key={i}
-                      className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600"
-                    >
-                      {f}
-                    </li>
-                  ))}
-                </ul>
+            {/* Acciones */}
+            {account.public_whatsapp && (
+              <div className="mt-2 flex flex-col gap-3">
+                <a
+                  href={whatsappHref(account.public_whatsapp, v)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-6 py-4 text-sm font-semibold uppercase tracking-wide text-white shadow-sm transition-colors hover:bg-[#20b358]"
+                >
+                  <WhatsAppIcon className="size-5" />
+                  Me interesa
+                </a>
+                {testDriveHref && (
+                  <a
+                    href={testDriveHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-black px-6 py-4 text-sm font-semibold uppercase tracking-wide text-black transition-colors hover:bg-[#f2f4f6]"
+                  >
+                    Agendar prueba de manejo
+                  </a>
+                )}
               </div>
             )}
-
-            {account.public_whatsapp && (
-              <a
-                href={whatsappHref(account.public_whatsapp, v)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-green-700 sm:w-auto"
-              >
-                Comenzar compra por WhatsApp
-              </a>
-            )}
           </div>
+        </div>
+
+        {/* Detalles */}
+        <div className="grid grid-cols-1 gap-12 border-t border-[#c5c6cd] pt-12 lg:grid-cols-2">
+          {/* Especificaciones */}
+          <div className="space-y-6">
+            <h2 className="border-b border-[#c5c6cd] pb-4 text-2xl font-semibold text-[#191c1e]">
+              Especificaciones
+            </h2>
+            <div className="flex flex-col divide-y divide-[#c5c6cd]">
+              {specRows.map(([k, val], i) => (
+                <div
+                  key={k}
+                  className={`flex justify-between py-3 ${
+                    i % 2 === 1 ? 'rounded bg-[#f2f4f6] px-2' : ''
+                  }`}
+                >
+                  <span className="text-[#44474d]">{k}</span>
+                  <span className="font-medium text-[#191c1e]">{val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Características */}
+          {feats.length > 0 && (
+            <div className="space-y-6">
+              <h2 className="border-b border-[#c5c6cd] pb-4 text-2xl font-semibold text-[#191c1e]">
+                Características
+              </h2>
+              <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {feats.map((f, i) => (
+                  <li key={i} className="flex items-center gap-3 text-[#191c1e]">
+                    <CheckCircle2 className="size-5 shrink-0 text-[#0059bb]" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </main>
 

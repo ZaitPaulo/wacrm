@@ -2,15 +2,15 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getShowcase } from '@/lib/showcase/data'
 import { getBaseUrl } from '@/lib/showcase/site-url'
-import { Catalog } from '@/components/storefront/catalog'
+import { Storefront } from '@/components/storefront/storefront'
+import { StoreNav } from '@/components/storefront/store-nav'
 import { StoreFooter } from '@/components/storefront/footer'
 
 // Refleja los cambios del CRM al instante (inventario, precios, on/off).
 export const dynamic = 'force-dynamic'
 
-// Metadata dinámica según el negocio (title/description/OG/Twitter). El
-// layout raíz pone noindex por defecto para la app privada; aquí lo
-// revertimos para la vitrina pública.
+// Metadata dinámica según el negocio. El layout raíz pone noindex por
+// defecto para la app privada; aquí lo revertimos para la vitrina.
 export async function generateMetadata(): Promise<Metadata> {
   const [data, base] = await Promise.all([getShowcase(), getBaseUrl()])
   if (!data) {
@@ -49,13 +49,13 @@ export default async function StorefrontPage() {
   // Vitrina no configurada: ninguna cuenta activó showcase_enabled.
   if (!data) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 p-8 text-center text-slate-900">
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#f7f9fb] p-8 text-center text-[#191c1e]">
         <h1 className="text-2xl font-semibold">Vitrina no configurada</h1>
-        <p className="max-w-md text-sm text-slate-500">
+        <p className="max-w-md text-sm text-[#44474d]">
           Aún no hay una vitrina pública activa. Un administrador puede activarla
           en el CRM (Ajustes → Public showcase).
         </p>
-        <Link href="/login" className="text-sm font-medium text-slate-900 underline">
+        <Link href="/login" className="text-sm font-medium text-[#0059bb] underline">
           Ir al CRM
         </Link>
       </main>
@@ -64,10 +64,10 @@ export default async function StorefrontPage() {
 
   const { account, vehicles } = data
   const displayName = account.public_name?.trim() || account.name
+  const heroImage = vehicles.find((v) => v.images?.[0])?.images?.[0] ?? null
   const base = await getBaseUrl()
 
-  // Datos estructurados (schema.org) para resultados enriquecidos: el
-  // concesionario y su oferta de vehículos.
+  // Datos estructurados (schema.org) para resultados enriquecidos.
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'AutoDealer',
@@ -105,43 +105,20 @@ export default async function StorefrontPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="flex min-h-screen flex-col bg-[#f7f9fb] text-[#191c1e]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-slate-900 to-slate-700 text-white">
-        <div className="mx-auto max-w-6xl px-4 py-16">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/60">
-            {displayName}
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Encuentra tu próximo vehículo
-          </h1>
-          <p className="mt-3 max-w-xl text-slate-300">
-            Explora nuestro inventario disponible y contáctanos por WhatsApp para
-            comenzar tu compra hoy mismo.
-          </p>
-          <span className="mt-6 inline-block rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-medium">
-            {vehicles.length} vehículo{vehicles.length === 1 ? '' : 's'} disponible
-            {vehicles.length === 1 ? '' : 's'}
-          </span>
-        </div>
-      </section>
 
-      {/* Catálogo */}
-      <main className="mx-auto max-w-6xl px-4 py-12">
-        <h2 className="mb-6 text-xl font-bold tracking-tight text-slate-900">
-          Nuestro inventario
-        </h2>
-        {vehicles.length === 0 ? (
-          <p className="py-20 text-center text-slate-500">
-            No hay vehículos disponibles en este momento. Vuelve pronto.
-          </p>
-        ) : (
-          <Catalog vehicles={vehicles} whatsapp={account.public_whatsapp} />
-        )}
+      <StoreNav account={account} />
+
+      <main className="flex-grow">
+        <Storefront
+          vehicles={vehicles}
+          whatsapp={account.public_whatsapp}
+          heroImage={heroImage}
+        />
       </main>
 
       <StoreFooter account={account} />

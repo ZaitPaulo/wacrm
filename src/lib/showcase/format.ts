@@ -26,6 +26,7 @@ export interface ShowcaseVehicle {
   transmission: string | null
   fuel_type: string | null
   body_type: string | null
+  condition: string | null
   features: Record<string, unknown> | unknown[] | null
   images: string[] | null
 }
@@ -38,7 +39,6 @@ export interface ShowcaseData {
 /** Vehículo con todos los campos que muestra la página de detalle. */
 export interface ShowcaseVehicleDetail extends ShowcaseVehicle {
   color: string | null
-  condition: string
   doors: number | null
 }
 

@@ -3,43 +3,45 @@
 import { useState } from 'react';
 import Image from 'next/image';
 
-// Galería de fotos del vehículo: imagen grande + tira de miniaturas
-// clickeables. Client component (mantiene el índice seleccionado).
+// Galería de fotos del vehículo (estilo Loramotors): imagen grande
+// aspect-video + tira de miniaturas en grilla. Client component.
 export function Gallery({ images, alt }: { images: string[]; alt: string }) {
   const [selected, setSelected] = useState(0);
 
   if (images.length === 0) {
     return (
-      <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-slate-100 text-sm text-slate-400">
+      <div className="flex aspect-video items-center justify-center rounded-xl bg-[#eceef0] text-sm text-[#75777e]">
         Sin foto
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100">
+    <div className="flex flex-col gap-4">
+      <div className="group relative aspect-video overflow-hidden rounded-xl bg-[#eceef0]">
         <Image
           src={images[selected]}
           alt={alt}
           fill
-          sizes="(min-width: 1024px) 600px, 100vw"
-          className="object-cover"
           priority
+          sizes="(min-width: 1024px) 66vw, 100vw"
+          className="object-cover transition-transform duration-700 group-hover:scale-105"
         />
       </div>
       {images.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="grid grid-cols-4 gap-4">
           {images.map((url, i) => (
             <button
               key={i}
               type="button"
               onClick={() => setSelected(i)}
-              className={`relative size-16 shrink-0 overflow-hidden rounded-lg border-2 transition ${
-                i === selected ? 'border-slate-900' : 'border-transparent opacity-70 hover:opacity-100'
+              className={`relative aspect-video overflow-hidden rounded-lg border-2 transition ${
+                i === selected
+                  ? 'border-black'
+                  : 'border-transparent opacity-70 hover:opacity-100'
               }`}
             >
-              <Image src={url} alt="" fill sizes="64px" className="object-cover" />
+              <Image src={url} alt="" fill sizes="140px" className="object-cover" />
             </button>
           ))}
         </div>
