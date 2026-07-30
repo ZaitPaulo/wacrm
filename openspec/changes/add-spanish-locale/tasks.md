@@ -32,10 +32,10 @@
 
 ## 5. Traducción de ajustes (450 claves)
 
-- [ ] 5.1 Traducir la primera mitad de `Settings`: cuenta, perfil, miembros, roles
-- [ ] 5.2 Traducir la segunda mitad de `Settings`: WhatsApp, plantillas, IA, base de conocimiento, API
-- [ ] 5.3 Verificar paridad y revisar a ojo
-- [ ] 5.4 Commit
+- [x] 5.1 Traducir la primera mitad de `Settings`: cuenta, perfil, miembros, roles
+- [x] 5.2 Traducir la segunda mitad de `Settings`: WhatsApp, plantillas, IA, base de conocimiento, API
+- [x] 5.3 Verificar paridad y revisar a ojo
+- [x] 5.4 Commit
 
 ## 6. Migración de las pantallas del CRM al catálogo
 
