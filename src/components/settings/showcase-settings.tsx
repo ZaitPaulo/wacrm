@@ -12,7 +12,7 @@ import { useCan } from '@/hooks/use-can';
 import { Loader2 } from 'lucide-react';
 
 /**
- * Ajustes de la vitrina pública (migraciones 035/037). Un admin activa
+ * Ajustes de la vitrina pública (migraciones 503/505). Un admin activa
  * la vitrina de esta cuenta, fija el WhatsApp del CTA y edita el perfil
  * del negocio que se muestra en el footer (nombre, logo, dirección,
  * contactos, horario). Lee/guarda vía /api/account.

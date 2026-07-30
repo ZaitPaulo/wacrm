@@ -27,7 +27,7 @@ import {
 export async function GET() {
   try {
     const ctx = await getCurrentAccount();
-    // Showcase fields live on the accounts row (migration 035); load them
+    // Showcase fields live on the accounts row (migration 503); load them
     // alongside the base account meta so Settings can render the panel.
     const { data: extra } = await ctx.supabase
       .from("accounts")

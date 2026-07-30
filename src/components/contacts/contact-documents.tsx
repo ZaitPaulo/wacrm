@@ -25,7 +25,7 @@ const BUCKET = 'contact-documents';
 const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
 const ALLOWED = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
 
-// Orden + etiquetas de las categorías (enum document_category, migración 034).
+// Orden + etiquetas de las categorías (enum document_category, migración 502).
 const CATEGORY_ORDER: DocumentCategory[] = ['person', 'vehicle', 'purchase', 'sale'];
 const CATEGORY_LABELS: Record<DocumentCategory, string> = {
   person: 'Persona',

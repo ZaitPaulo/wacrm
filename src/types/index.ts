@@ -626,7 +626,7 @@ export interface AutomationLog {
 }
 
 // ============================================================
-// Inventory (compraventa de vehículos) — migración 032.
+// Inventory (compraventa de vehículos) — migración 500.
 // ============================================================
 export type VehicleStatus = 'available' | 'reserved' | 'sold' | 'hidden';
 
@@ -658,7 +658,7 @@ export interface InventoryVehicle {
 }
 
 // ============================================================
-// Documentos del proceso de compra/venta — migraciones 033/034.
+// Documentos del proceso de compra/venta — migraciones 501/502.
 // ============================================================
 export type DocumentCategory = 'person' | 'vehicle' | 'purchase' | 'sale';
 

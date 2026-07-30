@@ -1,5 +1,5 @@
 -- ============================================================
--- 038_showcase_media_bucket.sql
+-- 506_showcase_media_bucket.sql
 --
 -- Bucket PÚBLICO 'showcase-media' para los assets que la vitrina muestra
 -- sin sesión: fotos de vehículos (inventory_vehicles.images) y el logo

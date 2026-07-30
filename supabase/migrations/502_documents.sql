@@ -1,7 +1,7 @@
 -- ============================================================
--- 034_documents.sql
+-- 502_documents.sql
 --
--- Evoluciona la documentación de leads (migración 033) a un modelo de
+-- Evoluciona la documentación de leads (migración 501) a un modelo de
 -- documentos del PROCESO de compra/venta:
 --
 --   1. Bucket 'contact-documents' pasa a PRIVADO. La lectura ya no es
@@ -16,7 +16,7 @@
 --      proceso de ESE contacto con ESE vehículo); uno "person" solo
 --      contact_id; uno "vehicle" al menos vehicle_id.
 --
--- La tabla `contact_documents` de 033 era nueva (sin datos reales), así
+-- La tabla `contact_documents` de 501 era nueva (sin datos reales), así
 -- que se reemplaza en vez de migrar fila por fila.
 --
 -- Idempotente — seguro de re-ejecutar.
@@ -37,9 +37,9 @@ END $$;
 -- ============================================================
 UPDATE storage.buckets SET public = FALSE WHERE id = 'contact-documents';
 
--- Lectura account-scoped (reemplaza la lectura pública de 033). Habilita
+-- Lectura account-scoped (reemplaza la lectura pública de 501). Habilita
 -- que un miembro genere signed URLs solo para objetos de su cuenta. Las
--- políticas de INSERT/UPDATE/DELETE de 033 siguen válidas (mismo bucket).
+-- políticas de INSERT/UPDATE/DELETE de 501 siguen válidas (mismo bucket).
 DROP POLICY IF EXISTS "Contact documents are publicly readable" ON storage.objects;
 DROP POLICY IF EXISTS "Members can read contact documents" ON storage.objects;
 CREATE POLICY "Members can read contact documents"

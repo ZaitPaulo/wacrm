@@ -1,5 +1,5 @@
 -- ============================================================
--- 035_showcase.sql
+-- 503_showcase.sql
 --
 -- Vitrina pública: la raíz del dominio (/) muestra el inventario
 -- 'available' de UNA concesionaria. Se parametriza desde el CRM:

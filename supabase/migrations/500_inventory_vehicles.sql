@@ -1,5 +1,5 @@
 -- ============================================================
--- 032_inventory_vehicles.sql
+-- 500_inventory_vehicles.sql
 --
 -- Inventario de vehículos para el CRM de compraventa. Sustituye a la
 -- migración 031 (retirada): una sola tabla canónica de stock.

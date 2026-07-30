@@ -1,5 +1,5 @@
 -- ============================================================
--- 036_inventory_vehicle_specs.sql
+-- 504_inventory_vehicle_specs.sql
 --
 -- Especificaciones estructuradas del vehículo (antes vivían sueltas en
 -- el JSONB `features`). Se vuelven columnas para poder mostrarlas

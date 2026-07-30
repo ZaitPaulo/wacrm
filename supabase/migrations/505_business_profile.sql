@@ -1,5 +1,5 @@
 -- ============================================================
--- 037_business_profile.sql
+-- 505_business_profile.sql
 --
 -- Perfil público del negocio para la vitrina (se muestra en el footer).
 -- Se parametriza desde el CRM (Ajustes → Public showcase). Todo texto
