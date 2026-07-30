@@ -7,12 +7,12 @@
 
 ## 2. Traducción del armazón (104 claves)
 
-- [ ] 2.1 Traducir el namespace `Sidebar` (26 claves)
-- [ ] 2.2 Traducir `Header` (15) y `ModeToggle` (1)
-- [ ] 2.3 Traducir `LoginPage` (13)
-- [ ] 2.4 Traducir `Dashboard` (49)
-- [ ] 2.5 Verificar la paridad de catálogos y revisar la aplicación a ojo
-- [ ] 2.6 Commit
+- [x] 2.1 Traducir el namespace `Sidebar` (26 claves)
+- [x] 2.2 Traducir `Header` (15) y `ModeToggle` (1)
+- [x] 2.3 Traducir `LoginPage` (13)
+- [x] 2.4 Traducir `Dashboard` (49)
+- [x] 2.5 Verificar la paridad de catálogos y revisar la aplicación a ojo
+- [x] 2.6 Commit
 
 ## 3. Traducción de la operación diaria (397 claves)
 
