@@ -8,6 +8,8 @@ import {
 import { HANDOFF_SENTINEL, aiRequestTimeoutMs } from './defaults'
 import { generateOpenAi } from './providers/openai'
 import { generateAnthropic } from './providers/anthropic'
+import { generateOpenRouter } from './providers/openrouter'
+import { generateGemini } from './providers/gemini'
 
 export interface GenerateArgs {
   config: AiConfig
@@ -40,6 +42,12 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
       break
     case 'anthropic':
       result = await generateAnthropic(providerArgs)
+      break
+    case 'openrouter':
+      result = await generateOpenRouter(providerArgs)
+      break
+    case 'gemini':
+      result = await generateGemini(providerArgs)
       break
     default:
       throw new AiError(`Unsupported AI provider: ${config.provider}`, {

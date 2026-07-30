@@ -192,3 +192,140 @@ describe('generateReply — Anthropic', () => {
     expect(body.messages).toHaveLength(1)
   })
 })
+
+describe('generateReply — OpenRouter', () => {
+  it('calls the OpenRouter endpoint with the bearer key and parses the completion', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okResponse({
+        choices: [{ message: { content: 'Claro, con gusto.' } }],
+        usage: { prompt_tokens: 11, completion_tokens: 4, total_tokens: 15 },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await generateReply({
+      config: config({
+        provider: 'openrouter',
+        apiKey: 'sk-or-v1-x',
+        model: 'google/gemini-2.5-flash',
+      }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hola' }],
+    })
+
+    expect(res).toEqual({
+      text: 'Claro, con gusto.',
+      handoff: false,
+      usage: { promptTokens: 11, completionTokens: 4, totalTokens: 15 },
+    })
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toContain('openrouter.ai')
+    expect(opts.headers.Authorization).toBe('Bearer sk-or-v1-x')
+    // The namespaced id must reach the wire untouched.
+    expect(JSON.parse(opts.body).model).toBe('google/gemini-2.5-flash')
+  })
+
+  it('sends attribution headers only when the site URL is configured', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okResponse({ choices: [{ message: { content: 'ok' } }] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', '')
+    await generateReply({
+      config: config({ provider: 'openrouter' }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })
+    expect(fetchMock.mock.calls[0][1].headers['HTTP-Referer']).toBeUndefined()
+
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://crm.example.com/')
+    await generateReply({
+      config: config({ provider: 'openrouter' }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })
+    // Trailing slash trimmed.
+    expect(fetchMock.mock.calls[1][1].headers['HTTP-Referer']).toBe(
+      'https://crm.example.com',
+    )
+  })
+
+  it('maps a 401 to an invalid_key AiError naming OpenRouter', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(errResponse(401, { error: { message: 'No auth' } })),
+    )
+    await expect(
+      generateReply({
+        config: config({ provider: 'openrouter' }),
+        systemPrompt: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_key', status: 401 })
+  })
+})
+
+describe('generateReply — Gemini', () => {
+  it('calls the OpenAI-compatible endpoint and parses the completion', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okResponse({
+        choices: [{ message: { content: 'Hola!' } }],
+        usage: { prompt_tokens: 7, completion_tokens: 2, total_tokens: 9 },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const res = await generateReply({
+      config: config({
+        provider: 'gemini',
+        apiKey: 'AIza-x',
+        model: 'gemini-2.5-flash',
+      }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hola' }],
+    })
+
+    expect(res.text).toBe('Hola!')
+    const [url, opts] = fetchMock.mock.calls[0]
+    expect(url).toContain('generativelanguage.googleapis.com')
+    expect(opts.headers.Authorization).toBe('Bearer AIza-x')
+  })
+
+  it('caps output with max_tokens, the only name Gemini honours', async () => {
+    // Gemini's compatibility layer silently ignores parameters it does
+    // not recognise, so sending OpenAI's `max_completion_tokens` here
+    // would uncap spend on the account's key instead of erroring.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okResponse({ choices: [{ message: { content: 'ok' } }] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await generateReply({
+      config: config({ provider: 'gemini' }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.max_tokens).toBeGreaterThan(0)
+    expect(body.max_completion_tokens).toBeUndefined()
+  })
+})
+
+describe('generateReply — unsupported provider', () => {
+  it('rejects a provider with no adapter instead of calling out', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      generateReply({
+        // Simulates a row written by a newer deployment than this code.
+        config: config({ provider: 'mistral' as never }),
+        systemPrompt: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
+    ).rejects.toMatchObject({ code: 'unsupported_provider', status: 400 })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})

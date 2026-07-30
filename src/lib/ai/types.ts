@@ -3,10 +3,35 @@
 //
 // One small provider-agnostic surface so the inbox draft route and the
 // inbound auto-reply bot both talk to `generateReply` without caring
-// whether the account is on OpenAI or Anthropic.
+// which vendor the account is on.
 // ============================================================
 
-export type AiProvider = 'openai' | 'anthropic'
+/**
+ * Vendors an account can point its own key at. `openrouter` is a broker
+ * that fronts hundreds of third-party models behind one key, so picking
+ * it makes `model` a namespaced id (`google/gemini-2.5-flash`); the rest
+ * take that vendor's own bare model names.
+ *
+ * Persisted as text in `ai_configs.provider` / `ai_usage_log.provider`
+ * — adding a value here needs a migration to widen their CHECK.
+ */
+export type AiProvider = 'openai' | 'anthropic' | 'openrouter' | 'gemini'
+
+/** Every provider, in the order the settings picker lists them. Single
+ *  source of truth for runtime validation of untrusted input. */
+export const AI_PROVIDERS: readonly AiProvider[] = [
+  'openai',
+  'anthropic',
+  'openrouter',
+  'gemini',
+] as const
+
+/** Type guard for request bodies / DB rows carrying an unvalidated provider. */
+export function isAiProvider(value: unknown): value is AiProvider {
+  return (
+    typeof value === 'string' && (AI_PROVIDERS as readonly string[]).includes(value)
+  )
+}
 
 /**
  * Account AI setup, decrypted and ready to use. Produced by
