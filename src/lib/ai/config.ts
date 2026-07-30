@@ -1,9 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decrypt } from '@/lib/whatsapp/encryption'
-import type { AiConfig } from './types'
+import type { AiConfig, AiProvider } from './types'
 
 interface AiConfigRow {
-  provider: 'openai' | 'anthropic'
+  // Sigue a `AiProvider`, no una copia literal: la fila se lee con un
+  // cast, así que un tipo más estrecho que la columna no daría error de
+  // compilación — mentiría en silencio sobre lo que puede venir de la BD.
+  provider: AiProvider
   model: string
   api_key: string
   system_prompt: string | null
