@@ -1,9 +1,9 @@
 ## 1. Base del catálogo
 
-- [ ] 1.1 Crear `messages/es.json` como copia exacta de `messages/en.json`, para que el test de paridad pase desde el primer commit y lo pendiente se vea como inglés en pantalla y no como una clave rota
-- [ ] 1.2 Definir `NEXT_PUBLIC_APP_LOCALE=es` en `.env` y documentarlo en `.env.local.example`
-- [ ] 1.3 Verificar que `npx vitest run src/i18n/` pasa
-- [ ] 1.4 Commit
+- [x] 1.1 Crear `messages/es.json` como copia exacta de `messages/en.json`, para que el test de paridad pase desde el primer commit y lo pendiente se vea como inglés en pantalla y no como una clave rota
+- [x] 1.2 Definir `NEXT_PUBLIC_APP_LOCALE=es` en `.env` y documentarlo en `.env.local.example`
+- [x] 1.3 Verificar que `npx vitest run src/i18n/` pasa
+- [x] 1.4 Commit
 
 ## 2. Traducción del armazón (104 claves)
 

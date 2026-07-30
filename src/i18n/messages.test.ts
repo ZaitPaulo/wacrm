@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -10,7 +10,15 @@ import { describe, expect, it } from 'vitest';
 
 const MESSAGES_DIR = join(process.cwd(), 'messages');
 const SOURCE_LOCALE = 'en';
-const TRANSLATED_LOCALES = ['ko'];
+
+// Discovered from disk rather than listed by hand: a hardcoded list
+// silently stops covering a locale the moment someone adds one, which is
+// exactly the gap this test exists to close.
+const TRANSLATED_LOCALES = readdirSync(MESSAGES_DIR)
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => f.replace(/\.json$/, ''))
+  .filter((locale) => locale !== SOURCE_LOCALE)
+  .sort();
 
 function loadKeys(locale: string): Set<string> {
   const raw = readFileSync(join(MESSAGES_DIR, `${locale}.json`), 'utf8');
