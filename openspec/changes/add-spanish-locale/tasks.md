@@ -24,11 +24,11 @@
 
 ## 4. Traducción de mensajería y automatización (481 claves)
 
-- [ ] 4.1 Traducir `Broadcasts` (149)
-- [ ] 4.2 Traducir `Automations` (152)
-- [ ] 4.3 Traducir `Flows` (180)
-- [ ] 4.4 Verificar paridad y revisar a ojo
-- [ ] 4.5 Commit
+- [x] 4.1 Traducir `Broadcasts` (149)
+- [x] 4.2 Traducir `Automations` (152)
+- [x] 4.3 Traducir `Flows` (180)
+- [x] 4.4 Verificar paridad y revisar a ojo
+- [x] 4.5 Commit
 
 ## 5. Traducción de ajustes (450 claves)
 
