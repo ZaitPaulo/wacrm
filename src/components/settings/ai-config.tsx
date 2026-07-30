@@ -38,6 +38,10 @@ const MASKED_KEY = '••••••••••••••••';
 // unassigned" choice gets a sentinel that maps to null in the payload.
 const HANDOFF_QUEUE = '__queue__';
 
+// Per-provider presentation. Typed as `Record<AiProvider, …>` on purpose:
+// adding a provider to the union breaks the build here until its label,
+// key placeholder and console URL are filled in, so the picker can't ship
+// with a blank entry.
 const PROVIDER_LABEL: Record<AiProvider, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic (Claude)',
@@ -45,6 +49,8 @@ const PROVIDER_LABEL: Record<AiProvider, string> = {
   gemini: 'Google Gemini',
 };
 
+// Key prefixes as each console issues them — the shape differs enough
+// between vendors to catch a key pasted into the wrong provider.
 const KEY_PLACEHOLDER: Record<AiProvider, string> = {
   openai: 'sk-...',
   anthropic: 'sk-ant-...',
