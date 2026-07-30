@@ -20,6 +20,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useCan } from '@/hooks/use-can';
 import { FileText, Upload, Trash2, Loader2, Download } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 const BUCKET = 'contact-documents';
 const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
@@ -27,12 +28,9 @@ const ALLOWED = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/we
 
 // Orden + etiquetas de las categorías (enum document_category, migración 502).
 const CATEGORY_ORDER: DocumentCategory[] = ['person', 'vehicle', 'purchase', 'sale'];
-const CATEGORY_LABELS: Record<DocumentCategory, string> = {
-  person: 'Persona',
-  vehicle: 'Vehículo',
-  purchase: 'Compra',
-  sale: 'Venta',
-};
+// Las etiquetas salen del catálogo por clave; acá solo queda el orden
+// en que se muestran las categorías.
+const CATEGORY_LABEL_KEY = (c: DocumentCategory) => `categories.${c}` as const;
 
 /** Las categorías distintas de "person" requieren asociar un vehículo. */
 function needsVehicle(category: DocumentCategory): boolean {
@@ -69,6 +67,7 @@ function vehicleLabel(v: { brand: string; model: string; year: number }): string
  * @param accountId Cuenta activa; requerido para subir (path account-scoped).
  */
 export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps) {
+  const t = useTranslations('Documents');
   const supabase = createClient();
   const canEdit = useCan('send-messages');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,10 +90,10 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
       .select('*, inventory_vehicles(brand, model, year)')
       .eq('contact_id', contactId)
       .order('created_at', { ascending: false });
-    if (error) toast.error('No se pudieron cargar los documentos');
+    if (error) toast.error(t('toasts.loadFailed'));
     else setDocuments(data ?? []);
     setLoading(false);
-  }, [contactId, supabase]);
+  }, [contactId, supabase, t]);
 
   useEffect(() => {
     fetchDocuments();
@@ -120,19 +119,19 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
 
   async function handleFile(file: File) {
     if (!contactId || !accountId) {
-      toast.error('No se pudo resolver el contacto o tu cuenta.');
+      toast.error(t('toasts.noContactOrAccount'));
       return;
     }
     if (needsVehicle(category) && !vehicleId) {
-      toast.error('Selecciona el vehículo para esta categoría.');
+      toast.error(t('toasts.pickVehicleForCategory'));
       return;
     }
     if (!ALLOWED.has(file.type)) {
-      toast.error('Solo se permiten archivos PDF o imágenes (PNG, JPG, WEBP).');
+      toast.error(t('toasts.invalidType'));
       return;
     }
     if (file.size > MEDIA_MAX_BYTES) {
-      toast.error('El archivo supera el límite de 16 MB.');
+      toast.error(t('toasts.tooLarge'));
       return;
     }
 
@@ -154,10 +153,10 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
         await deleteAccountMedia(BUCKET, path).catch(() => {});
         throw new Error(error.message);
       }
-      toast.success('Documento subido');
+      toast.success(t('toasts.uploaded'));
       await fetchDocuments();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo subir el documento');
+      toast.error(err instanceof Error ? err.message : t('toasts.uploadFailedDoc'));
     } finally {
       setUploading(false);
     }
@@ -169,14 +168,14 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
       .from(BUCKET)
       .createSignedUrl(doc.file_path, 60);
     if (error || !data) {
-      toast.error('No se pudo generar el enlace de descarga.');
+      toast.error(t('toasts.linkFailed'));
       return;
     }
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   }
 
   async function handleDelete(doc: DocumentRecord) {
-    if (!confirm(`¿Eliminar «${doc.file_name}»?`)) return;
+    if (!confirm(t('confirmDelete', { name: doc.file_name }))) return;
     setDeletingId(doc.id);
     try {
       const { error } = await supabase.from('documents').delete().eq('id', doc.id);
@@ -185,7 +184,7 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
       await deleteAccountMedia(BUCKET, doc.file_path).catch(() => {});
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo eliminar');
+      toast.error(err instanceof Error ? err.message : t('toasts.deleteFailed'));
     } finally {
       setDeletingId(null);
     }
@@ -199,7 +198,7 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
         <div className="border-border space-y-2 rounded-md border p-3">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-muted-foreground text-xs">Categoría</Label>
+              <Label className="text-muted-foreground text-xs">{t('upload.category')}</Label>
               <Select
                 value={category}
                 onValueChange={(v) => {
@@ -213,7 +212,7 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
                 <SelectContent>
                   {CATEGORY_ORDER.map((c) => (
                     <SelectItem key={c} value={c}>
-                      {CATEGORY_LABELS[c]}
+                      {t(CATEGORY_LABEL_KEY(c))}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -221,10 +220,10 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
             </div>
             {needsVehicle(category) && (
               <div className="space-y-1">
-                <Label className="text-muted-foreground text-xs">Vehículo</Label>
+                <Label className="text-muted-foreground text-xs">{t('upload.vehicle')}</Label>
                 <Select value={vehicleId} onValueChange={(v) => setVehicleId(v ?? '')}>
                   <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Selecciona…" />
+                    <SelectValue placeholder={t('upload.selectPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {vehicles.length === 0 ? (
@@ -280,7 +279,7 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
         </div>
       ) : documents.length === 0 ? (
         <p className="text-muted-foreground py-6 text-center text-sm">
-          Sin documentos todavía.
+          {t('empty')}
         </p>
       ) : (
         <div className="space-y-4">
@@ -288,7 +287,7 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
             (cat) => (
               <div key={cat} className="space-y-2">
                 <h4 className="text-muted-foreground text-xs font-medium uppercase">
-                  {CATEGORY_LABELS[cat]}
+                  {t(CATEGORY_LABEL_KEY(cat))}
                 </h4>
                 <ul className="space-y-2">
                   {documents
@@ -314,7 +313,7 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
                           type="button"
                           className="text-muted-foreground hover:text-foreground p-1"
                           onClick={() => openDocument(doc)}
-                          title="Abrir / descargar"
+                          title={t('actions.openOrDownload')}
                         >
                           <Download className="size-4" />
                         </button>
@@ -324,7 +323,7 @@ export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps
                             className="text-muted-foreground hover:text-destructive p-1 disabled:opacity-50"
                             disabled={deletingId === doc.id}
                             onClick={() => handleDelete(doc)}
-                            title="Eliminar"
+                            title={t('actions.delete')}
                           >
                             {deletingId === doc.id ? (
                               <Loader2 className="size-4 animate-spin" />

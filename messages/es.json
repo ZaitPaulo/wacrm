@@ -1685,6 +1685,34 @@
       "reindex": "Reindexar",
       "reindexTooltip": "Vuelve a indexar todos los documentos (por ejemplo, después de agregar una clave de embeddings)",
       "loading": "Cargando…"
+    },
+    "showcase": {
+      "title": "Vitrina pública",
+      "description": "Publica el inventario disponible de esta cuenta en la página principal.",
+      "enable": "Activar vitrina",
+      "enableHint": "La raíz del dominio mostrará tus vehículos disponibles.",
+      "whatsapp": "WhatsApp del CTA (con código de país)",
+      "whatsappPlaceholder": "573001234567",
+      "whatsappHint": "Solo números. El botón “Me interesa” de cada vehículo abre wa.me con este número.",
+      "businessTitle": "Información del negocio",
+      "businessHint": "Se muestra en el pie de página de la vitrina.",
+      "name": "Nombre comercial",
+      "namePlaceholder": "Autos del Valle",
+      "logo": "Logo",
+      "logoPlaceholder": "https://… o sube un archivo",
+      "phone": "Teléfono",
+      "email": "Email",
+      "emailPlaceholder": "ventas@negocio.com",
+      "address": "Dirección",
+      "addressPlaceholder": "Calle 123 #45-67, Ciudad",
+      "hours": "Horario de atención",
+      "hoursPlaceholder": "Lun–Sáb 8:00–18:00",
+      "save": "Guardar",
+      "logoUploadFailed": "No se pudo subir el logo",
+      "saved": "Vitrina actualizada",
+      "saveFailed": "No se pudo guardar",
+      "urlLabel": "URL de la vitrina:",
+      "upload": "Subir"
     }
   },
   "Inventory": {
@@ -1786,6 +1814,79 @@
       "saveFailed": "No se pudo guardar",
       "deleted": "Vehículo eliminado",
       "deleteFailed": "No se pudo eliminar"
+    }
+  },
+  "Documents": {
+    "title": "Documentos",
+    "empty": "Sin documentos todavía.",
+    "categories": {
+      "person": "Persona",
+      "vehicle": "Vehículo",
+      "purchase": "Compra",
+      "sale": "Venta"
+    },
+    "filters": {
+      "search": "Buscar",
+      "fileName": "Nombre del archivo…",
+      "category": "Buscar tipo…",
+      "contact": "Buscar persona…",
+      "vehicle": "Buscar vehículo…",
+      "brand": "Buscar marca…",
+      "plate": "Buscar placa…",
+      "clear": "Limpiar",
+      "all": "Todos"
+    },
+    "table": {
+      "file": "Archivo",
+      "category": "Categoría",
+      "contact": "Contacto",
+      "vehicle": "Vehículo",
+      "date": "Fecha",
+      "actions": "Acciones"
+    },
+    "actions": {
+      "view": "Ver documento",
+      "preview": "Visualizar",
+      "download": "Descargar",
+      "delete": "Eliminar",
+      "openOrDownload": "Abrir / descargar"
+    },
+    "upload": {
+      "dialogTitle": "Subir documento",
+      "category": "Categoría",
+      "vehicle": "Vehículo",
+      "contact": "Contacto",
+      "file": "Archivo",
+      "selectPlaceholder": "Selecciona…",
+      "searchContact": "Buscar contacto…",
+      "submit": "Subir"
+    },
+    "preview": {
+      "unsupported": "No se puede previsualizar este tipo de archivo.",
+      "download": "Descargar"
+    },
+    "toasts": {
+      "loadFailed": "No se pudieron cargar los documentos",
+      "noAccount": "No se pudo resolver tu cuenta.",
+      "noContactOrAccount": "No se pudo resolver el contacto o tu cuenta.",
+      "pickContact": "Selecciona el contacto.",
+      "pickVehicle": "Selecciona el vehículo.",
+      "pickVehicleForCategory": "Selecciona el vehículo para esta categoría.",
+      "pickFile": "Selecciona un archivo.",
+      "invalidType": "Solo se permiten archivos PDF o imágenes (PNG, JPG, WEBP).",
+      "tooLarge": "El archivo supera el límite de 16 MB.",
+      "uploaded": "Documento subido",
+      "uploadFailed": "No se pudo subir",
+      "uploadFailedDoc": "No se pudo subir el documento",
+      "linkFailed": "No se pudo generar el enlace de descarga.",
+      "previewFailed": "No se pudo generar la vista previa.",
+      "deleteFailed": "No se pudo eliminar"
+    },
+    "confirmDelete": "¿Eliminar «{name}»?",
+    "picker": {
+      "selectContact": "Selecciona contacto…",
+      "noResults": "Sin resultados.",
+      "searchPlaceholder": "Buscar…"
     }
   }
 }

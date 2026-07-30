@@ -1685,6 +1685,34 @@
       "reindex": "재색인",
       "reindexTooltip": "모든 문서를 다시 임베딩합니다 (예: 임베딩 키 추가 후)",
       "loading": "불러오는 중…"
+    },
+    "showcase": {
+      "title": "공개 쇼케이스",
+      "description": "이 계정의 판매 중인 재고를 사이트 첫 화면에 공개합니다.",
+      "enable": "쇼케이스 활성화",
+      "enableHint": "도메인 루트에 판매 중인 차량이 표시됩니다.",
+      "whatsapp": "CTA WhatsApp 번호 (국가번호 포함)",
+      "whatsappPlaceholder": "573001234567",
+      "whatsappHint": "숫자만 입력하세요. 각 차량의 “관심 있어요” 버튼이 이 번호로 wa.me를 엽니다.",
+      "businessTitle": "사업자 정보",
+      "businessHint": "쇼케이스 하단에 표시됩니다.",
+      "name": "상호명",
+      "namePlaceholder": "밸리 모터스",
+      "logo": "로고",
+      "logoPlaceholder": "https://… 또는 파일 업로드",
+      "phone": "전화번호",
+      "email": "이메일",
+      "emailPlaceholder": "sales@business.com",
+      "address": "주소",
+      "addressPlaceholder": "서울시 강남구 123",
+      "hours": "영업 시간",
+      "hoursPlaceholder": "월–토 8:00–18:00",
+      "save": "저장",
+      "logoUploadFailed": "로고를 업로드하지 못했습니다",
+      "saved": "쇼케이스가 업데이트되었습니다",
+      "saveFailed": "저장하지 못했습니다",
+      "urlLabel": "쇼케이스 URL:",
+      "upload": "업로드"
     }
   },
   "Inventory": {
@@ -1786,6 +1814,79 @@
       "saveFailed": "저장하지 못했습니다",
       "deleted": "차량이 삭제되었습니다",
       "deleteFailed": "삭제하지 못했습니다"
+    }
+  },
+  "Documents": {
+    "title": "문서",
+    "empty": "아직 문서가 없습니다.",
+    "categories": {
+      "person": "개인",
+      "vehicle": "차량",
+      "purchase": "구매",
+      "sale": "판매"
+    },
+    "filters": {
+      "search": "검색",
+      "fileName": "파일 이름…",
+      "category": "유형 검색…",
+      "contact": "사람 검색…",
+      "vehicle": "차량 검색…",
+      "brand": "제조사 검색…",
+      "plate": "번호판 검색…",
+      "clear": "초기화",
+      "all": "전체"
+    },
+    "table": {
+      "file": "파일",
+      "category": "분류",
+      "contact": "연락처",
+      "vehicle": "차량",
+      "date": "날짜",
+      "actions": "작업"
+    },
+    "actions": {
+      "view": "문서 보기",
+      "preview": "미리보기",
+      "download": "다운로드",
+      "delete": "삭제",
+      "openOrDownload": "열기 / 다운로드"
+    },
+    "upload": {
+      "dialogTitle": "문서 업로드",
+      "category": "분류",
+      "vehicle": "차량",
+      "contact": "연락처",
+      "file": "파일",
+      "selectPlaceholder": "선택하세요…",
+      "searchContact": "연락처 검색…",
+      "submit": "업로드"
+    },
+    "preview": {
+      "unsupported": "이 파일 형식은 미리 볼 수 없습니다.",
+      "download": "다운로드"
+    },
+    "toasts": {
+      "loadFailed": "문서를 불러오지 못했습니다",
+      "noAccount": "계정을 확인하지 못했습니다.",
+      "noContactOrAccount": "연락처 또는 계정을 확인하지 못했습니다.",
+      "pickContact": "연락처를 선택하세요.",
+      "pickVehicle": "차량을 선택하세요.",
+      "pickVehicleForCategory": "이 분류에 해당하는 차량을 선택하세요.",
+      "pickFile": "파일을 선택하세요.",
+      "invalidType": "PDF 또는 이미지(PNG, JPG, WEBP)만 허용됩니다.",
+      "tooLarge": "파일이 16MB 제한을 초과합니다.",
+      "uploaded": "문서를 업로드했습니다",
+      "uploadFailed": "업로드하지 못했습니다",
+      "uploadFailedDoc": "문서를 업로드하지 못했습니다",
+      "linkFailed": "다운로드 링크를 생성하지 못했습니다.",
+      "previewFailed": "미리보기를 생성하지 못했습니다.",
+      "deleteFailed": "삭제하지 못했습니다"
+    },
+    "confirmDelete": "\"{name}\"을(를) 삭제할까요?",
+    "picker": {
+      "selectContact": "연락처 선택…",
+      "noResults": "결과가 없습니다.",
+      "searchPlaceholder": "검색…"
     }
   }
 }

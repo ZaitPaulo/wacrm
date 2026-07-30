@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useCan } from '@/hooks/use-can';
 import { Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 /**
  * Ajustes de la vitrina pública (migraciones 503/505). Un admin activa
@@ -18,6 +19,7 @@ import { Loader2 } from 'lucide-react';
  * contactos, horario). Lee/guarda vía /api/account.
  */
 export function ShowcaseSettings() {
+  const t = useTranslations('Settings');
   const canEdit = useCan('edit-settings');
 
   const [enabled, setEnabled] = useState(false);
@@ -44,7 +46,7 @@ export function ShowcaseSettings() {
       const { publicUrl } = await uploadAccountMedia('showcase-media', file);
       setLogoUrl(publicUrl);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo subir el logo');
+      toast.error(err instanceof Error ? err.message : t('showcase.logoUploadFailed'));
     } finally {
       setUploadingLogo(false);
     }
@@ -93,9 +95,9 @@ export function ShowcaseSettings() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Error al guardar');
-      toast.success('Vitrina actualizada');
+      toast.success(t('showcase.saved'));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo guardar');
+      toast.error(err instanceof Error ? err.message : t('showcase.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -112,10 +114,9 @@ export function ShowcaseSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">Vitrina pública</h2>
+        <h2 className="text-lg font-semibold">{t('showcase.title')}</h2>
         <p className="text-muted-foreground text-sm">
-          Publica el inventario disponible de esta cuenta en la página principal
-          del sitio, con la información de tu negocio.
+          {t('showcase.description')}
         </p>
       </div>
 
@@ -123,32 +124,31 @@ export function ShowcaseSettings() {
       <div className="border-border space-y-4 rounded-lg border p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <Label>Activar vitrina</Label>
+            <Label>{t('showcase.enable')}</Label>
             <p className="text-muted-foreground text-xs">
-              La raíz del dominio mostrará tus vehículos disponibles.
+              {t('showcase.enableHint')}
             </p>
           </div>
           <Switch checked={enabled} onCheckedChange={setEnabled} disabled={!canEdit} />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="wa">WhatsApp del CTA (con código de país)</Label>
+          <Label htmlFor="wa">{t('showcase.whatsapp')}</Label>
           <Input
             id="wa"
             value={whatsapp}
             onChange={(e) => setWhatsapp(e.target.value)}
-            placeholder="573001234567"
+            placeholder={t('showcase.whatsappPlaceholder')}
             disabled={!canEdit}
           />
           <p className="text-muted-foreground text-xs">
-            Solo números. El botón “Me interesa” de cada vehículo abre wa.me con
-            este número.
+            {t('showcase.whatsappHint')}
           </p>
         </div>
 
         {enabled && origin && (
           <p className="text-sm">
-            URL de la vitrina:{' '}
+            {t('showcase.urlLabel')}{' '}
             <a
               href={origin}
               target="_blank"
@@ -164,25 +164,25 @@ export function ShowcaseSettings() {
       {/* Información del negocio (footer) */}
       <div className="border-border space-y-4 rounded-lg border p-4">
         <div>
-          <h3 className="font-medium">Información del negocio</h3>
+          <h3 className="font-medium">{t('showcase.businessTitle')}</h3>
           <p className="text-muted-foreground text-xs">
-            Se muestra en el pie de página de la vitrina.
+            {t('showcase.businessHint')}
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="pname">Nombre comercial</Label>
+            <Label htmlFor="pname">{t('showcase.name')}</Label>
             <Input
               id="pname"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Autos del Valle"
+              placeholder={t('showcase.namePlaceholder')}
               disabled={!canEdit}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="plogo">Logo</Label>
+            <Label htmlFor="plogo">{t('showcase.logo')}</Label>
             <div className="flex items-center gap-2">
               {logoUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -192,7 +192,7 @@ export function ShowcaseSettings() {
                 id="plogo"
                 value={logoUrl}
                 onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://… o sube un archivo"
+                placeholder={t('showcase.logoPlaceholder')}
                 disabled={!canEdit}
               />
               {canEdit && (
@@ -203,7 +203,7 @@ export function ShowcaseSettings() {
                   disabled={uploadingLogo}
                   onClick={() => logoInputRef.current?.click()}
                 >
-                  {uploadingLogo ? <Loader2 className="size-4 animate-spin" /> : 'Subir'}
+                  {uploadingLogo ? <Loader2 className="size-4 animate-spin" /> : t('showcase.upload')}
                 </Button>
               )}
             </div>
@@ -216,7 +216,7 @@ export function ShowcaseSettings() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="pphone">Teléfono</Label>
+            <Label htmlFor="pphone">{t('showcase.phone')}</Label>
             <Input
               id="pphone"
               value={phone}
@@ -226,34 +226,34 @@ export function ShowcaseSettings() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="pemail">Email</Label>
+            <Label htmlFor="pemail">{t('showcase.email')}</Label>
             <Input
               id="pemail"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="ventas@negocio.com"
+              placeholder={t('showcase.emailPlaceholder')}
               disabled={!canEdit}
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="paddr">Dirección</Label>
+            <Label htmlFor="paddr">{t('showcase.address')}</Label>
             <Textarea
               id="paddr"
               rows={2}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Calle 123 #45-67, Ciudad"
+              placeholder={t('showcase.addressPlaceholder')}
               disabled={!canEdit}
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="phours">Horario de atención</Label>
+            <Label htmlFor="phours">{t('showcase.hours')}</Label>
             <Textarea
               id="phours"
               rows={2}
               value={hours}
               onChange={(e) => setHours(e.target.value)}
-              placeholder="Lun–Sáb 8:00–18:00"
+              placeholder={t('showcase.hoursPlaceholder')}
               disabled={!canEdit}
             />
           </div>
@@ -263,7 +263,7 @@ export function ShowcaseSettings() {
       {canEdit && (
         <Button onClick={save} disabled={saving}>
           {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-          Guardar
+          {t('showcase.save')}
         </Button>
       )}
     </div>

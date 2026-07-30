@@ -1685,6 +1685,34 @@
       "reindex": "Reindex",
       "reindexTooltip": "Re-embed all documents (e.g. after adding an embeddings key)",
       "loading": "Loading…"
+    },
+    "showcase": {
+      "title": "Public showcase",
+      "description": "Publish this account's available inventory on the site's front page.",
+      "enable": "Enable showcase",
+      "enableHint": "The domain root will show your available vehicles.",
+      "whatsapp": "CTA WhatsApp number (with country code)",
+      "whatsappPlaceholder": "573001234567",
+      "whatsappHint": "Digits only. Each vehicle's \"I'm interested\" button opens wa.me with this number.",
+      "businessTitle": "Business details",
+      "businessHint": "Shown in the showcase footer.",
+      "name": "Trading name",
+      "namePlaceholder": "Valley Motors",
+      "logo": "Logo",
+      "logoPlaceholder": "https://… or upload a file",
+      "phone": "Phone",
+      "email": "Email",
+      "emailPlaceholder": "sales@business.com",
+      "address": "Address",
+      "addressPlaceholder": "123 Main St, City",
+      "hours": "Opening hours",
+      "hoursPlaceholder": "Mon–Sat 8:00–18:00",
+      "save": "Save",
+      "logoUploadFailed": "Couldn't upload the logo",
+      "saved": "Showcase updated",
+      "saveFailed": "Couldn't save",
+      "urlLabel": "Showcase URL:",
+      "upload": "Upload"
     }
   },
   "Inventory": {
@@ -1786,6 +1814,79 @@
       "saveFailed": "Couldn't save",
       "deleted": "Vehicle deleted",
       "deleteFailed": "Couldn't delete"
+    }
+  },
+  "Documents": {
+    "title": "Documents",
+    "empty": "No documents yet.",
+    "categories": {
+      "person": "Person",
+      "vehicle": "Vehicle",
+      "purchase": "Purchase",
+      "sale": "Sale"
+    },
+    "filters": {
+      "search": "Search",
+      "fileName": "File name…",
+      "category": "Search type…",
+      "contact": "Search person…",
+      "vehicle": "Search vehicle…",
+      "brand": "Search brand…",
+      "plate": "Search plate…",
+      "clear": "Clear",
+      "all": "All"
+    },
+    "table": {
+      "file": "File",
+      "category": "Category",
+      "contact": "Contact",
+      "vehicle": "Vehicle",
+      "date": "Date",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view": "View document",
+      "preview": "Preview",
+      "download": "Download",
+      "delete": "Delete",
+      "openOrDownload": "Open / download"
+    },
+    "upload": {
+      "dialogTitle": "Upload document",
+      "category": "Category",
+      "vehicle": "Vehicle",
+      "contact": "Contact",
+      "file": "File",
+      "selectPlaceholder": "Select…",
+      "searchContact": "Search contact…",
+      "submit": "Upload"
+    },
+    "preview": {
+      "unsupported": "This file type can't be previewed.",
+      "download": "Download"
+    },
+    "toasts": {
+      "loadFailed": "Couldn't load the documents",
+      "noAccount": "Couldn't resolve your account.",
+      "noContactOrAccount": "Couldn't resolve the contact or your account.",
+      "pickContact": "Pick the contact.",
+      "pickVehicle": "Pick the vehicle.",
+      "pickVehicleForCategory": "Pick the vehicle for this category.",
+      "pickFile": "Pick a file.",
+      "invalidType": "Only PDFs or images (PNG, JPG, WEBP) are allowed.",
+      "tooLarge": "The file is over the 16 MB limit.",
+      "uploaded": "Document uploaded",
+      "uploadFailed": "Couldn't upload",
+      "uploadFailedDoc": "Couldn't upload the document",
+      "linkFailed": "Couldn't generate the download link.",
+      "previewFailed": "Couldn't generate the preview.",
+      "deleteFailed": "Couldn't delete"
+    },
+    "confirmDelete": "Delete \"{name}\"?",
+    "picker": {
+      "selectContact": "Select contact…",
+      "noResults": "No results.",
+      "searchPlaceholder": "Search…"
     }
   }
 }

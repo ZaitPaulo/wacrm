@@ -217,7 +217,7 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();

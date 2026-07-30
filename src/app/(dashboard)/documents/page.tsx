@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { useCan } from '@/hooks/use-can';
+import { useTranslations } from 'next-intl';
 import type {
   DocumentRecord,
   DocumentCategory,
@@ -62,12 +63,8 @@ import {
 } from 'lucide-react';
 
 const CATEGORY_ORDER: DocumentCategory[] = ['person', 'vehicle', 'purchase', 'sale'];
-const CATEGORY_LABELS: Record<DocumentCategory, string> = {
-  person: 'Persona',
-  vehicle: 'Vehículo',
-  purchase: 'Compra',
-  sale: 'Venta',
-};
+// Las etiquetas salen del catálogo por clave; acá solo queda el orden.
+const CATEGORY_LABEL_KEY = (c: DocumentCategory) => `categories.${c}` as const;
 const CATEGORY_VARIANT: Record<
   DocumentCategory,
   'default' | 'secondary' | 'outline'
@@ -111,6 +108,7 @@ function ContactPicker({
   label: string;
   onSelect: (id: string, label: string) => void;
 }) {
+  const t = useTranslations('Documents');
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -142,7 +140,7 @@ function ContactPicker({
           <Button variant="outline" className="w-full justify-start font-normal" />
         }
       >
-        <span className="truncate">{label || 'Selecciona contacto…'}</span>
+        <span className="truncate">{label || t('picker.selectContact')}</span>
         <ChevronsUpDown className="ml-auto size-4 shrink-0 opacity-50" />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-0">
@@ -152,14 +150,14 @@ function ContactPicker({
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar contacto…"
+            placeholder={t('upload.searchContact')}
             className="placeholder:text-muted-foreground flex-1 bg-transparent text-sm outline-none"
           />
         </div>
         <div className="max-h-64 overflow-y-auto py-1">
           {results.length === 0 ? (
             <p className="text-muted-foreground px-3 py-4 text-center text-sm">
-              Sin resultados.
+              {t('picker.noResults')}
             </p>
           ) : (
             results.map((c) => (
@@ -288,6 +286,7 @@ function SearchableFilter({
  * URL, bucket privado) y borrar. Escritura para roles agent+.
  */
 export default function DocumentsPage() {
+  const t = useTranslations('Documents');
   const supabase = createClient();
   const { accountId } = useAuth();
   const canEdit = useCan('send-messages');
@@ -327,10 +326,10 @@ export default function DocumentsPage() {
       )
       .order('created_at', { ascending: false })
       .limit(500);
-    if (error) toast.error('No se pudieron cargar los documentos');
+    if (error) toast.error(t('toasts.loadFailed'));
     else setDocuments(data ?? []);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, t]);
 
   useEffect(() => {
     load();
@@ -364,27 +363,27 @@ export default function DocumentsPage() {
 
   async function doUpload() {
     if (!accountId) {
-      toast.error('No se pudo resolver tu cuenta.');
+      toast.error(t('toasts.noAccount'));
       return;
     }
     if (needsContact(category) && !contactId) {
-      toast.error('Selecciona el contacto.');
+      toast.error(t('toasts.pickContact'));
       return;
     }
     if (needsVehicle(category) && !vehicleId) {
-      toast.error('Selecciona el vehículo.');
+      toast.error(t('toasts.pickVehicle'));
       return;
     }
     if (!pendingFile) {
-      toast.error('Selecciona un archivo.');
+      toast.error(t('toasts.pickFile'));
       return;
     }
     if (!ALLOWED.has(pendingFile.type)) {
-      toast.error('Solo se permiten PDF o imágenes (PNG, JPG, WEBP).');
+      toast.error(t('toasts.invalidType'));
       return;
     }
     if (pendingFile.size > MEDIA_MAX_BYTES) {
-      toast.error('El archivo supera el límite de 16 MB.');
+      toast.error(t('toasts.tooLarge'));
       return;
     }
 
@@ -405,11 +404,11 @@ export default function DocumentsPage() {
         await deleteAccountMedia('contact-documents', path).catch(() => {});
         throw new Error(error.message);
       }
-      toast.success('Documento subido');
+      toast.success(t('toasts.uploaded'));
       setDialogOpen(false);
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo subir');
+      toast.error(err instanceof Error ? err.message : t('toasts.uploadFailed'));
     } finally {
       setUploading(false);
     }
@@ -420,7 +419,7 @@ export default function DocumentsPage() {
       .from('contact-documents')
       .createSignedUrl(doc.file_path, 60);
     if (error || !data) {
-      toast.error('No se pudo generar el enlace de descarga.');
+      toast.error(t('toasts.linkFailed'));
       return;
     }
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
@@ -435,7 +434,7 @@ export default function DocumentsPage() {
       .from('contact-documents')
       .createSignedUrl(doc.file_path, 300);
     if (error || !data) {
-      toast.error('No se pudo generar la vista previa.');
+      toast.error(t('toasts.previewFailed'));
       setViewerDoc(null);
       return;
     }
@@ -443,7 +442,7 @@ export default function DocumentsPage() {
   }
 
   async function remove(doc: DocumentRecord) {
-    if (!confirm(`¿Eliminar «${doc.file_name}»?`)) return;
+    if (!confirm(t('confirmDelete', { name: doc.file_name }))) return;
     setDeletingId(doc.id);
     try {
       const { error } = await supabase.from('documents').delete().eq('id', doc.id);
@@ -451,7 +450,7 @@ export default function DocumentsPage() {
       await deleteAccountMedia('contact-documents', doc.file_path).catch(() => {});
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo eliminar');
+      toast.error(err instanceof Error ? err.message : t('toasts.deleteFailed'));
     } finally {
       setDeletingId(null);
     }
@@ -493,7 +492,7 @@ export default function DocumentsPage() {
 
   const categoryOptions = CATEGORY_ORDER.map((c) => ({
     value: c,
-    label: CATEGORY_LABELS[c],
+    label: t(CATEGORY_LABEL_KEY(c)),
   }));
 
   const filtered = documents.filter((d) => {
@@ -530,7 +529,7 @@ export default function DocumentsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FileText className="h-6 w-6" />
-          <h1 className="text-2xl font-semibold">Documentos</h1>
+          <h1 className="text-2xl font-semibold">{t('title')}</h1>
           <span className="text-muted-foreground text-sm">
             {filtered.length} de {documents.length}
           </span>
@@ -546,13 +545,13 @@ export default function DocumentsPage() {
       {/* Filtros — cada uno con su etiqueta de título */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
-          <Label className="text-muted-foreground text-xs">Buscar</Label>
+          <Label className="text-muted-foreground text-xs">{t('filters.search')}</Label>
           <div className="relative">
             <Search className="text-muted-foreground absolute left-2 top-1/2 size-4 -translate-y-1/2" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Nombre del archivo…"
+              placeholder={t('filters.fileName')}
               className="w-56 pl-8"
             />
           </div>
@@ -563,7 +562,7 @@ export default function DocumentsPage() {
           onChange={setFilterCategory}
           options={categoryOptions}
           allLabel="Todos"
-          placeholder="Buscar tipo…"
+          placeholder={t('filters.category')}
         />
         <SearchableFilter
           label="Persona"
@@ -571,7 +570,7 @@ export default function DocumentsPage() {
           onChange={setFilterContactId}
           options={contactOptions}
           allLabel="Todas"
-          placeholder="Buscar persona…"
+          placeholder={t('filters.contact')}
         />
         <SearchableFilter
           label="Vehículo"
@@ -579,7 +578,7 @@ export default function DocumentsPage() {
           onChange={setFilterVehicleId}
           options={vehicleOptions}
           allLabel="Todos"
-          placeholder="Buscar vehículo…"
+          placeholder={t('filters.vehicle')}
         />
         <SearchableFilter
           label="Marca"
@@ -587,7 +586,7 @@ export default function DocumentsPage() {
           onChange={setFilterBrand}
           options={brandOptions}
           allLabel="Todas"
-          placeholder="Buscar marca…"
+          placeholder={t('filters.brand')}
         />
         <SearchableFilter
           label="Placa"
@@ -595,12 +594,12 @@ export default function DocumentsPage() {
           onChange={setFilterPlate}
           options={plateOptions}
           allLabel="Todas"
-          placeholder="Buscar placa…"
+          placeholder={t('filters.plate')}
         />
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             <X className="mr-1 size-4" />
-            Limpiar
+            {t('filters.clear')}
           </Button>
         )}
       </div>
@@ -609,12 +608,12 @@ export default function DocumentsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Archivo</TableHead>
-              <TableHead>Categoría</TableHead>
-              <TableHead>Contacto</TableHead>
-              <TableHead>Vehículo</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead className="w-28 text-right">Acciones</TableHead>
+              <TableHead>{t('table.file')}</TableHead>
+              <TableHead>{t('table.category')}</TableHead>
+              <TableHead>{t('table.contact')}</TableHead>
+              <TableHead>{t('table.vehicle')}</TableHead>
+              <TableHead>{t('table.date')}</TableHead>
+              <TableHead className="w-28 text-right">{t('table.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -635,14 +634,14 @@ export default function DocumentsPage() {
                 <TableRow key={doc.id}>
                   <TableCell
                     className="hover:text-primary max-w-xs cursor-pointer truncate font-medium"
-                    title="Ver documento"
+                    title={t('actions.view')}
                     onClick={() => openViewer(doc)}
                   >
                     {doc.file_name}
                   </TableCell>
                   <TableCell>
                     <Badge variant={CATEGORY_VARIANT[doc.category]}>
-                      {CATEGORY_LABELS[doc.category]}
+                      {t(CATEGORY_LABEL_KEY(doc.category))}
                     </Badge>
                   </TableCell>
                   <TableCell>{doc.contacts ? contactLabel(doc.contacts) : '—'}</TableCell>
@@ -657,7 +656,7 @@ export default function DocumentsPage() {
                       type="button"
                       className="text-muted-foreground hover:text-foreground p-1"
                       onClick={() => openViewer(doc)}
-                      title="Visualizar"
+                      title={t('actions.preview')}
                     >
                       <Eye className="size-4" />
                     </button>
@@ -665,7 +664,7 @@ export default function DocumentsPage() {
                       type="button"
                       className="text-muted-foreground hover:text-foreground ml-1 p-1"
                       onClick={() => openDocument(doc)}
-                      title="Descargar"
+                      title={t('actions.download')}
                     >
                       <Download className="size-4" />
                     </button>
@@ -675,7 +674,7 @@ export default function DocumentsPage() {
                         className="text-muted-foreground hover:text-destructive ml-1 p-1 disabled:opacity-50"
                         disabled={deletingId === doc.id}
                         onClick={() => remove(doc)}
-                        title="Eliminar"
+                        title={t('actions.delete')}
                       >
                         {deletingId === doc.id ? (
                           <Loader2 className="size-4 animate-spin" />
@@ -696,7 +695,7 @@ export default function DocumentsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Subir documento</DialogTitle>
+            <DialogTitle>{t('upload.dialogTitle')}</DialogTitle>
             <DialogDescription>
               Clasifica el documento y asócialo al contacto y/o vehículo del proceso.
             </DialogDescription>
@@ -704,7 +703,7 @@ export default function DocumentsPage() {
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Categoría</Label>
+              <Label>{t('upload.category')}</Label>
               <Select
                 value={category}
                 onValueChange={(v) => {
@@ -719,7 +718,7 @@ export default function DocumentsPage() {
                 <SelectContent>
                   {CATEGORY_ORDER.map((c) => (
                     <SelectItem key={c} value={c}>
-                      {CATEGORY_LABELS[c]}
+                      {t(CATEGORY_LABEL_KEY(c))}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -745,7 +744,7 @@ export default function DocumentsPage() {
                 </Label>
                 <Select value={vehicleId} onValueChange={(v) => setVehicleId(v ?? '')}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecciona…" />
+                    <SelectValue placeholder={t('upload.selectPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {vehicles.length === 0 ? (
@@ -765,7 +764,7 @@ export default function DocumentsPage() {
             )}
 
             <div className="space-y-1.5">
-              <Label>Archivo</Label>
+              <Label>{t('upload.file')}</Label>
               <Input
                 type="file"
                 accept={ACCEPT}
@@ -783,7 +782,7 @@ export default function DocumentsPage() {
             </Button>
             <Button onClick={doUpload} disabled={uploading}>
               {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Subir
+              {t('upload.submit')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -823,7 +822,7 @@ export default function DocumentsPage() {
               />
             ) : (
               <p className="text-muted-foreground py-10 text-center text-sm">
-                No se puede previsualizar este tipo de archivo.
+                {t('preview.unsupported')}
               </p>
             )}
           </div>
@@ -833,7 +832,7 @@ export default function DocumentsPage() {
               onClick={() => viewerDoc && openDocument(viewerDoc)}
             >
               <Download className="mr-2 size-4" />
-              Descargar
+              {t('preview.download')}
             </Button>
           </DialogFooter>
         </DialogContent>
