@@ -8,6 +8,9 @@ const h = vi.hoisted(() => ({
   retrieveKnowledge: vi.fn(),
   generateReply: vi.fn(),
   engineSendText: vi.fn(),
+  delay: vi.fn(),
+  hasNewerCustomerMessage: vi.fn(),
+  hasOutboundSince: vi.fn(),
   state: {
     conv: null as Record<string, unknown> | null,
     autoResponders: [] as { id: string }[],
@@ -22,6 +25,11 @@ vi.mock('./context', () => ({ buildConversationContext: h.buildConversationConte
 vi.mock('./knowledge', () => ({ retrieveKnowledge: h.retrieveKnowledge }))
 vi.mock('./generate', () => ({ generateReply: h.generateReply }))
 vi.mock('@/lib/flows/meta-send', () => ({ engineSendText: h.engineSendText }))
+vi.mock('./reply-window', () => ({
+  delay: h.delay,
+  hasNewerCustomerMessage: h.hasNewerCustomerMessage,
+  hasOutboundSince: h.hasOutboundSince,
+}))
 vi.mock('./admin-client', () => ({
   supabaseAdmin: () => ({
     from: (table: string) => {
@@ -64,6 +72,8 @@ const ARGS = {
   conversationId: 'conv-1',
   contactId: 'contact-1',
   configOwnerUserId: 'user-1',
+  inboundMessageId: 'msg-2',
+  inboundCreatedAt: '2026-07-30T20:12:33.000Z',
 }
 
 function aiConfig(overrides: Partial<AiConfig> = {}): AiConfig {
@@ -96,6 +106,10 @@ beforeEach(() => {
   h.retrieveKnowledge.mockResolvedValue([])
   h.generateReply.mockResolvedValue({ text: 'Hello!', handoff: false })
   h.engineSendText.mockResolvedValue({ whatsapp_message_id: 'm1' })
+  h.delay.mockResolvedValue(undefined)
+  // Default: nothing else happened while we waited.
+  h.hasNewerCustomerMessage.mockResolvedValue(false)
+  h.hasOutboundSince.mockResolvedValue(false)
 })
 
 describe('dispatchInboundToAiReply — eligibility gates', () => {
@@ -120,11 +134,15 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     expect(systemPrompt).toContain('Returns accepted within 30 days.')
   })
 
-  it('stands down when an active message-level automation exists', async () => {
+  it('replies even when an active message-level automation exists', async () => {
+    // Used to be the opposite: the mere existence of an active
+    // keyword_match automation silenced the LLM account-wide, so an
+    // automation that only tagged the contact left the customer with no
+    // answer at all. What silences the LLM now is an actual outbound.
     h.state.autoResponders = [{ id: 'auto-1' }]
     await dispatchInboundToAiReply(ARGS)
-    expect(h.generateReply).not.toHaveBeenCalled()
-    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.generateReply).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
   })
 
   it('does not send when the atomic slot claim loses the race', async () => {
@@ -191,7 +209,10 @@ describe('dispatchInboundToAiReply — handoff', () => {
     h.generateReply.mockResolvedValue({ text: '', handoff: true })
     await dispatchInboundToAiReply(ARGS)
     expect(h.engineSendText).not.toHaveBeenCalled()
-    expect(h.state.rpcCalls).toHaveLength(0)
+    // The slot is claimed before generating now, so a handoff burns one.
+    // Harmless: handoff sets ai_autoreply_disabled, so the thread won't
+    // auto-reply again regardless of the remaining count.
+    expect(h.state.rpcCalls).toHaveLength(1)
     expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
     expect(h.state.updatePayload?.ai_handoff_summary).toContain(
       'AI agent handed off',
@@ -208,5 +229,72 @@ describe('dispatchInboundToAiReply — handoff', () => {
       ai_autoreply_disabled: true,
       assigned_agent_id: 'agent-7',
     })
+  })
+})
+
+describe('dispatchInboundToAiReply — reply window', () => {
+  it('stands down when a newer customer message arrived, without spending tokens', async () => {
+    h.hasNewerCustomerMessage.mockResolvedValue(true)
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).not.toHaveBeenCalled()
+    expect(h.engineSendText).not.toHaveBeenCalled()
+  })
+
+  it('stands down when something already replied to the customer', async () => {
+    // Covers an automation, a Flow or a human agent alike — the query
+    // behind this doesn't ask who sent it.
+    h.hasOutboundSince.mockResolvedValue(true)
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).not.toHaveBeenCalled()
+    expect(h.engineSendText).not.toHaveBeenCalled()
+  })
+
+  it('waits for the debounce window before reading the transcript', async () => {
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.delay).toHaveBeenCalledWith(8000)
+    // Order matters: waiting after building the context would model the
+    // burst as it looked before the customer finished typing.
+    expect(h.delay.mock.invocationCallOrder[0]).toBeLessThan(
+      h.buildConversationContext.mock.invocationCallOrder[0],
+    )
+  })
+
+  it('checks the window against the message that triggered it', async () => {
+    await dispatchInboundToAiReply(ARGS)
+
+    for (const fn of [h.hasNewerCustomerMessage, h.hasOutboundSince]) {
+      expect(fn).toHaveBeenCalledWith(expect.anything(), 'conv-1', {
+        id: 'msg-2',
+        createdAt: '2026-07-30T20:12:33.000Z',
+      })
+    }
+  })
+
+  it('skips the wait entirely when the gates already rule the reply out', async () => {
+    h.state.conv = {
+      assigned_agent_id: 'agent-1',
+      ai_autoreply_disabled: false,
+      ai_reply_count: 0,
+    }
+
+    await dispatchInboundToAiReply(ARGS)
+
+    // Holding the webhook invocation open for 8s on a dispatch that was
+    // never going to reply is pure waste.
+    expect(h.delay).not.toHaveBeenCalled()
+  })
+
+  it('claims the cap slot before spending tokens', async () => {
+    h.state.claim = false
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.rpcCalls.map((c) => c.name)).toContain('claim_ai_reply_slot')
+    expect(h.generateReply).not.toHaveBeenCalled()
   })
 })

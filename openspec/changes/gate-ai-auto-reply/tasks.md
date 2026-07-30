@@ -19,25 +19,25 @@
 
 ## 3. Compuerta en el auto-reply
 
-- [ ] 3.1 Añadir a `src/lib/ai/auto-reply.test.ts` los mocks de `./reply-window` y los casos: se cancela ante un mensaje más nuevo sin invocar al proveedor; se cancela si ya salió una respuesta; responde cuando una automatización corrió pero no envió nada; la espera ocurre antes de construir el contexto; sin cupo no se invoca al proveedor
-- [ ] 3.2 Verificar que los tests nuevos fallan
-- [ ] 3.3 Extender `DispatchArgs` en `src/lib/ai/auto-reply.ts` con `inboundMessageId` e `inboundCreatedAt`
-- [ ] 3.4 Eliminar la consulta a `automations` y su `return` (el gate por existencia que apagaba la IA en toda la cuenta)
-- [ ] 3.5 Insertar `await delay(aiReplyDebounceMs())` después de los gates baratos y antes de construir el contexto, para que el transcript incluya toda la ráfaga
-- [ ] 3.6 Añadir los dos guards: `hasNewerCustomerMessage` y `hasOutboundSince`, ambos con `return` silencioso
-- [ ] 3.7 Mover el bloque de `claim_ai_reply_slot` para que corra antes de `generateReply`, y actualizar su comentario explicando el nuevo orden y la contrapartida (un fallo de generación quema un cupo)
-- [ ] 3.8 Actualizar los tests preexistentes que asumían el gate de automatizaciones: ese comportamiento se eliminó a propósito
-- [ ] 3.9 Verificar que toda la suite de `src/lib/ai/` pasa
-- [ ] 3.10 Commit
+- [x] 3.1 Añadir a `src/lib/ai/auto-reply.test.ts` los mocks de `./reply-window` y los casos: se cancela ante un mensaje más nuevo sin invocar al proveedor; se cancela si ya salió una respuesta; responde cuando una automatización corrió pero no envió nada; la espera ocurre antes de construir el contexto; sin cupo no se invoca al proveedor
+- [x] 3.2 Verificar que los tests nuevos fallan
+- [x] 3.3 Extender `DispatchArgs` en `src/lib/ai/auto-reply.ts` con `inboundMessageId` e `inboundCreatedAt`
+- [x] 3.4 Eliminar la consulta a `automations` y su `return` (el gate por existencia que apagaba la IA en toda la cuenta)
+- [x] 3.5 Insertar `await delay(aiReplyDebounceMs())` después de los gates baratos y antes de construir el contexto, para que el transcript incluya toda la ráfaga
+- [x] 3.6 Añadir los dos guards: `hasNewerCustomerMessage` y `hasOutboundSince`, ambos con `return` silencioso
+- [x] 3.7 Mover el bloque de `claim_ai_reply_slot` para que corra antes de `generateReply`, y actualizar su comentario explicando el nuevo orden y la contrapartida (un fallo de generación quema un cupo)
+- [x] 3.8 Actualizar los tests preexistentes que asumían el gate de automatizaciones: ese comportamiento se eliminó a propósito
+- [x] 3.9 Verificar que toda la suite de `src/lib/ai/` pasa
+- [x] 3.10 Commit
 
 ## 4. Propagación desde el webhook
 
-- [ ] 4.1 En `src/app/api/whatsapp/webhook/route.ts`, hacer que el insert del mensaje entrante devuelva la fila con `.select('id, created_at').single()` (hoy la descarta), conservando intactos todos los campos insertados
-- [ ] 4.2 Pasar `inboundMessageId` e `inboundCreatedAt` en la llamada a `dispatchInboundToAiReply`, y exigir que la fila insertada exista en la condición de guarda
-- [ ] 4.3 Verificar tipos con `npx tsc --noEmit`
-- [ ] 4.4 Verificar el build con `npm run build`
-- [ ] 4.5 Correr la suite completa; deben pasar todos salvo los 5 fallos ambientales preexistentes de `currency.test.ts` y `date-utils.test.ts`, que dependen de la zona horaria `America/Bogota` y el locale `es-CO`
-- [ ] 4.6 Commit
+- [x] 4.1 En `src/app/api/whatsapp/webhook/route.ts`, hacer que el insert del mensaje entrante devuelva la fila con `.select('id, created_at').single()` (hoy la descarta), conservando intactos todos los campos insertados
+- [x] 4.2 Pasar `inboundMessageId` e `inboundCreatedAt` en la llamada a `dispatchInboundToAiReply`, y exigir que la fila insertada exista en la condición de guarda
+- [x] 4.3 Verificar tipos con `npx tsc --noEmit`
+- [x] 4.4 Verificar el build con `npm run build`
+- [x] 4.5 Correr la suite completa; deben pasar todos salvo los 5 fallos ambientales preexistentes de `currency.test.ts` y `date-utils.test.ts`, que dependen de la zona horaria `America/Bogota` y el locale `es-CO`
+- [x] 4.6 Commit
 
 ## 5. Verificación contra WhatsApp real
 
