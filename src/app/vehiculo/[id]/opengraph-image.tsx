@@ -41,6 +41,11 @@ export default async function OgImage({ params }: Params) {
   const { account, vehicle: v } = data
   const name = account.public_name?.trim() || account.name
   const photo = v.images?.[0]
+  // Satori (next/og) exige `display: flex` en cualquier div con más de un
+  // hijo. Interpolar varias expresiones en una línea genera un nodo de
+  // texto por cada una, así que se arman aquí como cadena única.
+  const title = `${v.brand} ${v.model} ${v.year}`
+  const price = `$${formatPrice(v.price)}`
 
   return new ImageResponse(
     (
@@ -72,12 +77,12 @@ export default async function OgImage({ params }: Params) {
           <div
             style={{ fontSize: 58, fontWeight: 800, marginTop: 16, lineHeight: 1.1 }}
           >
-            {v.brand} {v.model} {v.year}
+            {title}
           </div>
           <div
             style={{ fontSize: 56, fontWeight: 800, marginTop: 24, color: '#4ade80' }}
           >
-            ${formatPrice(v.price)}
+            {price}
           </div>
         </div>
       </div>

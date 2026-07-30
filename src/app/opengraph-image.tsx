@@ -13,6 +13,12 @@ export default async function OgImage() {
     ? data.account.public_name?.trim() || data.account.name
     : 'Vitrina'
   const count = data?.vehicles.length ?? 0
+  // Satori (next/og) exige `display: flex` en cualquier div con más de un
+  // hijo, y una interpolación como `{count} vehículo{...}` genera varios
+  // nodos de texto. Precalcular la frase la deja como un único hijo.
+  const availability = `${count} vehículo${count === 1 ? '' : 's'} disponible${
+    count === 1 ? '' : 's'
+  }`
 
   return new ImageResponse(
     (
@@ -43,7 +49,7 @@ export default async function OgImage() {
           Encuentra tu próximo vehículo
         </div>
         <div style={{ fontSize: 34, opacity: 0.85, marginTop: 28 }}>
-          {count} vehículo{count === 1 ? '' : 's'} disponible{count === 1 ? '' : 's'}
+          {availability}
         </div>
       </div>
     ),
