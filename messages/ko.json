@@ -1686,5 +1686,106 @@
       "reindexTooltip": "모든 문서를 다시 임베딩합니다 (예: 임베딩 키 추가 후)",
       "loading": "불러오는 중…"
     }
+  },
+  "Inventory": {
+    "title": "재고",
+    "vehicleCount": "차량 {count}대",
+    "addVehicle": "차량 추가",
+    "empty": "아직 차량이 없습니다.",
+    "table": {
+      "vehicle": "차량",
+      "year": "연식",
+      "plate": "번호판",
+      "price": "가격",
+      "mileage": "주행거리",
+      "status": "상태"
+    },
+    "status": {
+      "available": "판매 중",
+      "reserved": "예약됨",
+      "sold": "판매 완료",
+      "hidden": "숨김"
+    },
+    "actions": {
+      "edit": "수정",
+      "delete": "삭제"
+    },
+    "dialog": {
+      "editTitle": "차량 수정",
+      "createTitle": "차량 추가",
+      "description": "\"판매 중\" 상태의 차량은 WhatsApp AI 어시스턴트와 자동으로 동기화됩니다.",
+      "cancel": "취소",
+      "save": "변경사항 저장",
+      "create": "추가"
+    },
+    "fields": {
+      "brand": "제조사 *",
+      "model": "모델 *",
+      "year": "연식 *",
+      "status": "상태",
+      "price": "가격",
+      "mileage": "주행거리",
+      "plate": "번호판",
+      "vin": "차대번호",
+      "transmission": "변속기",
+      "fuelType": "연료",
+      "bodyType": "차종",
+      "condition": "상태",
+      "color": "색상",
+      "doors": "도어 수",
+      "features": "옵션 (한 줄에 하나씩, \"항목: 값\")",
+      "featuresPlaceholder": "변속기: 자동\n색상: 검정\n에어컨",
+      "images": "이미지",
+      "internalNotes": "내부 메모",
+      "selectPlaceholder": "선택하세요…"
+    },
+    "images": {
+      "remove": "제거",
+      "primary": "대표",
+      "upload": "이미지 업로드",
+      "hint": "PNG, JPG 또는 WEBP (각 최대 5MB). 첫 번째 이미지가 대표 이미지입니다."
+    },
+    "specs": {
+      "transmission": {
+        "manual": "수동",
+        "automatic": "자동",
+        "cvt": "CVT",
+        "other": "기타"
+      },
+      "fuelType": {
+        "gasoline": "가솔린",
+        "diesel": "디젤",
+        "hybrid": "하이브리드",
+        "electric": "전기",
+        "lpg": "LPG",
+        "other": "기타"
+      },
+      "bodyType": {
+        "sedan": "세단",
+        "suv": "SUV",
+        "hatchback": "해치백",
+        "pickup": "픽업",
+        "coupe": "쿠페",
+        "van": "밴",
+        "wagon": "왜건",
+        "convertible": "컨버터블",
+        "other": "기타"
+      },
+      "condition": {
+        "new": "신차",
+        "used": "중고"
+      },
+      "empty": "—"
+    },
+    "toasts": {
+      "uploadFailed": "이미지를 업로드하지 못했습니다",
+      "loadFailed": "재고를 불러오지 못했습니다",
+      "requiredFields": "제조사, 모델, 연식은 필수입니다",
+      "updated": "차량이 수정되었습니다",
+      "created": "차량이 추가되었습니다",
+      "saveFailed": "저장하지 못했습니다",
+      "deleted": "차량이 삭제되었습니다",
+      "deleteFailed": "삭제하지 못했습니다"
+    }
   }
 }

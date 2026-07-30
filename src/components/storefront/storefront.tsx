@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import Image from 'next/image';
 import { X, SlidersHorizontal, ChevronDown } from 'lucide-react';
@@ -82,9 +83,12 @@ function VehicleCard({
   v: ShowcaseVehicle;
   whatsapp: string | null;
 }) {
+  const t = useTranslations('Inventory');
   const image = v.images?.[0] ?? null;
-  const body = labelOf(BODY_TYPES, v.body_type);
-  const subtitle = body !== '—' ? body : featuresToList(v.features)[0];
+  const body = labelOf(t, BODY_TYPES, v.body_type);
+  // labelOf returns the em dash when the value is null; fall back to the
+  // first feature so the card still says something about the car.
+  const subtitle = body !== t('specs.empty') ? body : featuresToList(v.features)[0];
   const href = `/vehiculo/${v.id}`;
 
   return (
@@ -176,6 +180,7 @@ export function Storefront({
   whatsapp: string | null;
   heroImage: string | null;
 }) {
+  const t = useTranslations('Inventory');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
@@ -400,7 +405,7 @@ export function Storefront({
                       <option value="">Todas</option>
                       {transmissionOpts.map((o) => (
                         <option key={o.value} value={o.value}>
-                          {o.label}
+                          {t(o.labelKey)}
                         </option>
                       ))}
                     </SelectField>
@@ -410,7 +415,7 @@ export function Storefront({
                       <option value="">Todos</option>
                       {fuelOpts.map((o) => (
                         <option key={o.value} value={o.value}>
-                          {o.label}
+                          {t(o.labelKey)}
                         </option>
                       ))}
                     </SelectField>
@@ -420,7 +425,7 @@ export function Storefront({
                       <option value="">Todas</option>
                       {bodyOpts.map((o) => (
                         <option key={o.value} value={o.value}>
-                          {o.label}
+                          {t(o.labelKey)}
                         </option>
                       ))}
                     </SelectField>

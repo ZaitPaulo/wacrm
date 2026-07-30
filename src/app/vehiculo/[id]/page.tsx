@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { getTranslations } from 'next-intl/server'
 import { CheckCircle2 } from 'lucide-react'
 import { WhatsAppIcon } from '@/components/storefront/whatsapp-icon'
 import { getShowcaseVehicle } from '@/lib/showcase/data'
@@ -29,10 +30,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { account, vehicle: v } = data
   const name = account.public_name?.trim() || account.name
   const title = `${v.brand} ${v.model} ${v.year} — $${formatPrice(v.price)} | ${name}`
+  const t = await getTranslations('Inventory')
   const parts = [`${v.brand} ${v.model} ${v.year}`]
   if (v.mileage != null) parts.push(`${formatPrice(v.mileage)} km`)
-  if (v.transmission) parts.push(labelOf(TRANSMISSIONS, v.transmission))
-  if (v.fuel_type) parts.push(labelOf(FUEL_TYPES, v.fuel_type))
+  if (v.transmission) parts.push(labelOf(t, TRANSMISSIONS, v.transmission))
+  if (v.fuel_type) parts.push(labelOf(t, FUEL_TYPES, v.fuel_type))
   const description = `${parts.join(' · ')}. Disponible en ${name}. Contáctanos por WhatsApp.`
 
   return {
@@ -73,15 +75,16 @@ export default async function VehiclePage({ params }: Params) {
   if (!data) notFound()
 
   const { account, vehicle: v } = data
+  const t = await getTranslations('Inventory')
   const feats = featuresToList(v.features)
 
   const specRows: [string, string][] = [
-    ['Transmisión', labelOf(TRANSMISSIONS, v.transmission)],
-    ['Combustible', labelOf(FUEL_TYPES, v.fuel_type)],
-    ['Carrocería', labelOf(BODY_TYPES, v.body_type)],
+    ['Transmisión', labelOf(t, TRANSMISSIONS, v.transmission)],
+    ['Combustible', labelOf(t, FUEL_TYPES, v.fuel_type)],
+    ['Carrocería', labelOf(t, BODY_TYPES, v.body_type)],
     ['Color', v.color || '—'],
     ['Puertas', v.doors != null ? String(v.doors) : '—'],
-    ['Condición', labelOf(CONDITIONS, v.condition)],
+    ['Condición', labelOf(t, CONDITIONS, v.condition)],
   ]
 
   const waDigits = account.public_whatsapp?.replace(/\D/g, '') || null
@@ -109,8 +112,8 @@ export default async function VehiclePage({ params }: Params) {
         }
       : {}),
     ...(v.color ? { color: v.color } : {}),
-    ...(v.fuel_type ? { fuelType: labelOf(FUEL_TYPES, v.fuel_type) } : {}),
-    ...(v.body_type ? { bodyType: labelOf(BODY_TYPES, v.body_type) } : {}),
+    ...(v.fuel_type ? { fuelType: labelOf(t, FUEL_TYPES, v.fuel_type) } : {}),
+    ...(v.body_type ? { bodyType: labelOf(t, BODY_TYPES, v.body_type) } : {}),
     ...(v.doors != null ? { numberOfDoors: v.doors } : {}),
     offers: {
       '@type': 'Offer',
@@ -160,8 +163,8 @@ export default async function VehiclePage({ params }: Params) {
                 label="Kilometraje"
                 value={v.mileage != null ? `${formatPrice(v.mileage)} km` : '—'}
               />
-              <Stat label="Combustible" value={labelOf(FUEL_TYPES, v.fuel_type)} />
-              <Stat label="Condición" value={labelOf(CONDITIONS, v.condition)} />
+              <Stat label="Combustible" value={labelOf(t, FUEL_TYPES, v.fuel_type)} />
+              <Stat label="Condición" value={labelOf(t, CONDITIONS, v.condition)} />
             </div>
 
             {/* Acciones */}

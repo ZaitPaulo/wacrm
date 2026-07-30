@@ -1686,5 +1686,106 @@
       "reindexTooltip": "Vuelve a indexar todos los documentos (por ejemplo, después de agregar una clave de embeddings)",
       "loading": "Cargando…"
     }
+  },
+  "Inventory": {
+    "title": "Inventario",
+    "vehicleCount": "{count} {count, plural, =1 {vehículo} other {vehículos}}",
+    "addVehicle": "Agregar vehículo",
+    "empty": "Sin vehículos todavía.",
+    "table": {
+      "vehicle": "Vehículo",
+      "year": "Año",
+      "plate": "Placa",
+      "price": "Precio",
+      "mileage": "Kilometraje",
+      "status": "Estado"
+    },
+    "status": {
+      "available": "Disponible",
+      "reserved": "Reservado",
+      "sold": "Vendido",
+      "hidden": "Oculto"
+    },
+    "actions": {
+      "edit": "Editar",
+      "delete": "Eliminar"
+    },
+    "dialog": {
+      "editTitle": "Editar vehículo",
+      "createTitle": "Agregar vehículo",
+      "description": "Los vehículos en estado \"Disponible\" se sincronizan automáticamente con el asistente de IA de WhatsApp.",
+      "cancel": "Cancelar",
+      "save": "Guardar cambios",
+      "create": "Agregar"
+    },
+    "fields": {
+      "brand": "Marca *",
+      "model": "Modelo *",
+      "year": "Año *",
+      "status": "Estado",
+      "price": "Precio",
+      "mileage": "Kilometraje",
+      "plate": "Placa",
+      "vin": "VIN",
+      "transmission": "Transmisión",
+      "fuelType": "Combustible",
+      "bodyType": "Carrocería",
+      "condition": "Condición",
+      "color": "Color",
+      "doors": "Puertas",
+      "features": "Características (una por línea, «Clave: Valor»)",
+      "featuresPlaceholder": "Transmisión: Automática\nColor: Negro\nAire acondicionado",
+      "images": "Imágenes",
+      "internalNotes": "Notas internas",
+      "selectPlaceholder": "Selecciona…"
+    },
+    "images": {
+      "remove": "Quitar",
+      "primary": "Principal",
+      "upload": "Subir imagen",
+      "hint": "PNG, JPG o WEBP (máx. 5 MB c/u). La primera imagen es la principal."
+    },
+    "specs": {
+      "transmission": {
+        "manual": "Mecánica",
+        "automatic": "Automática",
+        "cvt": "CVT",
+        "other": "Otra"
+      },
+      "fuelType": {
+        "gasoline": "Gasolina",
+        "diesel": "Diésel",
+        "hybrid": "Híbrido",
+        "electric": "Eléctrico",
+        "lpg": "GLP",
+        "other": "Otro"
+      },
+      "bodyType": {
+        "sedan": "Sedán",
+        "suv": "SUV",
+        "hatchback": "Hatchback",
+        "pickup": "Pickup",
+        "coupe": "Coupé",
+        "van": "Van",
+        "wagon": "Familiar",
+        "convertible": "Convertible",
+        "other": "Otro"
+      },
+      "condition": {
+        "new": "Nuevo",
+        "used": "Usado"
+      },
+      "empty": "—"
+    },
+    "toasts": {
+      "uploadFailed": "No se pudo subir la imagen",
+      "loadFailed": "No se pudo cargar el inventario",
+      "requiredFields": "Marca, modelo y año son obligatorios",
+      "updated": "Vehículo actualizado",
+      "created": "Vehículo agregado",
+      "saveFailed": "No se pudo guardar",
+      "deleted": "Vehículo eliminado",
+      "deleteFailed": "No se pudo eliminar"
+    }
   }
 }

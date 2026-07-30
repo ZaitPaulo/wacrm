@@ -39,11 +39,11 @@
 
 ## 6. Migración de las pantallas del CRM al catálogo
 
-- [ ] 6.1 Crear el namespace `Inventory` en los tres catálogos y migrar `src/app/(dashboard)/inventory/page.tsx`
+- [x] 6.1 Crear el namespace `Inventory` en los tres catálogos y migrar `src/app/(dashboard)/inventory/page.tsx`
 - [ ] 6.2 Crear el namespace `Documents` en los tres catálogos y migrar `src/app/(dashboard)/documents/page.tsx`
 - [ ] 6.3 Migrar `src/components/contacts/contact-documents.tsx` al namespace `Documents`
 - [ ] 6.4 Migrar `src/components/settings/showcase-settings.tsx` al namespace `Settings`
-- [ ] 6.5 Migrar las etiquetas de `src/lib/inventory/specs.ts` al catálogo, dejando **sin traducir** los valores que se guardan en base de datos
+- [x] 6.5 Migrar las etiquetas de `src/lib/inventory/specs.ts` al catálogo, dejando **sin traducir** los valores que se guardan en base de datos
 - [ ] 6.6 Verificar tipos, paridad de catálogos y suite completa
 - [ ] 6.7 Commit
 

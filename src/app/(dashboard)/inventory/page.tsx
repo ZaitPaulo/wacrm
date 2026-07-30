@@ -47,6 +47,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCan } from '@/hooks/use-can';
+import { useTranslations } from 'next-intl';
 import {
   TRANSMISSIONS,
   FUEL_TYPES,
@@ -55,14 +56,16 @@ import {
 } from '@/lib/inventory/specs';
 import { uploadAccountMedia } from '@/lib/storage/upload-media';
 
+// Sólo la variante visual vive acá; la etiqueta sale del catálogo, por
+// clave, para que el orden del selector siga siendo el de este objeto.
 const STATUS_META: Record<
   VehicleStatus,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
+  { variant: 'default' | 'secondary' | 'destructive' | 'outline' }
 > = {
-  available: { label: 'Disponible', variant: 'default' },
-  reserved: { label: 'Reservado', variant: 'secondary' },
-  sold: { label: 'Vendido', variant: 'outline' },
-  hidden: { label: 'Oculto', variant: 'secondary' },
+  available: { variant: 'default' },
+  reserved: { variant: 'secondary' },
+  sold: { variant: 'outline' },
+  hidden: { variant: 'secondary' },
 };
 
 interface VehicleDraft {
@@ -165,6 +168,7 @@ function formatPrice(value: number): string {
  * solo para roles con permiso de edición (`send-messages` = agent+).
  */
 export default function InventoryPage() {
+  const t = useTranslations('Inventory');
   const canEdit = useCan('send-messages');
 
   const [vehicles, setVehicles] = useState<InventoryVehicle[]>([]);
@@ -191,7 +195,7 @@ export default function InventoryPage() {
       }
       setDraft((d) => ({ ...d, images: [...d.images, ...urls] }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo subir la imagen');
+      toast.error(err instanceof Error ? err.message : t('toasts.uploadFailed'));
     } finally {
       setUploadingImages(false);
     }
@@ -209,7 +213,7 @@ export default function InventoryPage() {
       if (!res.ok) throw new Error(json.error || 'Error al cargar');
       setVehicles(json.vehicles ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo cargar el inventario');
+      toast.error(err instanceof Error ? err.message : t('toasts.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -233,7 +237,7 @@ export default function InventoryPage() {
 
   async function save() {
     if (!draft.brand.trim() || !draft.model.trim() || !draft.year.trim()) {
-      toast.error('Marca, modelo y año son obligatorios');
+      toast.error(t('toasts.requiredFields'));
       return;
     }
     setSaving(true);
@@ -270,12 +274,12 @@ export default function InventoryPage() {
       if (!res.ok) throw new Error(json.error || 'Error al guardar');
 
       if (json.warning) toast.warning(json.warning);
-      else toast.success(editing ? 'Vehículo actualizado' : 'Vehículo agregado');
+      else toast.success(editing ? t('toasts.updated') : t('toasts.created'));
 
       setDialogOpen(false);
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo guardar');
+      toast.error(err instanceof Error ? err.message : t('toasts.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -288,10 +292,10 @@ export default function InventoryPage() {
       const res = await fetch(`/api/inventory/${v.id}`, { method: 'DELETE' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Error al eliminar');
-      toast.success('Vehículo eliminado');
+      toast.success(t('toasts.deleted'));
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo eliminar');
+      toast.error(err instanceof Error ? err.message : t('toasts.deleteFailed'));
     } finally {
       setDeletingId(null);
     }
@@ -302,15 +306,15 @@ export default function InventoryPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Car className="h-6 w-6" />
-          <h1 className="text-2xl font-semibold">Inventario</h1>
+          <h1 className="text-2xl font-semibold">{t('title')}</h1>
           <span className="text-muted-foreground text-sm">
-            {vehicles.length} vehículo{vehicles.length === 1 ? '' : 's'}
+            {t('vehicleCount', { count: vehicles.length })}
           </span>
         </div>
         {canEdit && (
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            Agregar vehículo
+            {t('addVehicle')}
           </Button>
         )}
       </div>
@@ -319,12 +323,12 @@ export default function InventoryPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Vehículo</TableHead>
-              <TableHead>Año</TableHead>
-              <TableHead>Placa</TableHead>
-              <TableHead className="text-right">Precio</TableHead>
-              <TableHead className="text-right">Kilometraje</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead>{t('table.vehicle')}</TableHead>
+              <TableHead>{t('table.year')}</TableHead>
+              <TableHead>{t('table.plate')}</TableHead>
+              <TableHead className="text-right">{t('table.price')}</TableHead>
+              <TableHead className="text-right">{t('table.mileage')}</TableHead>
+              <TableHead>{t('table.status')}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -338,7 +342,7 @@ export default function InventoryPage() {
             ) : vehicles.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
-                  Sin vehículos todavía.
+                  {t('empty')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -355,7 +359,7 @@ export default function InventoryPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={STATUS_META[v.status].variant}>
-                      {STATUS_META[v.status].label}
+                      {t(`status.${v.status}`)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -379,14 +383,14 @@ export default function InventoryPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openEdit(v)}>
                             <Pencil className="mr-2 h-4 w-4" />
-                            Editar
+                            {t('actions.edit')}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => remove(v)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Eliminar
+                            {t('actions.delete')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -402,16 +406,15 @@ export default function InventoryPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar vehículo' : 'Agregar vehículo'}</DialogTitle>
+            <DialogTitle>{editing ? t('dialog.editTitle') : t('dialog.createTitle')}</DialogTitle>
             <DialogDescription>
-              Los vehículos en estado &quot;Disponible&quot; se sincronizan automáticamente con
-              el asistente de IA de WhatsApp.
+              {t('dialog.description')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="brand">Marca *</Label>
+              <Label htmlFor="brand">{t('fields.brand')}</Label>
               <Input
                 id="brand"
                 value={draft.brand}
@@ -419,7 +422,7 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="model">Modelo *</Label>
+              <Label htmlFor="model">{t('fields.model')}</Label>
               <Input
                 id="model"
                 value={draft.model}
@@ -427,7 +430,7 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="year">Año *</Label>
+              <Label htmlFor="year">{t('fields.year')}</Label>
               <Input
                 id="year"
                 type="number"
@@ -436,7 +439,7 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="status">Estado</Label>
+              <Label htmlFor="status">{t('fields.status')}</Label>
               <Select
                 value={draft.status}
                 onValueChange={(value) =>
@@ -449,14 +452,14 @@ export default function InventoryPage() {
                 <SelectContent>
                   {(Object.keys(STATUS_META) as VehicleStatus[]).map((s) => (
                     <SelectItem key={s} value={s}>
-                      {STATUS_META[s].label}
+                      {t(`status.${s}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="price">Precio</Label>
+              <Label htmlFor="price">{t('fields.price')}</Label>
               <Input
                 id="price"
                 type="number"
@@ -465,7 +468,7 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="mileage">Kilometraje</Label>
+              <Label htmlFor="mileage">{t('fields.mileage')}</Label>
               <Input
                 id="mileage"
                 type="number"
@@ -474,7 +477,7 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="license_plate">Placa</Label>
+              <Label htmlFor="license_plate">{t('fields.plate')}</Label>
               <Input
                 id="license_plate"
                 value={draft.license_plate}
@@ -482,7 +485,7 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="vin">VIN</Label>
+              <Label htmlFor="vin">{t('fields.vin')}</Label>
               <Input
                 id="vin"
                 value={draft.vin}
@@ -490,25 +493,25 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="transmission">Transmisión</Label>
+              <Label htmlFor="transmission">{t('fields.transmission')}</Label>
               <Select
                 value={draft.transmission}
                 onValueChange={(v) => setDraft({ ...draft, transmission: v ?? '' })}
               >
                 <SelectTrigger id="transmission">
-                  <SelectValue placeholder="Selecciona…" />
+                  <SelectValue placeholder={t('fields.selectPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {TRANSMISSIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {t(o.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="fuel_type">Combustible</Label>
+              <Label htmlFor="fuel_type">{t('fields.fuelType')}</Label>
               <Select
                 value={draft.fuel_type}
                 onValueChange={(v) => setDraft({ ...draft, fuel_type: v ?? '' })}
@@ -519,14 +522,14 @@ export default function InventoryPage() {
                 <SelectContent>
                   {FUEL_TYPES.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {t(o.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="body_type">Carrocería</Label>
+              <Label htmlFor="body_type">{t('fields.bodyType')}</Label>
               <Select
                 value={draft.body_type}
                 onValueChange={(v) => setDraft({ ...draft, body_type: v ?? '' })}
@@ -537,14 +540,14 @@ export default function InventoryPage() {
                 <SelectContent>
                   {BODY_TYPES.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {t(o.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="condition">Condición</Label>
+              <Label htmlFor="condition">{t('fields.condition')}</Label>
               <Select
                 value={draft.condition}
                 onValueChange={(v) => setDraft({ ...draft, condition: v ?? 'used' })}
@@ -555,14 +558,14 @@ export default function InventoryPage() {
                 <SelectContent>
                   {CONDITIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {t(o.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="color">Color</Label>
+              <Label htmlFor="color">{t('fields.color')}</Label>
               <Input
                 id="color"
                 value={draft.color}
@@ -570,7 +573,7 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="doors">Puertas</Label>
+              <Label htmlFor="doors">{t('fields.doors')}</Label>
               <Input
                 id="doors"
                 type="number"
@@ -579,17 +582,17 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="features">Características (una por línea, «Clave: Valor»)</Label>
+              <Label htmlFor="features">{t('fields.features')}</Label>
               <Textarea
                 id="features"
                 rows={4}
-                placeholder={'Transmisión: Automática\nColor: Negro\nAire acondicionado'}
+                placeholder={t('fields.featuresPlaceholder')}
                 value={draft.featuresText}
                 onChange={(e) => setDraft({ ...draft, featuresText: e.target.value })}
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label>Imágenes</Label>
+              <Label>{t('fields.images')}</Label>
               <div className="flex flex-wrap gap-2">
                 {draft.images.map((url, i) => (
                   <div
@@ -602,13 +605,13 @@ export default function InventoryPage() {
                       type="button"
                       onClick={() => removeImage(i)}
                       className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white"
-                      title="Quitar"
+                      title={t('images.remove')}
                     >
                       <X className="size-3" />
                     </button>
                     {i === 0 && (
                       <span className="absolute inset-x-0 bottom-0 bg-black/60 text-center text-[10px] text-white">
-                        Principal
+                        {t('images.primary')}
                       </span>
                     )}
                   </div>
@@ -618,7 +621,7 @@ export default function InventoryPage() {
                   onClick={() => imageInputRef.current?.click()}
                   disabled={uploadingImages}
                   className="text-muted-foreground border-border flex size-20 items-center justify-center rounded-md border border-dashed disabled:opacity-50"
-                  title="Subir imagen"
+                  title={t('images.upload')}
                 >
                   {uploadingImages ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -636,11 +639,11 @@ export default function InventoryPage() {
                 onChange={handleImageUpload}
               />
               <p className="text-muted-foreground text-xs">
-                PNG, JPG o WEBP (máx. 5 MB c/u). La primera imagen es la principal.
+                {t('images.hint')}
               </p>
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="internal_notes">Notas internas</Label>
+              <Label htmlFor="internal_notes">{t('fields.internalNotes')}</Label>
               <Textarea
                 id="internal_notes"
                 rows={2}
@@ -652,11 +655,11 @@ export default function InventoryPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
-              Cancelar
+              {t('dialog.cancel')}
             </Button>
             <Button onClick={save} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editing ? 'Guardar cambios' : 'Agregar'}
+              {editing ? t('dialog.save') : t('dialog.create')}
             </Button>
           </DialogFooter>
         </DialogContent>

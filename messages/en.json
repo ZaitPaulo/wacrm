@@ -1686,5 +1686,106 @@
       "reindexTooltip": "Re-embed all documents (e.g. after adding an embeddings key)",
       "loading": "Loading…"
     }
+  },
+  "Inventory": {
+    "title": "Inventory",
+    "vehicleCount": "{count} {count, plural, =1 {vehicle} other {vehicles}}",
+    "addVehicle": "Add vehicle",
+    "empty": "No vehicles yet.",
+    "table": {
+      "vehicle": "Vehicle",
+      "year": "Year",
+      "plate": "Plate",
+      "price": "Price",
+      "mileage": "Mileage",
+      "status": "Status"
+    },
+    "status": {
+      "available": "Available",
+      "reserved": "Reserved",
+      "sold": "Sold",
+      "hidden": "Hidden"
+    },
+    "actions": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "dialog": {
+      "editTitle": "Edit vehicle",
+      "createTitle": "Add vehicle",
+      "description": "Vehicles marked \"Available\" sync automatically with the WhatsApp AI assistant.",
+      "cancel": "Cancel",
+      "save": "Save changes",
+      "create": "Add"
+    },
+    "fields": {
+      "brand": "Brand *",
+      "model": "Model *",
+      "year": "Year *",
+      "status": "Status",
+      "price": "Price",
+      "mileage": "Mileage",
+      "plate": "Plate",
+      "vin": "VIN",
+      "transmission": "Transmission",
+      "fuelType": "Fuel",
+      "bodyType": "Body type",
+      "condition": "Condition",
+      "color": "Color",
+      "doors": "Doors",
+      "features": "Features (one per line, \"Key: Value\")",
+      "featuresPlaceholder": "Transmission: Automatic\nColor: Black\nAir conditioning",
+      "images": "Images",
+      "internalNotes": "Internal notes",
+      "selectPlaceholder": "Select…"
+    },
+    "images": {
+      "remove": "Remove",
+      "primary": "Primary",
+      "upload": "Upload image",
+      "hint": "PNG, JPG or WEBP (max 5 MB each). The first image is the primary one."
+    },
+    "specs": {
+      "transmission": {
+        "manual": "Manual",
+        "automatic": "Automatic",
+        "cvt": "CVT",
+        "other": "Other"
+      },
+      "fuelType": {
+        "gasoline": "Petrol",
+        "diesel": "Diesel",
+        "hybrid": "Hybrid",
+        "electric": "Electric",
+        "lpg": "LPG",
+        "other": "Other"
+      },
+      "bodyType": {
+        "sedan": "Sedan",
+        "suv": "SUV",
+        "hatchback": "Hatchback",
+        "pickup": "Pickup",
+        "coupe": "Coupé",
+        "van": "Van",
+        "wagon": "Estate",
+        "convertible": "Convertible",
+        "other": "Other"
+      },
+      "condition": {
+        "new": "New",
+        "used": "Used"
+      },
+      "empty": "—"
+    },
+    "toasts": {
+      "uploadFailed": "Couldn't upload the image",
+      "loadFailed": "Couldn't load the inventory",
+      "requiredFields": "Brand, model and year are required",
+      "updated": "Vehicle updated",
+      "created": "Vehicle added",
+      "saveFailed": "Couldn't save",
+      "deleted": "Vehicle deleted",
+      "deleteFailed": "Couldn't delete"
+    }
   }
 }
