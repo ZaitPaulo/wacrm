@@ -1,11 +1,11 @@
 ## 1. Ventana de agrupación configurable
 
-- [ ] 1.1 Escribir el test de `aiReplyDebounceMs()` en `src/lib/ai/defaults.test.ts`: por defecto 8000, respeta un override válido, cae al default con valores no numéricos o negativos, y acepta 0 para desactivar la espera
-- [ ] 1.2 Verificar que el test falla (`npx vitest run src/lib/ai/defaults.test.ts`)
-- [ ] 1.3 Implementar `aiReplyDebounceMs()` en `src/lib/ai/defaults.ts` leyendo `AI_REPLY_DEBOUNCE_MS`, con guarda `>= 0` (a diferencia de `aiRequestTimeoutMs`, aquí 0 es válido)
-- [ ] 1.4 Verificar que el test pasa
-- [ ] 1.5 Documentar `AI_REPLY_DEBOUNCE_MS` en `.env.local.example`, junto a `AI_CONTEXT_MESSAGE_LIMIT`
-- [ ] 1.6 Commit
+- [x] 1.1 Escribir el test de `aiReplyDebounceMs()` en `src/lib/ai/defaults.test.ts`: por defecto 8000, respeta un override válido, cae al default con valores no numéricos o negativos, y acepta 0 para desactivar la espera
+- [x] 1.2 Verificar que el test falla (`npx vitest run src/lib/ai/defaults.test.ts`)
+- [x] 1.3 Implementar `aiReplyDebounceMs()` en `src/lib/ai/defaults.ts` leyendo `AI_REPLY_DEBOUNCE_MS`, con guarda `>= 0` (a diferencia de `aiRequestTimeoutMs`, aquí 0 es válido)
+- [x] 1.4 Verificar que el test pasa
+- [x] 1.5 Documentar `AI_REPLY_DEBOUNCE_MS` en `.env.local.example`, junto a `AI_CONTEXT_MESSAGE_LIMIT`
+- [x] 1.6 Commit
 
 ## 2. Consultas de ventana temporal
 

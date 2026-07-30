@@ -32,6 +32,7 @@ export const MAX_OUTPUT_TOKENS = 1024
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 const DEFAULT_CONTEXT_MESSAGE_LIMIT = 20
+const DEFAULT_REPLY_DEBOUNCE_MS = 8_000
 
 /** Per-call provider timeout. Override with `AI_REQUEST_TIMEOUT_MS`. */
 export function aiRequestTimeoutMs(): number {
@@ -44,6 +45,31 @@ export function aiRequestTimeoutMs(): number {
 export function aiContextMessageLimit(): number {
   const raw = Number(process.env.AI_CONTEXT_MESSAGE_LIMIT)
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_CONTEXT_MESSAGE_LIMIT
+}
+
+/**
+ * How long auto-reply waits before answering an inbound message.
+ *
+ * Customers type one thought as several messages ("60 millones" / "un
+ * suv" / "kia"), and without this every fragment triggers its own reply
+ * — three answers, and three generations whose context keeps growing
+ * with the bot's own output. Waiting lets the burst settle so a single
+ * generation sees the whole thing.
+ *
+ * Override with `AI_REPLY_DEBOUNCE_MS`. Unlike the other tunables here
+ * the guard is `>= 0`, because 0 is a supported value: it turns the wait
+ * off without a code change, which is the documented rollback path.
+ */
+export function aiReplyDebounceMs(): number {
+  // The empty string must be checked before Number(): `Number('')` is 0,
+  // not NaN, so an unset-but-present env var would silently disable the
+  // wait instead of falling back. The other tunables here dodge this by
+  // rejecting 0 outright; this one can't.
+  const configured = process.env.AI_REPLY_DEBOUNCE_MS?.trim()
+  if (!configured) return DEFAULT_REPLY_DEBOUNCE_MS
+
+  const raw = Number(configured)
+  return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : DEFAULT_REPLY_DEBOUNCE_MS
 }
 
 /**
