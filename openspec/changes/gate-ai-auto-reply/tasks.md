@@ -9,13 +9,13 @@
 
 ## 2. Consultas de ventana temporal
 
-- [ ] 2.1 Escribir `src/lib/ai/reply-window.test.ts` cubriendo: `hasNewerCustomerMessage` verdadero/falso, `hasOutboundSince` verdadero/falso, exclusión de `status = 'failed'`, desempate por id ante `created_at` igual, y que ambas devuelven `false` cuando la consulta falla
-- [ ] 2.2 Verificar que el test falla (no existe el módulo)
-- [ ] 2.3 Crear `src/lib/ai/reply-window.ts` con `InboundRef`, `delay(ms)`, `hasNewerCustomerMessage(db, conversationId, inbound)` y `hasOutboundSince(db, conversationId, inbound)`
-- [ ] 2.4 Implementar el filtro "posterior a" como `created_at.gt.<ts>` OR (`created_at.eq.<ts>` AND `id.gt.<id>`), para que dos mensajes con la misma marca de tiempo tengan un orden total
-- [ ] 2.5 Hacer que ambas consultas registren el error en consola y devuelvan `false`, de modo que un fallo de base nunca deje al cliente sin respuesta
-- [ ] 2.6 Verificar que el test pasa
-- [ ] 2.7 Commit
+- [x] 2.1 Escribir `src/lib/ai/reply-window.test.ts` cubriendo: `hasNewerCustomerMessage` verdadero/falso, `hasOutboundSince` verdadero/falso, exclusión de `status = 'failed'`, desempate por id ante `created_at` igual, y que ambas devuelven `false` cuando la consulta falla
+- [x] 2.2 Verificar que el test falla (no existe el módulo)
+- [x] 2.3 Crear `src/lib/ai/reply-window.ts` con `InboundRef`, `delay(ms)`, `hasNewerCustomerMessage(db, conversationId, inbound)` y `hasOutboundSince(db, conversationId, inbound)`
+- [x] 2.4 Implementar el filtro "posterior a" como `created_at.gt.<ts>` OR (`created_at.eq.<ts>` AND `id.gt.<id>`), para que dos mensajes con la misma marca de tiempo tengan un orden total
+- [x] 2.5 Hacer que ambas consultas registren el error en consola y devuelvan `false`, de modo que un fallo de base nunca deje al cliente sin respuesta
+- [x] 2.6 Verificar que el test pasa
+- [x] 2.7 Commit
 
 ## 3. Compuerta en el auto-reply
 
