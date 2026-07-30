@@ -16,11 +16,11 @@
 
 ## 3. Traducción de la operación diaria (397 claves)
 
-- [ ] 3.1 Traducir `Inbox` (125)
-- [ ] 3.2 Traducir `Contacts` (173)
-- [ ] 3.3 Traducir `Pipelines` (99)
-- [ ] 3.4 Verificar paridad y revisar a ojo
-- [ ] 3.5 Commit
+- [x] 3.1 Traducir `Inbox` (125)
+- [x] 3.2 Traducir `Contacts` (173)
+- [x] 3.3 Traducir `Pipelines` (99)
+- [x] 3.4 Verificar paridad y revisar a ojo
+- [x] 3.5 Commit
 
 ## 4. Traducción de mensajería y automatización (481 claves)
 
