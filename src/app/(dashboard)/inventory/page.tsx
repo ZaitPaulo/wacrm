@@ -47,6 +47,8 @@ import {
   X,
 } from 'lucide-react';
 import { useCan } from '@/hooks/use-can';
+import { useAuth } from '@/hooks/use-auth';
+import { formatPrice, formatNumber } from '@/lib/showcase/format';
 import { useTranslations } from 'next-intl';
 import {
   TRANSMISSIONS,
@@ -157,10 +159,6 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
   };
 }
 
-function formatPrice(value: number): string {
-  return new Intl.NumberFormat('es', { maximumFractionDigits: 2 }).format(value);
-}
-
 /**
  * Página de inventario de vehículos (/inventory). Lista, crea, edita y
  * elimina el stock vía las rutas /api/inventory (que además sincronizan
@@ -170,6 +168,8 @@ function formatPrice(value: number): string {
 export default function InventoryPage() {
   const t = useTranslations('Inventory');
   const canEdit = useCan('send-messages');
+  const { account } = useAuth();
+  const currency = account?.default_currency ?? 'USD';
 
   const [vehicles, setVehicles] = useState<InventoryVehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -353,9 +353,9 @@ export default function InventoryPage() {
                   </TableCell>
                   <TableCell>{v.year}</TableCell>
                   <TableCell>{v.license_plate ?? '—'}</TableCell>
-                  <TableCell className="text-right">{formatPrice(v.price)}</TableCell>
+                  <TableCell className="text-right">{formatPrice(v.price, currency)}</TableCell>
                   <TableCell className="text-right">
-                    {v.mileage != null ? `${formatPrice(v.mileage)} km` : '—'}
+                    {v.mileage != null ? `${formatNumber(v.mileage)} km` : '—'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={STATUS_META[v.status].variant}>

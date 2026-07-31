@@ -4,9 +4,13 @@
 // ./data.ts, para no arrastrar el service-role al bundle del cliente.
 // ============================================================
 
+import { CURRENCIES } from '@/lib/currency'
+
 export interface ShowcaseAccount {
   id: string
   name: string
+  /** Moneda de la cuenta; los precios de los vehículos se muestran con su símbolo. */
+  default_currency: string
   public_whatsapp: string | null
   public_name: string | null
   public_logo_url: string | null
@@ -43,8 +47,23 @@ export interface ShowcaseVehicleDetail extends ShowcaseVehicle {
 }
 
 /** Formatea un número con separadores de miles (sin decimales). */
-export function formatPrice(value: number): string {
+/** Número con separadores de miles, sin unidad. Para kilometraje y demás. */
+export function formatNumber(value: number): string {
   return new Intl.NumberFormat('es', { maximumFractionDigits: 0 }).format(value)
+}
+
+/**
+ * Precio con el símbolo de la moneda de la cuenta.
+ *
+ * Los precios de `inventory_vehicles` se guardan como números pelados: la
+ * moneda vive una sola vez en `accounts.default_currency`, así que hay que
+ * pasarla acá. Antes el símbolo estaba escrito a mano en cada pantalla, lo
+ * que daba `$` incluso para cuentas en euros o yenes.
+ */
+export function formatPrice(value: number, currency: string): string {
+  const symbol =
+    CURRENCIES.find((c) => c.code === currency)?.symbol ?? `${currency} `
+  return `${symbol}${formatNumber(value)}`
 }
 
 /** Convierte el JSONB `features` en una lista de etiquetas legibles. */

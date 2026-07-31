@@ -5,7 +5,12 @@ import { CheckCircle2 } from 'lucide-react'
 import { WhatsAppIcon } from '@/components/storefront/whatsapp-icon'
 import { getShowcaseVehicle } from '@/lib/showcase/data'
 import { getBaseUrl } from '@/lib/showcase/site-url'
-import { featuresToList, whatsappHref, formatPrice } from '@/lib/showcase/format'
+import {
+  featuresToList,
+  whatsappHref,
+  formatPrice,
+  formatNumber,
+} from '@/lib/showcase/format'
 import {
   labelOf,
   TRANSMISSIONS,
@@ -29,10 +34,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   }
   const { account, vehicle: v } = data
   const name = account.public_name?.trim() || account.name
-  const title = `${v.brand} ${v.model} ${v.year} — $${formatPrice(v.price)} | ${name}`
+  const title = `${v.brand} ${v.model} ${v.year} — ${formatPrice(v.price, account.default_currency)} | ${name}`
   const t = await getTranslations('Inventory')
   const parts = [`${v.brand} ${v.model} ${v.year}`]
-  if (v.mileage != null) parts.push(`${formatPrice(v.mileage)} km`)
+  if (v.mileage != null) parts.push(`${formatNumber(v.mileage)} km`)
   if (v.transmission) parts.push(labelOf(t, TRANSMISSIONS, v.transmission))
   if (v.fuel_type) parts.push(labelOf(t, FUEL_TYPES, v.fuel_type))
   const description = `${parts.join(' · ')}. Disponible en ${name}. Contáctanos por WhatsApp.`
@@ -152,7 +157,7 @@ export default async function VehiclePage({ params }: Params) {
                 {v.brand} {v.model} {v.year}
               </h1>
               <p className="mt-2 text-2xl font-semibold text-[#0d1c32]">
-                ${formatPrice(v.price)}
+                {formatPrice(v.price, account.default_currency)}
               </p>
             </div>
 
@@ -161,7 +166,7 @@ export default async function VehiclePage({ params }: Params) {
               <Stat label="Año" value={String(v.year)} />
               <Stat
                 label="Kilometraje"
-                value={v.mileage != null ? `${formatPrice(v.mileage)} km` : '—'}
+                value={v.mileage != null ? `${formatNumber(v.mileage)} km` : '—'}
               />
               <Stat label="Combustible" value={labelOf(t, FUEL_TYPES, v.fuel_type)} />
               <Stat label="Condición" value={labelOf(t, CONDITIONS, v.condition)} />

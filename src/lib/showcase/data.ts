@@ -8,7 +8,7 @@ import type {
 } from './format'
 
 const ACCOUNT_COLUMNS =
-  'id, name, public_whatsapp, public_name, public_logo_url, public_address, public_phone, public_email, public_hours'
+  'id, name, default_currency, public_whatsapp, public_name, public_logo_url, public_address, public_phone, public_email, public_hours'
 
 // ============================================================
 // Datos de la vitrina pública (server-only).

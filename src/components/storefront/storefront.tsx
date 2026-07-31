@@ -7,7 +7,12 @@ import Image from 'next/image';
 import { X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { WhatsAppIcon } from './whatsapp-icon';
 import type { ShowcaseVehicle } from '@/lib/showcase/format';
-import { whatsappHref, formatPrice, featuresToList } from '@/lib/showcase/format';
+import {
+  whatsappHref,
+  formatPrice,
+  formatNumber,
+  featuresToList,
+} from '@/lib/showcase/format';
 import {
   labelOf,
   TRANSMISSIONS,
@@ -79,9 +84,11 @@ function niceBudgetTiers(maxPrice: number): number[] {
 function VehicleCard({
   v,
   whatsapp,
+  currency,
 }: {
   v: ShowcaseVehicle;
   whatsapp: string | null;
+  currency: string;
 }) {
   const t = useTranslations('Inventory');
   const image = v.images?.[0] ?? null;
@@ -145,14 +152,14 @@ function VehicleCard({
               Kilometraje
             </span>
             <span className="font-medium tabular-nums text-[#191c1e]">
-              {v.mileage != null ? `${formatPrice(v.mileage)} km` : '—'}
+              {v.mileage != null ? `${formatNumber(v.mileage)} km` : '—'}
             </span>
           </div>
         </div>
 
         <div className="mt-auto space-y-3 border-t border-[#c5c6cd]/30 pt-6">
           <div className="text-2xl font-bold tabular-nums text-[#0d1c32]">
-            ${formatPrice(v.price)}
+            {formatPrice(v.price, currency)}
           </div>
           {whatsapp ? (
             <a
@@ -175,10 +182,13 @@ export function Storefront({
   vehicles,
   whatsapp,
   heroImage,
+  currency,
 }: {
   vehicles: ShowcaseVehicle[];
   whatsapp: string | null;
   heroImage: string | null;
+  /** Moneda de la cuenta, para los precios y los tramos de presupuesto. */
+  currency: string;
 }) {
   const t = useTranslations('Inventory');
   const [brand, setBrand] = useState('');
@@ -380,7 +390,7 @@ export function Storefront({
                     <option value="">Sin límite</option>
                     {budgetTiers.map((t) => (
                       <option key={t} value={t}>
-                        Hasta ${formatPrice(t)}
+                        Hasta {formatPrice(t, currency)}
                       </option>
                     ))}
                   </SelectField>
@@ -392,7 +402,7 @@ export function Storefront({
                     <option value="">Sin límite</option>
                     {mileageTiers.map((t) => (
                       <option key={t} value={t}>
-                        Hasta {formatPrice(t)} km
+                        Hasta {formatNumber(t)} km
                       </option>
                     ))}
                   </SelectField>
@@ -447,7 +457,12 @@ export function Storefront({
               ) : (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   {shown.map((v) => (
-                    <VehicleCard key={v.id} v={v} whatsapp={whatsapp} />
+                    <VehicleCard
+                      key={v.id}
+                      v={v}
+                      whatsapp={whatsapp}
+                      currency={currency}
+                    />
                   ))}
                 </div>
               )}

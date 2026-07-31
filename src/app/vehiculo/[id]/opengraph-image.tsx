@@ -45,7 +45,7 @@ export default async function OgImage({ params }: Params) {
   // hijo. Interpolar varias expresiones en una línea genera un nodo de
   // texto por cada una, así que se arman aquí como cadena única.
   const title = `${v.brand} ${v.model} ${v.year}`
-  const price = `$${formatPrice(v.price)}`
+  const price = formatPrice(v.price, account.default_currency)
 
   return new ImageResponse(
     (
