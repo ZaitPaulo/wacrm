@@ -9,6 +9,12 @@
  * The policy lives on `flows.fallback_policy` (JSONB) and is loaded
  * with the run; defaults filled in by `resolveFallbackPolicy` so an
  * older flow row (or a partial JSONB blob) doesn't crash the runner.
+ *
+ * One field is not about fallback at all: `handoff_assign_to` is the
+ * flow's default handoff agent, read by the explicit `handoff` node too
+ * (see FlowFallbackPolicy). It rides in this blob because it's the
+ * JSONB the editor already round-trips — don't go looking for a
+ * `flows.default_agent` column, there isn't one.
  */
 
 import {
@@ -56,6 +62,14 @@ export function resolveFallbackPolicy(
       r.on_exhaust === "handoff" || r.on_exhaust === "end"
         ? r.on_exhaust
         : DEFAULT_FALLBACK_POLICY.on_exhaust,
+    // Optional — there is no default agent to fall back to, so an
+    // absent / blank / non-string value collapses to undefined, which
+    // both handoff routes read as "assign nobody". Trimmed because the
+    // builder writes "" for the empty selection.
+    handoff_assign_to:
+      typeof r.handoff_assign_to === "string" && r.handoff_assign_to.trim()
+        ? r.handoff_assign_to.trim()
+        : undefined,
   };
 }
 

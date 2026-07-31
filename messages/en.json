@@ -1046,6 +1046,9 @@
       "keywordsLabel": "Keywords (comma-separated)",
       "keywordsPlaceholder": "support, help, hi",
       "entryNodeTitle": "Entry node:",
+      "handoffTitle": "Handoff",
+      "handoffDefaultAgentLabel": "Default agent",
+      "handoffDefaultAgentHint": "Assigned when a handoff node has no agent of its own, and when the customer runs out of retries. In the latter case it won't replace an agent who already took the conversation.",
       "entryNodePlaceholder": "Pick the first node…",
       "nodesTitle": "Nodes ({count})",
       "nodesEmpty": "Add a <strong>Start</strong> node, then a <strong>Send buttons</strong> node, then a <strong>Handoff</strong> — that's the welcome-menu shape from the brief.",
@@ -1120,7 +1123,12 @@
         "filenamePlaceholder": "invoice.pdf",
         "advanceAfterSending": "After sending, advance to",
         "pickNextNode": "Pick a next node…",
-        "none": "— None —"
+        "none": "— None —",
+        "handoffAgent": "Assign to",
+        "handoffAgentHint": "Left unset, the flow's default agent is used.",
+        "agentUnassigned": "— Unassigned —",
+        "agentIdPlaceholder": "Agent id",
+        "agentUnknown": "{id} (unknown agent)"
       },
       "categories": {
         "messaging": "Messaging",

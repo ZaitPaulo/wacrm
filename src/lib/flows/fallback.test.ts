@@ -56,6 +56,43 @@ describe("resolveFallbackPolicy", () => {
       DEFAULT_FALLBACK_POLICY,
     );
   });
+
+  it("keeps a configured handoff_assign_to", () => {
+    expect(
+      resolveFallbackPolicy({ handoff_assign_to: "agent-1" })
+        .handoff_assign_to,
+    ).toBe("agent-1");
+  });
+
+  it("trims a padded handoff_assign_to", () => {
+    expect(
+      resolveFallbackPolicy({ handoff_assign_to: "  agent-1  " })
+        .handoff_assign_to,
+    ).toBe("agent-1");
+  });
+
+  it("treats a missing, blank or non-string handoff_assign_to as no default", () => {
+    // The builder writes "" for the empty selection, and flows authored
+    // before this field existed have no key at all.
+    expect(resolveFallbackPolicy({}).handoff_assign_to).toBeUndefined();
+    expect(
+      resolveFallbackPolicy({ handoff_assign_to: "" }).handoff_assign_to,
+    ).toBeUndefined();
+    expect(
+      resolveFallbackPolicy({ handoff_assign_to: "   " }).handoff_assign_to,
+    ).toBeUndefined();
+    expect(
+      resolveFallbackPolicy({ handoff_assign_to: 42 as unknown as string })
+        .handoff_assign_to,
+    ).toBeUndefined();
+  });
+
+  it("leaves the other fields untouched when only the agent is set", () => {
+    expect(resolveFallbackPolicy({ handoff_assign_to: "agent-1" })).toEqual({
+      ...DEFAULT_FALLBACK_POLICY,
+      handoff_assign_to: "agent-1",
+    });
+  });
 });
 
 const POLICY_REPROMPT_2_HANDOFF: FlowFallbackPolicy = {

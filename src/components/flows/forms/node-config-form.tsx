@@ -48,7 +48,7 @@ import {
 import { cn } from "@/lib/utils";
 import { uploadAccountMedia, MEDIA_MAX_BYTES } from "@/lib/storage/upload-media";
 import { slugify, type BuilderNode } from "../shared";
-import { NextNodeRow, NodeKeySelect, TextRow } from "./fields";
+import { AgentSelectRow, NextNodeRow, NodeKeySelect, TextRow } from "./fields";
 
 interface NodeConfigFormProps {
   node: BuilderNode;
@@ -195,15 +195,25 @@ export function NodeConfigForm({
         />
       );
 
-    case "handoff":
+    case "handoff": {
+      const handoffCfg = cfg as { note?: string; assign_to?: string };
       return (
-        <TextRow
-          label={t("internalNote")}
-          value={(cfg as { note?: string }).note ?? ""}
-          onChange={(v) => onUpdateConfig({ note: v })}
-          rows={2}
-        />
+        <>
+          <AgentSelectRow
+            label={t("handoffAgent")}
+            value={handoffCfg.assign_to ?? ""}
+            onChange={(v) => onUpdateConfig({ assign_to: v })}
+            hint={t("handoffAgentHint")}
+          />
+          <TextRow
+            label={t("internalNote")}
+            value={handoffCfg.note ?? ""}
+            onChange={(v) => onUpdateConfig({ note: v })}
+            rows={2}
+          />
+        </>
       );
+    }
 
     case "end":
       return (

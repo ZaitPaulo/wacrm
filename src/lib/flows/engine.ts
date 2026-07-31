@@ -58,6 +58,8 @@ import {
   type SetTagNodeConfig,
   type StartNodeConfig,
   type KeywordTriggerConfig,
+  type FlowFallbackPolicy,
+  type HandoffNodeConfig,
 } from "./types";
 
 // ============================================================
@@ -134,6 +136,40 @@ export function isSuspending(node_type: string): boolean {
 /** Nodes that end the run. */
 export function isTerminal(node_type: string): boolean {
   return node_type === "handoff" || node_type === "end";
+}
+
+/**
+ * Which agent an explicit `handoff` node assigns to.
+ *
+ * The node's own `assign_to` wins over the flow-level default: the
+ * author pointed THIS exit at THIS agent, and the default exists to
+ * fill the gap, not to override it. Null when neither is configured —
+ * the conversation still flips to `pending`, it just stays in the
+ * shared queue (the behavior every flow had before the builder could
+ * express an agent at all).
+ */
+export function resolveHandoffAgent(
+  cfg: Pick<HandoffNodeConfig, "assign_to">,
+  policy: Pick<FlowFallbackPolicy, "handoff_assign_to">,
+): string | null {
+  return cfg.assign_to?.trim() || policy.handoff_assign_to || null;
+}
+
+/**
+ * Which agent the fallback-exhausted route assigns to, given the flow's
+ * default and whoever currently owns the conversation.
+ *
+ * Returns null whenever the thread already has an assignee. That route
+ * fires because the customer got stuck, not because anyone routed them
+ * there, so it must never take the case away from a human who picked
+ * it up mid-run. Mirrors the AI handoff's rule in lib/ai/auto-reply.ts.
+ */
+export function resolveFallbackHandoffAgent(
+  policy: Pick<FlowFallbackPolicy, "handoff_assign_to">,
+  currentAssignee: string | null | undefined,
+): string | null {
+  if (currentAssignee) return null;
+  return policy.handoff_assign_to || null;
 }
 
 /**
@@ -432,17 +468,33 @@ async function sendListAndSuspend(
   return { outcome: "advanced", node_key: node.node_key };
 }
 
+/**
+ * Terminal executor for a `handoff` node: park the conversation for a
+ * human, route it to whoever should pick it up, and end the run as
+ * `handed_off`.
+ *
+ * `policy` is the flow's resolved fallback policy, wanted only for its
+ * `handoff_assign_to` — the flow-level default this node falls back to
+ * when it carries no agent of its own. It's passed in rather than
+ * loaded here so the caller owns the single, lazy flow read; see the
+ * call site in `advanceFromNodeKey`.
+ */
 async function executeHandoff(
   db: AdminClient,
   run: FlowRunRow,
   node: FlowNodeRow,
+  policy: FlowFallbackPolicy,
 ): Promise<void> {
-  const cfg = node.config as { assign_to?: string; note?: string };
+  const cfg = node.config as unknown as HandoffNodeConfig;
+  const assignTo = resolveHandoffAgent(cfg, policy);
   const convUpdate: Record<string, unknown> = {
     status: "pending",
     updated_at: new Date().toISOString(),
   };
-  if (cfg.assign_to) convUpdate.assigned_agent_id = cfg.assign_to;
+  // Deliberately overwrites an existing assignee — unlike the
+  // fallback-exhausted route below, reaching this node IS the routing
+  // decision the flow's author authored.
+  if (assignTo) convUpdate.assigned_agent_id = assignTo;
   if (run.conversation_id) {
     await db
       .from("conversations")
@@ -451,7 +503,10 @@ async function executeHandoff(
   }
   await logEvent(db, run.id, "handoff", node.node_key, {
     note: cfg.note ?? null,
-    assigned_to: cfg.assign_to ?? null,
+    // What was actually assigned, not what was configured: a run with
+    // no conversation writes nothing, and "handed off to nobody" is
+    // precisely the case worth telling apart in the events viewer.
+    assigned_to: run.conversation_id && assignTo ? assignTo : null,
   });
   await endRun(db, run.id, "handed_off", "handoff_node");
 }
@@ -770,7 +825,15 @@ async function advanceFromNodeKey(
       return { outcome: "advanced" };
     }
     if (node.node_type === "handoff") {
-      await executeHandoff(db, run, node);
+      // The flow row is loaded HERE rather than at the top of dispatch:
+      // its fallback policy is the only thing the advance loop needs it
+      // for, and the overwhelming majority of inbound messages never
+      // reach a handoff node. One SELECT on a terminal path beats one
+      // on every message.
+      const policy = resolveFallbackPolicy(
+        (await loadFlow(db, run.flow_id))?.fallback_policy,
+      );
+      await executeHandoff(db, run, node, policy);
       return { outcome: "handed_off" };
     }
     if (node.node_type === "end") {
@@ -1037,14 +1100,36 @@ async function handleReplyForActiveRun(
     return { consumed: true, flow_run_id: run.id, outcome: "fallback_fired" };
   }
   if (action.type === "handoff") {
+    let assignedTo: string | null = null;
     if (run.conversation_id) {
+      const convUpdate: Record<string, unknown> = {
+        status: "pending",
+        updated_at: new Date().toISOString(),
+      };
+      // Read the current owner before deciding — resolveFallbackHandoffAgent
+      // refuses to steal a thread a human already took. Only worth the
+      // round trip when there's a default agent to assign at all.
+      if (policy.handoff_assign_to) {
+        const { data: conv } = await db
+          .from("conversations")
+          .select("assigned_agent_id")
+          .eq("id", run.conversation_id)
+          .maybeSingle();
+        assignedTo = resolveFallbackHandoffAgent(
+          policy,
+          (conv as { assigned_agent_id: string | null } | null)
+            ?.assigned_agent_id,
+        );
+        if (assignedTo) convUpdate.assigned_agent_id = assignedTo;
+      }
       await db
         .from("conversations")
-        .update({ status: "pending", updated_at: new Date().toISOString() })
+        .update(convUpdate)
         .eq("id", run.conversation_id);
     }
     await logEvent(db, run.id, "handoff", run.current_node_key, {
       reason: "fallback_exhausted",
+      assigned_to: assignedTo,
     });
     await endRun(db, run.id, "handed_off", "fallback_exhausted");
     return { consumed: true, flow_run_id: run.id, outcome: "handed_off" };

@@ -294,6 +294,24 @@ export interface FlowFallbackPolicy {
   on_timeout_hours: number;
   /** What to do once max_reprompts has been hit. */
   on_exhaust: "handoff" | "end";
+  /**
+   * Flow-level default agent for handoffs. Despite living under
+   * `fallback_policy`, this applies to BOTH routes that hand a
+   * conversation over:
+   *   - the explicit `handoff` node, when its own `assign_to` is empty
+   *     (see HandoffNodeConfig.assign_to, which takes precedence);
+   *   - the fallback-exhausted route, which has no node config of its
+   *     own and would otherwise never assign anyone.
+   *
+   * It rides here because `flows.fallback_policy` is already a JSONB
+   * column the editor persists — a dedicated column would buy an FK we
+   * can't have anyway (`conversations.assigned_agent_id` has none) at
+   * the cost of a migration.
+   *
+   * Undefined / empty means "no default": the conversation flips to
+   * `pending` unassigned, which is the pre-existing behavior.
+   */
+  handoff_assign_to?: string;
 }
 
 export const DEFAULT_FALLBACK_POLICY: FlowFallbackPolicy = {

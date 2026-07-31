@@ -1047,6 +1047,9 @@
       "keywordsPlaceholder": "soporte, ayuda, hola",
       "entryNodeTitle": "Nodo de entrada:",
       "entryNodePlaceholder": "Elige el primer nodo…",
+      "handoffTitle": "Derivación",
+      "handoffDefaultAgentLabel": "Agente por defecto",
+      "handoffDefaultAgentHint": "Se asigna cuando un nodo de derivación no tiene agente propio, y cuando el cliente agota los reintentos. En este último caso no reemplaza a un agente que ya haya tomado la conversación.",
       "nodesTitle": "Nodos ({count})",
       "nodesEmpty": "Agrega un nodo <strong>Inicio</strong>, después uno de <strong>Enviar botones</strong> y por último una <strong>Derivación</strong>: esa es la forma del menú de bienvenida.",
       "addNode": "Agregar nodo",
@@ -1120,7 +1123,12 @@
         "filenamePlaceholder": "factura.pdf",
         "advanceAfterSending": "Después de enviar, avanzar a",
         "pickNextNode": "Elige el nodo siguiente…",
-        "none": "— Ninguno —"
+        "none": "— Ninguno —",
+        "handoffAgent": "Asignar a",
+        "handoffAgentHint": "Si lo dejas sin elegir, se usa el agente por defecto del flujo.",
+        "agentUnassigned": "— Sin asignar —",
+        "agentIdPlaceholder": "Id del agente",
+        "agentUnknown": "{id} (agente desconocido)"
       },
       "categories": {
         "messaging": "Mensajería",

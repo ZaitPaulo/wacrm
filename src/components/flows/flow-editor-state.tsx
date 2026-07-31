@@ -51,7 +51,12 @@ import {
 } from "@/lib/flows/validate";
 import { useTranslations } from "next-intl";
 import { unlinkNodeReferences } from "@/lib/flows/edges";
-import type { FlowNodeRow, FlowRow } from "@/lib/flows/types";
+import { resolveFallbackPolicy } from "@/lib/flows/fallback";
+import type {
+  FlowFallbackPolicy,
+  FlowNodeRow,
+  FlowRow,
+} from "@/lib/flows/types";
 import { NODE_META, slugify, type BuilderNode, type NodeType } from "./shared";
 
 // ============================================================
@@ -66,10 +71,19 @@ export interface BuilderState {
   entry_node_id: string | null;
   status: FlowRow["status"];
   nodes: BuilderNode[];
+  /**
+   * Authored, not envelope: `handoff_assign_to` (the flow's default
+   * handoff agent) is editable in the builder, so the whole policy has
+   * to round-trip through the form and the PUT. Always held in resolved
+   * form so a save can never write a partial policy over the defaults.
+   */
+  fallback_policy: FlowFallbackPolicy;
 }
 
 export interface FlowEditorContextValue {
-  /** Immutable post-load envelope: id, created_at, fallback_policy, etc. */
+  /** Immutable post-load envelope: id, created_at, etc. `fallback_policy`
+   *  used to be read from here; it's authored now and lives on
+   *  BuilderState, so this copy is stale the moment the form is edited. */
   flow: FlowRow;
 
   // Authored state
@@ -184,7 +198,10 @@ export function defaultConfigFor(type: NodeType): Record<string, unknown> {
     case "set_tag":
       return { mode: "add", tag_id: "", next_node_key: "" };
     case "handoff":
-      return { note: "" };
+      // `assign_to` blank = fall back to the flow's default agent (and,
+      // failing that, hand off unassigned). Seeded explicitly so the
+      // node's form has a value to bind rather than an absent key.
+      return { note: "", assign_to: "" };
     case "end":
       return {};
   }
@@ -247,6 +264,10 @@ export function FlowEditorProvider({
     trigger_config: initialFlow.trigger_config as Record<string, unknown>,
     entry_node_id: initialFlow.entry_node_id,
     status: initialFlow.status,
+    // Resolved, not raw: flows authored before `handoff_assign_to`
+    // existed carry a partial blob, and seeding it as-is would make the
+    // next save write that partial policy back over the defaults.
+    fallback_policy: resolveFallbackPolicy(initialFlow.fallback_policy),
     nodes: initialNodes.map((n) => ({
       node_key: n.node_key,
       node_type: n.node_type as NodeType,
@@ -341,6 +362,7 @@ export function FlowEditorProvider({
           trigger_type: state.trigger_type,
           trigger_config: state.trigger_config,
           entry_node_id: state.entry_node_id,
+          fallback_policy: state.fallback_policy,
           nodes: state.nodes,
         }),
       });

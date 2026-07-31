@@ -59,7 +59,7 @@ import {
   type NodeType,
 } from './shared';
 import { NodeConfigForm } from './forms/node-config-form';
-import { NodeKeySelect } from './forms/fields';
+import { AgentSelectRow, NodeKeySelect } from './forms/fields';
 import { IssueLine } from './validation-panel';
 import { useFlowEditor, type BuilderState } from './flow-editor-state';
 
@@ -164,6 +164,8 @@ export function FlowBuilder() {
       />
 
       <EntryPicker state={state} setState={setState} t={t} />
+
+      <HandoffDefaultsPanel state={state} setState={setState} t={t} />
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -365,6 +367,53 @@ function EntryPicker({
         placeholder={t('entryNodePlaceholder')}
         className="max-w-xs flex-1"
       />
+    </section>
+  );
+}
+
+// ============================================================
+// Flow-level handoff defaults
+// ============================================================
+
+/**
+ * The flow's default handoff agent. Always shown, not gated on the
+ * graph containing a handoff node: the fallback policy defaults to
+ * `on_exhaust: "handoff"`, so ANY flow can hand a conversation over
+ * once the customer exhausts the reprompts — and that route has no node
+ * config of its own to carry an agent.
+ */
+function HandoffDefaultsPanel({
+  state,
+  setState,
+  t,
+}: {
+  state: BuilderState;
+  setState: React.Dispatch<React.SetStateAction<BuilderState>>;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <section className="border-border bg-card rounded-lg border p-4">
+      <h2 className="text-foreground mb-3 text-sm font-semibold">
+        {t('handoffTitle')}
+      </h2>
+      <div className="max-w-sm">
+        <AgentSelectRow
+          label={t('handoffDefaultAgentLabel')}
+          value={state.fallback_policy.handoff_assign_to ?? ''}
+          onChange={(v) =>
+            setState((s) => ({
+              ...s,
+              fallback_policy: {
+                ...s.fallback_policy,
+                // "" reads as unset everywhere downstream
+                // (resolveFallbackPolicy collapses it to undefined).
+                handoff_assign_to: v,
+              },
+            }))
+          }
+          hint={t('handoffDefaultAgentHint')}
+        />
+      </div>
     </section>
   );
 }

@@ -6,6 +6,8 @@ import {
   isSuspending,
   isTerminal,
   evaluateConditionPredicate,
+  resolveHandoffAgent,
+  resolveFallbackHandoffAgent,
 } from "./engine";
 
 describe("matchReplyId", () => {
@@ -295,5 +297,76 @@ describe("evaluateConditionPredicate", () => {
         configValue: "anything",
       }),
     ).toBe(false);
+  });
+});
+
+describe("resolveHandoffAgent", () => {
+  it("prefers the node's own agent over the flow default", () => {
+    expect(
+      resolveHandoffAgent(
+        { assign_to: "agent-node" },
+        { handoff_assign_to: "agent-default" },
+      ),
+    ).toBe("agent-node");
+  });
+
+  it("falls back to the flow default when the node has none", () => {
+    expect(
+      resolveHandoffAgent({}, { handoff_assign_to: "agent-default" }),
+    ).toBe("agent-default");
+    expect(
+      resolveHandoffAgent(
+        { assign_to: "" },
+        { handoff_assign_to: "agent-default" },
+      ),
+    ).toBe("agent-default");
+    // The builder can leave whitespace behind in the raw-id fallback
+    // input; it must not count as a configured agent.
+    expect(
+      resolveHandoffAgent(
+        { assign_to: "   " },
+        { handoff_assign_to: "agent-default" },
+      ),
+    ).toBe("agent-default");
+  });
+
+  it("trims the node's agent id", () => {
+    expect(resolveHandoffAgent({ assign_to: " agent-node " }, {})).toBe(
+      "agent-node",
+    );
+  });
+
+  it("returns null when neither is configured", () => {
+    // Pre-existing behavior: status-only handoff, no assignment.
+    expect(resolveHandoffAgent({}, {})).toBeNull();
+    expect(resolveHandoffAgent({ assign_to: "" }, {})).toBeNull();
+  });
+});
+
+describe("resolveFallbackHandoffAgent", () => {
+  it("assigns the flow default on an unowned conversation", () => {
+    expect(
+      resolveFallbackHandoffAgent({ handoff_assign_to: "agent-default" }, null),
+    ).toBe("agent-default");
+    expect(
+      resolveFallbackHandoffAgent(
+        { handoff_assign_to: "agent-default" },
+        undefined,
+      ),
+    ).toBe("agent-default");
+  });
+
+  it("never steals a conversation a human already took", () => {
+    expect(
+      resolveFallbackHandoffAgent(
+        { handoff_assign_to: "agent-default" },
+        "agent-human",
+      ),
+    ).toBeNull();
+  });
+
+  it("returns null when the flow declares no default", () => {
+    expect(resolveFallbackHandoffAgent({}, null)).toBeNull();
+    expect(resolveFallbackHandoffAgent({ handoff_assign_to: "" }, null)).toBeNull();
   });
 });
