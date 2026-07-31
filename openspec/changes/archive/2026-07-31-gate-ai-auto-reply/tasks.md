@@ -41,8 +41,8 @@
 
 ## 5. Verificación contra WhatsApp real
 
-- [ ] 5.1 Con el auto-reply activo y sin automatizaciones de mensaje, enviar tres mensajes seguidos en menos de 8 segundos y confirmar que llega una sola respuesta que considera los tres
-- [ ] 5.2 Confirmar en `ai_usage_log` que esa ráfaga registró una sola fila, no tres
-- [ ] 5.3 Reactivar *Lead Qualifier* dejándole solo acciones que no envían mensajes, y confirmar que la automatización etiqueta y además la IA responde
-- [ ] 5.4 Añadirle a esa automatización una acción `send_message` y confirmar que llega solo la respuesta de la automatización, que la IA calla y que `ai_usage_log` no crece
-- [ ] 5.5 Si algún caso se desvía del spec, volver al diseño antes de parchear
+- [x] 5.1 Con el auto-reply activo y sin automatizaciones de mensaje, enviar tres mensajes seguidos en menos de 8 segundos y confirmar que llega una sola respuesta que considera los tres
+- [x] 5.2 Confirmar en `ai_usage_log` que esa ráfaga registró una sola fila, no tres
+- [x] 5.3 Reactivar *Lead Qualifier* dejándole solo acciones que no envían mensajes, y confirmar que la automatización etiqueta y además la IA responde
+- [x] 5.4 Añadirle a esa automatización una acción `send_message` y confirmar que llega solo la respuesta de la automatización, que la IA calla y que `ai_usage_log` no crece
+- [X] 5.5 Si algún caso se desvía del spec, volver al diseño antes de parchear

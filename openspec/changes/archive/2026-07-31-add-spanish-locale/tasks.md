@@ -90,6 +90,6 @@ nunca internacionalizó, además de un problema aparte con date-fns.
 
 - [x] 8.1 Correr `npx tsc --noEmit`, `npm run build` y la suite completa; los 5 fallos ambientales de `currency.test.ts` y `date-utils.test.ts` son preexistentes y no cuentan
 - [x] 8.2 Recorrer la aplicación en español buscando textos que hayan quedado en inglés
-- [ ] 8.3 Revisar desbordes de texto en botones, pestañas y encabezados de tabla: el español ocupa entre 15% y 30% más que el inglés
+- [x] 8.3 Revisar desbordes de texto en botones, pestañas y encabezados de tabla: el español ocupa entre 15% y 30% más que el inglés
 - [x] 8.4 Verificar la vitrina pública y el detalle de vehículo en español
-- [ ] 8.5 Commit de los ajustes que surjan
+- [x] 8.5 Commit de los ajustes que surjan
