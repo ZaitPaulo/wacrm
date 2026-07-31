@@ -47,6 +47,19 @@
 - [x] 6.6 Verificar tipos, paridad de catálogos y suite completa
 - [x] 6.7 Commit
 
+## 6b. Pantalla de agentes IA (no estaba en el plan)
+
+Detectada al probar: `/agents` seguía en inglés porque upstream nunca la
+internacionalizó — no existía namespace que traducir. Su pestaña "Setup" sí
+estaba en español porque reusa `Settings.aiConfig`.
+
+- [x] 6b.1 Crear el namespace `Agents` en los tres catálogos
+- [x] 6b.2 Migrar `src/app/(dashboard)/agents/page.tsx` (título, descripción y pestañas)
+- [x] 6b.3 Migrar `src/components/agents/ai-playground.tsx`, renombrando la variable `t` del map de turnos para que el traductor pueda usar ese nombre como en el resto del repo
+- [x] 6b.4 Migrar `src/components/agents/ai-usage.tsx`
+- [x] 6b.5 Verificar tipos, lint, build y paridad de catálogos
+- [x] 6b.6 Commit
+
 ## 7. Migración de la vitrina pública al catálogo
 
 - [ ] 7.1 Crear el namespace `Storefront` en los tres catálogos

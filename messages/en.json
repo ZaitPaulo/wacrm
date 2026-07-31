@@ -1888,5 +1888,45 @@
       "noResults": "No results.",
       "searchPlaceholder": "Search…"
     }
+  },
+  "Agents": {
+    "title": "AI Agents",
+    "description": "Your bring-your-own-key AI agent — set it up, then test it in the playground before it replies to customers in the inbox.",
+    "tabs": {
+      "playground": "Playground",
+      "setup": "Setup",
+      "usage": "Usage"
+    },
+    "playground": {
+      "title": "Playground",
+      "subtitle": "— test replies as if you were a customer",
+      "reset": "Reset",
+      "emptyTitle": "Send a message to see how your agent would reply.",
+      "emptyHint": "It uses your knowledge base and behaves exactly like the auto-reply bot — including handoff.",
+      "goToSetup": "Go to Setup",
+      "wouldHandOff": "Would hand off to a human here",
+      "placeholder": "Type a customer message…",
+      "notConfigured": "No agent configured yet — finish Setup first.",
+      "failed": "Couldn't get a reply.",
+      "networkError": "Couldn't reach the server.",
+      "thinking": "Thinking…",
+      "notSetUpYet": "Not set up yet? Go to Setup"
+    },
+    "usage": {
+      "title": "Token usage",
+      "description": "Tokens spent on your provider key by drafts and the auto-reply bot. Counts only — no message content is stored here.",
+      "lastDays": "Last {count} days",
+      "emptyTitle": "No AI usage in the last {count} days yet.",
+      "emptyHint": "This fills in as the assistant drafts and auto-replies.",
+      "totalTokens": "Total tokens",
+      "llmCalls": "LLM calls",
+      "autoReply": "Auto-reply",
+      "drafts": "Drafts",
+      "tokensPerDay": "Tokens per day",
+      "byModel": "By model",
+      "tokens": "Tokens",
+      "partialWindow": "Showing a partial window — usage is high enough that only the most recent days are counted.",
+      "loadFailed": "Failed to load usage"
+    }
   }
 }

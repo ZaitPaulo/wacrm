@@ -1888,5 +1888,45 @@
       "noResults": "Sin resultados.",
       "searchPlaceholder": "Buscar…"
     }
+  },
+  "Agents": {
+    "title": "Agentes IA",
+    "description": "Tu agente de IA con tu propia clave: configúralo y pruébalo en el playground antes de que empiece a responderles a tus clientes en la bandeja.",
+    "tabs": {
+      "playground": "Playground",
+      "setup": "Configuración",
+      "usage": "Consumo"
+    },
+    "playground": {
+      "title": "Playground",
+      "subtitle": "— prueba las respuestas como si fueras un cliente",
+      "reset": "Reiniciar",
+      "emptyTitle": "Envía un mensaje para ver cómo respondería tu agente.",
+      "emptyHint": "Usa tu base de conocimiento y se comporta igual que el bot de respuesta automática, derivación incluida.",
+      "goToSetup": "Ir a Configuración",
+      "wouldHandOff": "Acá derivaría a una persona",
+      "placeholder": "Escribe un mensaje de cliente…",
+      "notConfigured": "Todavía no hay un agente configurado — termina la configuración primero.",
+      "failed": "No se pudo obtener una respuesta.",
+      "networkError": "No se pudo conectar con el servidor.",
+      "thinking": "Pensando…",
+      "notSetUpYet": "¿Todavía sin configurar? Ve a Configuración"
+    },
+    "usage": {
+      "title": "Consumo de tokens",
+      "description": "Tokens gastados con tu clave del proveedor por los borradores y el bot de respuesta automática. Solo se cuentan: acá no se guarda el contenido de los mensajes.",
+      "lastDays": "Últimos {count} días",
+      "emptyTitle": "Todavía no hubo consumo de IA en los últimos {count} días.",
+      "emptyHint": "Esto se va llenando a medida que el asistente redacta y responde solo.",
+      "totalTokens": "Tokens totales",
+      "llmCalls": "Llamadas al modelo",
+      "autoReply": "Respuesta automática",
+      "drafts": "Borradores",
+      "tokensPerDay": "Tokens por día",
+      "byModel": "Por modelo",
+      "tokens": "Tokens",
+      "partialWindow": "Se muestra una ventana parcial: el consumo es tan alto que solo se cuentan los días más recientes.",
+      "loadFailed": "No se pudo cargar el consumo"
+    }
   }
 }
