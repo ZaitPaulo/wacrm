@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { getShowcase } from '@/lib/showcase/data'
+import { getTranslations } from 'next-intl/server'
 
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
@@ -9,16 +10,15 @@ export const alt = 'Vehículos disponibles'
 // remotas → siempre renderiza).
 export default async function OgImage() {
   const data = await getShowcase()
+  const t = await getTranslations('Storefront')
   const name = data
     ? data.account.public_name?.trim() || data.account.name
     : 'Vitrina'
   const count = data?.vehicles.length ?? 0
   // Satori (next/og) exige `display: flex` en cualquier div con más de un
-  // hijo, y una interpolación como `{count} vehículo{...}` genera varios
-  // nodos de texto. Precalcular la frase la deja como un único hijo.
-  const availability = `${count} vehículo${count === 1 ? '' : 's'} disponible${
-    count === 1 ? '' : 's'
-  }`
+  // hijo, y una interpolación genera varios nodos de texto. El catálogo
+  // ya devuelve la frase armada, así que queda como un único hijo.
+  const availability = t('ogAvailability', { count })
 
   return new ImageResponse(
     (
@@ -46,7 +46,7 @@ export default async function OgImage() {
           {name}
         </div>
         <div style={{ fontSize: 74, fontWeight: 800, marginTop: 24, lineHeight: 1.05 }}>
-          Encuentra tu próximo vehículo
+          {t('ogTagline')}
         </div>
         <div style={{ fontSize: 34, opacity: 0.85, marginTop: 28 }}>
           {availability}

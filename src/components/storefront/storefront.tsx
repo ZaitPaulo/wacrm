@@ -91,6 +91,7 @@ function VehicleCard({
   currency: string;
 }) {
   const t = useTranslations('Inventory');
+  const s = useTranslations('Storefront');
   const image = v.images?.[0] ?? null;
   const body = labelOf(t, BODY_TYPES, v.body_type);
   // labelOf returns the em dash when the value is null; fall back to the
@@ -113,18 +114,18 @@ function VehicleCard({
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-[#75777e]">
-            Sin foto
+            {s('noPhoto')}
           </div>
         )}
         {v.condition === 'new' && (
           <div className="absolute right-4 top-4 rounded-full border border-[#0059bb]/20 bg-white/90 px-3 py-1 text-xs font-semibold text-[#0059bb] backdrop-blur-sm">
-            Nuevo
+            {s('new')}
           </div>
         )}
         <Link
           href={href}
           className="absolute inset-0"
-          aria-label={`Ver ${v.brand} ${v.model} ${v.year}`}
+          aria-label={s('viewVehicle', { vehicle: `${v.brand} ${v.model} ${v.year}` })}
         />
       </div>
 
@@ -143,13 +144,13 @@ function VehicleCard({
         <div className="mb-6 grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-[#75777e]">
-              Año
+              {s('year')}
             </span>
             <span className="font-medium tabular-nums text-[#191c1e]">{v.year}</span>
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-[#75777e]">
-              Kilometraje
+              {s('mileage')}
             </span>
             <span className="font-medium tabular-nums text-[#191c1e]">
               {v.mileage != null ? `${formatNumber(v.mileage)} km` : '—'}
@@ -169,7 +170,7 @@ function VehicleCard({
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#20b358]"
             >
               <WhatsAppIcon className="size-[18px]" />
-              Me interesa
+              {s('interested')}
             </a>
           ) : null}
         </div>
@@ -191,6 +192,7 @@ export function Storefront({
   currency: string;
 }) {
   const t = useTranslations('Inventory');
+  const s = useTranslations('Storefront');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
@@ -297,7 +299,7 @@ export function Storefront({
 
         <div className="relative z-10 mx-auto w-full max-w-[1280px]">
           <h1 className="mb-5 max-w-2xl text-4xl font-bold leading-tight tracking-tight text-[#191c1e] sm:text-5xl">
-            Encuentra el auto de tus sueños
+            {s('heroTitle')}
           </h1>
           <p className="mb-8 max-w-xl text-lg text-[#44474d]">
             Calidad premium, confianza garantizada. Explora nuestra selección de
@@ -307,7 +309,7 @@ export function Storefront({
             href="#inventario"
             className="inline-flex items-center justify-center rounded-lg bg-black px-8 py-3 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#0059bb]"
           >
-            Ver inventario
+            {s('viewInventory')}
           </a>
         </div>
       </section>
@@ -322,7 +324,7 @@ export function Storefront({
             <h2 className="mb-1 text-2xl font-semibold text-[#191c1e]">
               Inventario Destacado
             </h2>
-            <p className="text-[#44474d]">Descubre los vehículos disponibles hoy.</p>
+            <p className="text-[#44474d]">{s('inventorySubtitle')}</p>
           </div>
 
           <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
@@ -341,7 +343,7 @@ export function Storefront({
                 className={`${showFilters ? 'block' : 'hidden'} h-fit rounded-xl border border-[#c5c6cd] bg-white p-5 ${LUXURY_SHADOW} lg:sticky lg:top-24 lg:block`}
               >
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-[#191c1e]">Filtros</h3>
+                  <h3 className="text-sm font-bold text-[#191c1e]">{s('filters')}</h3>
                   {hasFilters && (
                     <button
                       type="button"
@@ -356,7 +358,7 @@ export function Storefront({
 
                 <div className="space-y-4">
                   <SelectField
-                    label="Marca"
+                    label={s('brand')}
                     value={brand}
                     onChange={(v) => {
                       setBrand(v);
@@ -370,7 +372,7 @@ export function Storefront({
                       </option>
                     ))}
                   </SelectField>
-                  <SelectField label="Modelo" value={model} onChange={setModel}>
+                  <SelectField label={s('model')} value={model} onChange={setModel}>
                     <option value="">Todos</option>
                     {models.map((m) => (
                       <option key={m} value={m}>
@@ -378,37 +380,37 @@ export function Storefront({
                       </option>
                     ))}
                   </SelectField>
-                  <SelectField label="Año" value={year} onChange={setYear}>
-                    <option value="">Cualquiera</option>
+                  <SelectField label={s('year')} value={year} onChange={setYear}>
+                    <option value="">{s('anyYear')}</option>
                     {years.map((y) => (
                       <option key={y} value={y}>
                         {y}
                       </option>
                     ))}
                   </SelectField>
-                  <SelectField label="Presupuesto" value={budget} onChange={setBudget}>
+                  <SelectField label={s('budget')} value={budget} onChange={setBudget}>
                     <option value="">Sin límite</option>
                     {budgetTiers.map((t) => (
                       <option key={t} value={t}>
-                        Hasta {formatPrice(t, currency)}
+                        {s('upTo', { value: formatPrice(t, currency) })}
                       </option>
                     ))}
                   </SelectField>
                   <SelectField
-                    label="Kilometraje"
+                    label={s('mileage')}
                     value={mileageMax}
                     onChange={setMileageMax}
                   >
                     <option value="">Sin límite</option>
                     {mileageTiers.map((t) => (
                       <option key={t} value={t}>
-                        Hasta {formatNumber(t)} km
+                        {s('upTo', { value: `${formatNumber(t)} km` })}
                       </option>
                     ))}
                   </SelectField>
                   {transmissionOpts.length > 0 && (
                     <SelectField
-                      label="Transmisión"
+                      label={s('transmission')}
                       value={transmission}
                       onChange={setTransmission}
                     >
@@ -421,7 +423,7 @@ export function Storefront({
                     </SelectField>
                   )}
                   {fuelOpts.length > 0 && (
-                    <SelectField label="Combustible" value={fuel} onChange={setFuel}>
+                    <SelectField label={s('fuel')} value={fuel} onChange={setFuel}>
                       <option value="">Todos</option>
                       {fuelOpts.map((o) => (
                         <option key={o.value} value={o.value}>
@@ -431,7 +433,7 @@ export function Storefront({
                     </SelectField>
                   )}
                   {bodyOpts.length > 0 && (
-                    <SelectField label="Carrocería" value={body} onChange={setBody}>
+                    <SelectField label={s('bodyType')} value={body} onChange={setBody}>
                       <option value="">Todas</option>
                       {bodyOpts.map((o) => (
                         <option key={o.value} value={o.value}>

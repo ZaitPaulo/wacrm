@@ -1,17 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 
 // Galería de fotos del vehículo (estilo Loramotors): imagen grande
 // aspect-video + tira de miniaturas en grilla. Client component.
 export function Gallery({ images, alt }: { images: string[]; alt: string }) {
+  const t = useTranslations('Storefront');
   const [selected, setSelected] = useState(0);
 
   if (images.length === 0) {
     return (
       <div className="flex aspect-video items-center justify-center rounded-xl bg-[#eceef0] text-sm text-[#75777e]">
-        Sin foto
+        {t('noPhoto')}
       </div>
     );
   }

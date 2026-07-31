@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { getShowcase } from '@/lib/showcase/data'
 import { getBaseUrl } from '@/lib/showcase/site-url'
@@ -44,19 +45,20 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function StorefrontPage() {
+  const t = await getTranslations('Storefront')
   const data = await getShowcase()
 
   // Vitrina no configurada: ninguna cuenta activó showcase_enabled.
   if (!data) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#f7f9fb] p-8 text-center text-[#191c1e]">
-        <h1 className="text-2xl font-semibold">Vitrina no configurada</h1>
+        <h1 className="text-2xl font-semibold">{t('notConfigured')}</h1>
         <p className="max-w-md text-sm text-[#44474d]">
           Aún no hay una vitrina pública activa. Un administrador puede activarla
           en el CRM (Ajustes → Public showcase).
         </p>
         <Link href="/login" className="text-sm font-medium text-[#0059bb] underline">
-          Ir al CRM
+          {t('goToCrm')}
         </Link>
       </main>
     )

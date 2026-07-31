@@ -1,6 +1,7 @@
 "use client";
 
 import { List, Reply } from "lucide-react";
+import { useTranslations } from 'next-intl';
 import { cn } from "@/lib/utils";
 import type { InteractiveMessagePayload } from "@/lib/whatsapp/interactive";
 
@@ -21,6 +22,7 @@ export function InteractivePreview({
   payload: InteractiveMessagePayload;
   className?: string;
 }) {
+  const t = useTranslations('Interactive');
   return (
     <div
       className={cn(
@@ -36,7 +38,7 @@ export function InteractivePreview({
         ) : null}
         <p className="whitespace-pre-wrap break-words text-sm">
           {payload.body || (
-            <span className="text-muted-foreground">Message body…</span>
+            <span className="text-muted-foreground">{t('previewPlaceholder')}</span>
           )}
         </p>
         {payload.footer ? (

@@ -1,9 +1,11 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import type { ShowcaseAccount } from '@/lib/showcase/format';
 
 // Nav sticky de la vitrina (estilo Loramotors), compartida por la portada
 // y las páginas de detalle. Server component.
-export function StoreNav({ account }: { account: ShowcaseAccount }) {
+export async function StoreNav({ account }: { account: ShowcaseAccount }) {
+  const t = await getTranslations('Storefront');
   const displayName = account.public_name?.trim() || account.name;
   const waDigits = account.public_whatsapp?.replace(/\D/g, '') || null;
 
@@ -49,7 +51,7 @@ export function StoreNav({ account }: { account: ShowcaseAccount }) {
             href="/login"
             className="rounded-lg bg-[#0059bb] px-6 py-2.5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#0070ea]"
           >
-            Iniciar sesión
+            {t('signIn')}
           </Link>
         </div>
       </div>

@@ -81,15 +81,16 @@ export default async function VehiclePage({ params }: Params) {
 
   const { account, vehicle: v } = data
   const t = await getTranslations('Inventory')
+  const s = await getTranslations('Storefront')
   const feats = featuresToList(v.features)
 
   const specRows: [string, string][] = [
-    ['Transmisión', labelOf(t, TRANSMISSIONS, v.transmission)],
-    ['Combustible', labelOf(t, FUEL_TYPES, v.fuel_type)],
-    ['Carrocería', labelOf(t, BODY_TYPES, v.body_type)],
-    ['Color', v.color || '—'],
-    ['Puertas', v.doors != null ? String(v.doors) : '—'],
-    ['Condición', labelOf(t, CONDITIONS, v.condition)],
+    [s('transmission'), labelOf(t, TRANSMISSIONS, v.transmission)],
+    [s('fuel'), labelOf(t, FUEL_TYPES, v.fuel_type)],
+    [s('bodyType'), labelOf(t, BODY_TYPES, v.body_type)],
+    [s('color'), v.color || '—'],
+    [s('doors'), v.doors != null ? String(v.doors) : '—'],
+    [s('condition'), labelOf(t, CONDITIONS, v.condition)],
   ]
 
   const waDigits = account.public_whatsapp?.replace(/\D/g, '') || null
@@ -151,7 +152,7 @@ export default async function VehiclePage({ params }: Params) {
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#e6e8ea] px-3 py-1 text-xs font-semibold text-[#191c1e]">
                 <span className="size-2 rounded-full bg-[#0070ea]" />
-                Disponible
+                {s('available')}
               </div>
               <h1 className="text-3xl font-bold tracking-tight text-[#191c1e] sm:text-4xl">
                 {v.brand} {v.model} {v.year}
@@ -163,13 +164,13 @@ export default async function VehiclePage({ params }: Params) {
 
             {/* Stats clave */}
             <div className="grid grid-cols-2 gap-4 border-y border-[#c5c6cd] py-6">
-              <Stat label="Año" value={String(v.year)} />
+              <Stat label={s('year')} value={String(v.year)} />
               <Stat
-                label="Kilometraje"
+                label={s('mileage')}
                 value={v.mileage != null ? `${formatNumber(v.mileage)} km` : '—'}
               />
-              <Stat label="Combustible" value={labelOf(t, FUEL_TYPES, v.fuel_type)} />
-              <Stat label="Condición" value={labelOf(t, CONDITIONS, v.condition)} />
+              <Stat label={s('fuel')} value={labelOf(t, FUEL_TYPES, v.fuel_type)} />
+              <Stat label={s('condition')} value={labelOf(t, CONDITIONS, v.condition)} />
             </div>
 
             {/* Acciones */}
@@ -182,7 +183,7 @@ export default async function VehiclePage({ params }: Params) {
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-6 py-4 text-sm font-semibold uppercase tracking-wide text-white shadow-sm transition-colors hover:bg-[#20b358]"
                 >
                   <WhatsAppIcon className="size-5" />
-                  Me interesa
+                  {s('interested')}
                 </a>
                 {testDriveHref && (
                   <a
@@ -191,7 +192,7 @@ export default async function VehiclePage({ params }: Params) {
                     rel="noopener noreferrer"
                     className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-black px-6 py-4 text-sm font-semibold uppercase tracking-wide text-black transition-colors hover:bg-[#f2f4f6]"
                   >
-                    Agendar prueba de manejo
+                    {s('bookTestDrive')}
                   </a>
                 )}
               </div>
@@ -204,7 +205,7 @@ export default async function VehiclePage({ params }: Params) {
           {/* Especificaciones */}
           <div className="space-y-6">
             <h2 className="border-b border-[#c5c6cd] pb-4 text-2xl font-semibold text-[#191c1e]">
-              Especificaciones
+              {s('specifications')}
             </h2>
             <div className="flex flex-col divide-y divide-[#c5c6cd]">
               {specRows.map(([k, val], i) => (
@@ -225,7 +226,7 @@ export default async function VehiclePage({ params }: Params) {
           {feats.length > 0 && (
             <div className="space-y-6">
               <h2 className="border-b border-[#c5c6cd] pb-4 text-2xl font-semibold text-[#191c1e]">
-                Características
+                {s('features')}
               </h2>
               <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {feats.map((f, i) => (

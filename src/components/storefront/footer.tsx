@@ -1,11 +1,13 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { MapPin, Phone, Mail, Clock, MessageCircle } from 'lucide-react';
 import type { ShowcaseAccount } from '@/lib/showcase/format';
 
 // Footer del negocio (paleta Loramotors), compartido por la portada y las
 // páginas de detalle. Solo muestra los datos cargados en Ajustes → Public
 // showcase. Server component.
-export function StoreFooter({ account }: { account: ShowcaseAccount }) {
+export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
+  const t = await getTranslations('Storefront');
   const displayName = account.public_name?.trim() || account.name;
   const waDigits = account.public_whatsapp?.replace(/\D/g, '') || null;
 
@@ -37,7 +39,7 @@ export function StoreFooter({ account }: { account: ShowcaseAccount }) {
           {/* Contacto */}
           <div>
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#191c1e]">
-              Contacto
+              {t('contact')}
             </h4>
             <ul className="space-y-2.5 text-sm text-[#44474d]">
               {account.public_address && (
@@ -87,7 +89,7 @@ export function StoreFooter({ account }: { account: ShowcaseAccount }) {
             © {new Date().getFullYear()} {displayName}
           </span>
           <Link href="/login" className="transition-colors hover:text-black">
-            Administración
+            {t('administration')}
           </Link>
         </div>
       </div>
