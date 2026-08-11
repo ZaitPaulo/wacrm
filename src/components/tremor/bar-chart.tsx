@@ -695,12 +695,20 @@ const BarChart = React.forwardRef<HTMLDivElement, BarChartProps>(
               tick={{
                 transform:
                   layout !== "vertical" ? "translate(0, 6)" : undefined,
+                // `fill` va en el tick y no sólo en la clase del eje: el
+                // className aterriza en el <g> contenedor, pero Recharts
+                // pinta cada <text> con su propio atributo fill, que gana
+                // sobre la herencia. Con el `fill=""` que había antes —un
+                // valor SVG inválido— el navegador caía al valor inicial
+                // (negro) y las etiquetas desaparecían en tema oscuro.
+                // `currentColor` las ata a `text-muted-foreground`, que sí
+                // se hereda y sí cambia con el tema.
+                fill: "currentColor",
               }}
-              fill=""
               stroke=""
               className={cx(
                 "text-xs",
-                "fill-muted-foreground",
+                "text-muted-foreground",
                 { "mt-4": layout !== "vertical" },
               )}
               tickLine={false}
@@ -741,17 +749,19 @@ const BarChart = React.forwardRef<HTMLDivElement, BarChartProps>(
               hide={!showYAxis}
               axisLine={false}
               tickLine={false}
-              fill=""
               stroke=""
               className={cx(
                 "text-xs",
-                "fill-muted-foreground",
+                "text-muted-foreground",
               )}
               tick={{
                 transform:
                   layout !== "vertical"
                     ? "translate(-3, 0)"
                     : "translate(0, 0)",
+                // Mismo motivo que en el XAxis: sin este fill los nombres
+                // de categoría se renderizan en negro sobre fondo oscuro.
+                fill: "currentColor",
               }}
               {...(layout !== "vertical"
                 ? {
