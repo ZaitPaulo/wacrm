@@ -9,7 +9,7 @@
 - [x] 1.7 Backfill de `public_ref` para los vehículos existentes, con alfabeto de 6 caracteres sin `I`/`L`/`O`/`U`
 - [x] 1.8 Tabla `vehicle_inquiries` (`vehicle_id`, `contact_id`, `conversation_id`, `created_at`, `account_id`) + RLS de miembro (`is_account_member(account_id)` lectura, `'agent'` escritura)
 - [x] 1.9 Índices de consulta sobre `inventory_vehicles(account_id, status)`, `inventory_vehicles(account_id, sold_at)` y `vehicle_inquiries(account_id, vehicle_id)`
-- [ ] 1.10 Aplicar a la nube con `npx supabase db push --db-url "<cadena>?sslmode=require" --include-all` (lo corre el usuario; el comando pide confirmación interactiva) y verificar por introspección que las tablas, columnas y políticas quedaron creadas
+- [x] 1.10 Aplicada a la nube por el usuario y verificada: `vehicle_acquisitions` y `vehicle_inquiries` existen y operan (14 y 42 filas), las columnas de cierre y `public_ref` están en `inventory_vehicles` con el backfill hecho, y la RLS devuelve 0 filas a un cliente sin sesión
 
 ## 2. Tipos y capa de datos del inventario
 
@@ -83,6 +83,12 @@
 - [x] 10.1 `pnpm typecheck` limpio
 - [x] 10.2 `pnpm lint` sin errores nuevos (el repo ya arrastra 2 errores preexistentes en `join/[token]/page.tsx`)
 - [x] 10.3 `pnpm test` sin fallos nuevos (5 fallos preexistentes de locale en `currency.test.ts` y `date-utils.test.ts`)
-- [ ] 10.4 Prueba manual de la frontera de seguridad: con un usuario de rol `agent`, confirmar que la API no devuelve datos de adquisición y que el tablero no muestra márgenes
-- [ ] 10.5 Prueba manual del ciclo completo: cargar un vehículo con costo, marcarlo vendido, verificar margen y días en inventario, revertir la venta y comprobar que los campos se limpian
-- [ ] 10.6 Prueba manual de atribución: abrir el CTA de la vitrina, enviar el mensaje y verificar que la consulta queda registrada contra el vehículo correcto
+- [ ] 10.4 **NO EJECUTADA** — Prueba manual de la frontera de seguridad con un usuario de rol `agent`. Se verificó que un cliente **sin sesión** recibe 0 filas de `vehicle_acquisitions`, pero eso no es la misma prueba: al anónimo lo frena no ser miembro, mientras que al `agent` lo frena `is_account_member(account_id, 'admin')`. Requiere crear un segundo usuario con rol `agent` en la cuenta. **Es la prueba más importante de este change**: si falla, los vendedores ven el costo de compra
+- [ ] 10.5 **NO EJECUTADA por la UI** — Ciclo completo: cargar un vehículo con costo, marcarlo vendido, verificar margen y días en inventario, revertir y comprobar que los campos se limpian. La lógica está cubierta por tests unitarios (`payload.test.ts`, `vehicle-metrics.test.ts`) y los datos de demo ejercitan las consultas de punta a punta, pero nadie recorrió el diálogo de venta a mano
+- [ ] 10.6 **NO EJECUTADA** — Atribución de punta a punta: enviar un WhatsApp real desde el CTA de la vitrina y verificar que la consulta queda contra el vehículo correcto. El parser tiene tests (`public-ref.test.ts`) y los enlaces se verificaron en la vitrina, pero el tramo del webhook con un mensaje real de Meta no se ha probado
+
+> **Nota de archivo.** Se archiva con 10.4, 10.5 y 10.6 sin ejecutar. Todo lo verificable
+> por código está verificado (build, typecheck, lint, 739 tests, RLS contra cliente
+> anónimo, migración aplicada con datos reales). Lo que falta exige recorrer la interfaz
+> a mano y enviar un mensaje real de WhatsApp. La 10.4 es la que conviene no dejar
+> pasar: es la única que confirma que un vendedor no puede leer el costo de compra.
