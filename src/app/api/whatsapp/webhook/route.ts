@@ -9,6 +9,7 @@ import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
+import { recordVehicleInquiry } from '@/lib/inventory/inquiries'
 import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
@@ -713,6 +714,15 @@ async function processMessage(
   // so the broadcast's `replied_count` advances (via the aggregate
   // trigger installed in migration 003).
   await flagBroadcastReplyIfAny(accountId, contactRecord.id)
+
+  // Si el mensaje conserva el código del CTA de la vitrina, queda
+  // atribuido al vehículo que lo originó. Best-effort: no lanza.
+  await recordVehicleInquiry(
+    accountId,
+    contactRecord.id,
+    conversation.id,
+    contentText,
+  )
 
   // ============================================================
   // Flow runner dispatch.

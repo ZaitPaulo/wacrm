@@ -73,7 +73,30 @@
       "newTodayVsYesterday": "어제 대비 신규",
       "vsYesterday": "어제 대비",
       "openDeals": "진행 중인 딜 {count}건",
-      "noChange": "변동 없음 {suffix}"
+      "noChange": "변동 없음 {suffix}",
+      "sections": {
+        "inventory": "재고",
+        "sales": "판매 · 최근 {days}일",
+        "conversations": "대화"
+      },
+      "stockAvailable": "판매 가능 차량",
+      "ofTotal": "총 {total}대 중",
+      "stockValue": "묶인 자본",
+      "stockValueHint": "판매 가능 재고 합계",
+      "reserved": "예약됨",
+      "reservedHint": "계약금 또는 예약 완료",
+      "soldTotal": "판매 완료",
+      "soldTotalHint": "전체 기간",
+      "unitsSold": "판매 대수",
+      "revenue": "매출",
+      "avgTicket": "평균 판매가",
+      "daysInStock": "재고 보유 일수",
+      "inRange": "{days}일간",
+      "noSales": "해당 기간 판매 없음",
+      "perUnit": "판매 1대당",
+      "days": "{days}일",
+      "noPurchaseDates": "매입일 정보 없음",
+      "overUnits": "{count}대 기준"
     },
     "quickActions": {
       "newContact": "새 연락처",
@@ -122,6 +145,50 @@
       "lastWeek": "지난 주:",
       "noReplies": "아직 기록된 응답이 없습니다",
       "noRepliesHint": "고객 메시지에 답변하면 이 차트가 채워집니다."
+    },
+    "inventoryAging": {
+      "title": "재고 경과 기간",
+      "description": "매입일 기준으로 각 차량이 재고로 머문 기간",
+      "staleAlert": "장기 재고 {count}대",
+      "bucket": {
+        "fresh": "30일 이내",
+        "recent": "31~60일",
+        "aging": "61~90일",
+        "stale": "90일 초과"
+      },
+      "empty": "판매 가능한 차량이 없습니다",
+      "emptyHint": "차량을 등록하면 각 차량의 재고 경과 기간이 여기에 표시됩니다."
+    },
+    "inventoryMix": {
+      "title": "재고 구성",
+      "description": "재고 분포 현황",
+      "units": "대수",
+      "dimension": {
+        "brand": "브랜드",
+        "bodyType": "차종"
+      },
+      "empty": "등록된 차량이 없습니다",
+      "emptyHint": "재고에서 차량을 등록하면 구성이 여기에 표시됩니다."
+    },
+    "margins": {
+      "title": "브랜드별 이익",
+      "description": "매출 총이익: 판매가에서 매입가를 뺀 금액",
+      "profit": "이익",
+      "marginPct": "마진 {pct}%",
+      "empty": "표시할 이익이 아직 없습니다",
+      "emptyHint": "매입가와 함께 판매를 등록하면 마진이 여기에 표시됩니다.",
+      "emptyNoCost": "해당 기간에 판매는 있으나 매입가가 등록된 건이 없습니다.",
+      "sample": "매입가가 등록된 {withCost}대 기준입니다.",
+      "excluded": "매입가 미등록 {count}대는 제외되었습니다."
+    },
+    "vehicleInterest": {
+      "title": "문의가 많은 차량",
+      "description": "쇼룸에서 WhatsApp으로 들어온 문의",
+      "conversion": "판매로 이어짐",
+      "inquiries": "문의 {count}건",
+      "sold": "판매 완료",
+      "empty": "아직 쇼룸 문의가 없습니다",
+      "emptyHint": "차량의 WhatsApp 버튼으로 문의가 오면 여기에 표시됩니다."
     },
     "emptyState": {
       "title": "아직 데이터가 충분하지 않습니다"
@@ -1715,7 +1782,7 @@
       "enable": "쇼케이스 활성화",
       "enableHint": "도메인 루트에 판매 중인 차량이 표시됩니다.",
       "whatsapp": "CTA WhatsApp 번호 (국가번호 포함)",
-      "whatsappPlaceholder": "573001234567",
+      "whatsappPlaceholder": "573178409975",
       "whatsappHint": "숫자만 입력하세요. 각 차량의 “관심 있어요” 버튼이 이 번호로 wa.me를 엽니다.",
       "businessTitle": "사업자 정보",
       "businessHint": "쇼케이스 하단에 표시됩니다.",
@@ -1852,8 +1919,24 @@
       "created": "차량이 추가되었습니다",
       "saveFailed": "저장하지 못했습니다",
       "deleted": "차량이 삭제되었습니다",
-      "deleteFailed": "삭제하지 못했습니다"
-    }
+      "deleteFailed": "삭제하지 못했습니다",
+      "soldPriceRequired": "판매 완료로 표시하려면 최종 판매가를 입력하세요."
+    },
+    "purchase": {
+      "title": "매입",
+      "hint": "관리자만 볼 수 있습니다. 마진 계산에 사용됩니다.",
+      "cost": "매입가",
+      "date": "매입일"
+    },
+    "sale": {
+      "title": "판매 정보",
+      "hint": "마진, 평균 판매가, 재고 보유 일수 계산에 사용됩니다.",
+      "price": "최종 판매가",
+      "date": "판매일",
+      "buyer": "구매자",
+      "noBuyer": "지정 안 함"
+    },
+    "confirmRevertSale": "판매 완료로 등록된 차량입니다. 상태를 변경하면 판매가, 판매일, 구매자 정보가 삭제됩니다. 계속하시겠습니까?"
   },
   "Documents": {
     "title": "문서",

@@ -64,9 +64,10 @@ const SECURITY_HEADERS = [
 ] as const;
 
 // Hosts permitidos para el optimizador de imágenes (next/image). Las
-// fotos de la vitrina viven en el bucket público de Supabase; picsum es
-// para los vehículos demo. Otros hosts externos se agregan aquí.
-const IMAGE_HOSTS = ["**.supabase.co", "picsum.photos"];
+// fotos de la vitrina viven en el bucket público de Supabase; picsum e
+// images.unsplash.com son para los vehículos demo (picsum devuelve fotos
+// aleatorias, unsplash las de autos). Otros hosts externos se agregan aquí.
+const IMAGE_HOSTS = ["**.supabase.co", "picsum.photos", "images.unsplash.com"];
 
 const nextConfig: NextConfig = {
   images: {

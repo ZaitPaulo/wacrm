@@ -47,6 +47,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCan } from '@/hooks/use-can';
+import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { formatPrice, formatNumber } from '@/lib/showcase/format';
 import { useTranslations } from 'next-intl';
@@ -88,6 +89,13 @@ interface VehicleDraft {
   featuresText: string;
   images: string[];
   internal_notes: string;
+  // Compra (508) — sólo visible/editable para admin+.
+  purchase_cost: string;
+  purchase_date: string;
+  // Cierre de venta (508) — sólo se piden cuando el estado es 'sold'.
+  sold_price: string;
+  sold_at: string;
+  sold_to_contact_id: string;
 }
 
 const EMPTY_DRAFT: VehicleDraft = {
@@ -108,7 +116,17 @@ const EMPTY_DRAFT: VehicleDraft = {
   featuresText: '',
   images: [],
   internal_notes: '',
+  purchase_cost: '',
+  purchase_date: '',
+  sold_price: '',
+  sold_at: '',
+  sold_to_contact_id: '',
 };
+
+/** Fecha de hoy como YYYY-MM-DD, para prellenar los inputs de fecha. */
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 // features (JSONB) <-> texto "Clave: Valor" por línea.
 function featuresToText(features: InventoryVehicle['features']): string {
@@ -156,6 +174,14 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
     featuresText: featuresToText(v.features),
     images: v.images ?? [],
     internal_notes: v.internal_notes ?? '',
+    // `acquisition` llega vacío tanto si no hay costo cargado como si el
+    // usuario no tiene permiso para verlo: la RLS no distingue, y está bien.
+    purchase_cost:
+      v.acquisition?.purchase_cost != null ? String(v.acquisition.purchase_cost) : '',
+    purchase_date: v.acquisition?.purchase_date ?? '',
+    sold_price: v.sold_price != null ? String(v.sold_price) : '',
+    sold_at: v.sold_at ? v.sold_at.slice(0, 10) : '',
+    sold_to_contact_id: v.sold_to_contact_id ?? '',
   };
 }
 
@@ -168,11 +194,19 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
 export default function InventoryPage() {
   const t = useTranslations('Inventory');
   const canEdit = useCan('send-messages');
+  // Gate de UI para el costo de compra. La defensa real es la RLS de
+  // vehicle_acquisitions: a un 'agent' la API no le devuelve el dato
+  // aunque fuerce este flag.
+  const canViewMargins = useCan('view-margins');
   const { account } = useAuth();
   const currency = account?.default_currency ?? 'USD';
 
   const [vehicles, setVehicles] = useState<InventoryVehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  // Para el selector de comprador al cerrar una venta. Se cargan una vez
+  // con el cliente de sesión (la RLS los acota a la cuenta), igual que en
+  // /documents.
+  const [contacts, setContacts] = useState<{ id: string; name: string }[]>([]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryVehicle | null>(null);
@@ -223,6 +257,23 @@ export default function InventoryPage() {
     load();
   }, [load]);
 
+  // Los contactos sólo alimentan el selector de comprador; si la consulta
+  // falla, cerrar una venta sigue siendo posible sin vincular a nadie.
+  useEffect(() => {
+    const db = createClient();
+    void db
+      .from('contacts')
+      .select('id, name')
+      .order('name')
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[inventory] no se pudieron cargar los contactos:', error);
+          return;
+        }
+        setContacts((data ?? []) as { id: string; name: string }[]);
+      });
+  }, []);
+
   function openCreate() {
     setEditing(null);
     setDraft(EMPTY_DRAFT);
@@ -239,6 +290,18 @@ export default function InventoryPage() {
     if (!draft.brand.trim() || !draft.model.trim() || !draft.year.trim()) {
       toast.error(t('toasts.requiredFields'));
       return;
+    }
+    // Marcar vendido sin precio de cierre dejaría la venta sin margen ni
+    // ingreso en el tablero. El backend también lo rechaza; acá se avisa
+    // antes de perder el viaje.
+    if (draft.status === 'sold' && draft.sold_price.trim() === '') {
+      toast.error(t('toasts.soldPriceRequired'));
+      return;
+    }
+    // Salir de 'sold' borra el cierre (lo impone el CHECK de la 508), así
+    // que se avisa antes de que el dato desaparezca.
+    if (editing?.status === 'sold' && draft.status !== 'sold') {
+      if (!confirm(t('confirmRevertSale'))) return;
     }
     setSaving(true);
     try {
@@ -260,6 +323,26 @@ export default function InventoryPage() {
         features: textToFeatures(draft.featuresText),
         images: draft.images,
         internal_notes: draft.internal_notes.trim() || null,
+        // Sólo se mandan si el vehículo queda vendido; al revertir, el
+        // backend los limpia solo (applySoldCoherence).
+        ...(draft.status === 'sold'
+          ? {
+              sold_price: Number(draft.sold_price),
+              sold_at: draft.sold_at || today(),
+              sold_to_contact_id: draft.sold_to_contact_id || null,
+            }
+          : {}),
+        // El costo viaja sólo si el usuario puede verlo; si no, ni se
+        // menciona en el body y la API no toca el registro existente.
+        ...(canViewMargins
+          ? {
+              purchase_cost:
+                draft.purchase_cost.trim() === ''
+                  ? null
+                  : Number(draft.purchase_cost),
+              purchase_date: draft.purchase_date || null,
+            }
+          : {}),
       };
 
       const res = await fetch(
@@ -476,6 +559,112 @@ export default function InventoryPage() {
                 onChange={(e) => setDraft({ ...draft, mileage: e.target.value })}
               />
             </div>
+
+            {/* Compra — sólo admin+. Aunque alguien fuerce este bloque, la
+                RLS de vehicle_acquisitions rechaza la escritura. */}
+            {canViewMargins && (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4 sm:col-span-2">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t('purchase.title')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('purchase.hint')}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase_cost">{t('purchase.cost')}</Label>
+                    <Input
+                      id="purchase_cost"
+                      type="number"
+                      value={draft.purchase_cost}
+                      onChange={(e) =>
+                        setDraft({ ...draft, purchase_cost: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase_date">{t('purchase.date')}</Label>
+                    <Input
+                      id="purchase_date"
+                      type="date"
+                      value={draft.purchase_date}
+                      onChange={(e) =>
+                        setDraft({ ...draft, purchase_date: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Cierre de venta — aparece al elegir 'vendido'. Es lo que
+                convierte un cambio de estado en una venta medible. */}
+            {draft.status === 'sold' && (
+              <div className="space-y-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 sm:col-span-2">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t('sale.title')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{t('sale.hint')}</p>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="sold_price">{t('sale.price')}</Label>
+                    <Input
+                      id="sold_price"
+                      type="number"
+                      value={draft.sold_price}
+                      // Se propone el precio de lista para no teclearlo de
+                      // nuevo cuando se vendió sin descuento.
+                      placeholder={draft.price || undefined}
+                      onChange={(e) =>
+                        setDraft({ ...draft, sold_price: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sold_at">{t('sale.date')}</Label>
+                    <Input
+                      id="sold_at"
+                      type="date"
+                      value={draft.sold_at || today()}
+                      onChange={(e) =>
+                        setDraft({ ...draft, sold_at: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sold_to_contact_id">{t('sale.buyer')}</Label>
+                    <Select
+                      value={draft.sold_to_contact_id || 'none'}
+                      onValueChange={(value) =>
+                        setDraft({
+                          ...draft,
+                          // 'none' es el centinela de "sin comprador"; el
+                          // Select puede entregar null al deseleccionar.
+                          sold_to_contact_id:
+                            !value || value === 'none' ? '' : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger id="sold_to_contact_id">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">{t('sale.noBuyer')}</SelectItem>
+                        {contacts.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="license_plate">{t('fields.plate')}</Label>
               <Input

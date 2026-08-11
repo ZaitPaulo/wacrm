@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { buildVehiclePayload } from '@/lib/inventory/payload'
+import { persistAcquisition } from '@/lib/inventory/acquisitions'
 import {
   syncVehicleKnowledge,
   deleteVehicleKnowledge,
@@ -19,7 +20,7 @@ type Params = { params: Promise<{ id: string }> }
  */
 export async function PATCH(request: Request, { params }: Params) {
   try {
-    const { supabase, accountId, userId } = await requireRole('agent')
+    const { supabase, accountId, userId, role } = await requireRole('agent')
     const limit = checkRateLimit(`inventory:${userId}`, RATE_LIMITS.adminAction)
     if (!limit.success) return rateLimitResponse(limit)
 
@@ -29,8 +30,17 @@ export async function PATCH(request: Request, { params }: Params) {
     if ('error' in parsed) {
       return NextResponse.json({ error: parsed.error }, { status: 400 })
     }
+
+    // Editar sólo el costo es un patch válido aunque no toque ninguna
+    // columna del vehículo, así que la adquisición se resuelve antes de
+    // decidir que "no hay nada que actualizar".
+    const acq = await persistAcquisition(supabase, accountId, id, role, body)
+    if (acq.error) {
+      return NextResponse.json({ error: acq.error }, { status: acq.status ?? 500 })
+    }
+
     if (Object.keys(parsed.value).length === 0) {
-      return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 })
+      return NextResponse.json({ success: true })
     }
 
     const { data: updated, error } = await supabase

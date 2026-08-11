@@ -15,7 +15,7 @@
     "createAccount": "Crear cuenta"
   },
   "Sidebar": {
-    "title": "CRM para WhatsApp",
+    "title": "AutoNova",
     "dashboard": "Panel",
     "inbox": "Bandeja",
     "notifications": "Notificaciones",
@@ -73,7 +73,30 @@
       "newTodayVsYesterday": "nuevos hoy frente a ayer",
       "vsYesterday": "frente a ayer",
       "openDeals": "{count} {count, plural, =1 {negocio abierto} other {negocios abiertos}}",
-      "noChange": "Sin cambios {suffix}"
+      "noChange": "Sin cambios {suffix}",
+      "sections": {
+        "inventory": "Inventario",
+        "sales": "Ventas · últimos {days} días",
+        "conversations": "Conversaciones"
+      },
+      "stockAvailable": "Vehículos disponibles",
+      "ofTotal": "de {total} en total",
+      "stockValue": "Capital inmovilizado",
+      "stockValueHint": "Suma del stock disponible",
+      "reserved": "Reservados",
+      "reservedHint": "Con seña o compromiso",
+      "soldTotal": "Vendidos",
+      "soldTotalHint": "Histórico completo",
+      "unitsSold": "Unidades vendidas",
+      "revenue": "Ingresos",
+      "avgTicket": "Ticket promedio",
+      "daysInStock": "Días en inventario",
+      "inRange": "en {days} días",
+      "noSales": "Sin ventas en el período",
+      "perUnit": "Por unidad vendida",
+      "days": "{days} días",
+      "noPurchaseDates": "Falta la fecha de compra",
+      "overUnits": "Sobre {count} {count, plural, =1 {unidad} other {unidades}}"
     },
     "quickActions": {
       "newContact": "Nuevo contacto",
@@ -122,6 +145,50 @@
       "lastWeek": "Semana pasada:",
       "noReplies": "Todavía no hay respuestas registradas",
       "noRepliesHint": "Este gráfico se llena a medida que respondes mensajes de clientes."
+    },
+    "inventoryAging": {
+      "title": "Antigüedad del stock",
+      "description": "Hace cuánto está cada vehículo disponible, desde su compra",
+      "staleAlert": "{count} {count, plural, =1 {vehículo parado} other {vehículos parados}}",
+      "bucket": {
+        "fresh": "Hasta 30 días",
+        "recent": "31 a 60 días",
+        "aging": "61 a 90 días",
+        "stale": "Más de 90 días"
+      },
+      "empty": "No hay vehículos disponibles",
+      "emptyHint": "Cuando cargues vehículos vas a ver acá cuánto lleva parado cada uno."
+    },
+    "inventoryMix": {
+      "title": "Composición del inventario",
+      "description": "Cómo se reparte el stock",
+      "units": "Unidades",
+      "dimension": {
+        "brand": "Marca",
+        "bodyType": "Carrocería"
+      },
+      "empty": "Todavía no hay vehículos",
+      "emptyHint": "Carga vehículos en Inventario para ver cómo se reparte tu stock."
+    },
+    "margins": {
+      "title": "Utilidad por marca",
+      "description": "Margen bruto: precio de venta menos costo de compra",
+      "profit": "Utilidad",
+      "marginPct": "{pct}% de margen",
+      "empty": "Todavía no hay utilidad que mostrar",
+      "emptyHint": "Cuando registres una venta con su costo de compra vas a ver el margen acá.",
+      "emptyNoCost": "Hay ventas en el período, pero ninguna tiene el costo de compra registrado.",
+      "sample": "Calculado sobre {withCost} {withCost, plural, =1 {unidad} other {unidades}} con costo registrado.",
+      "excluded": "Quedan fuera {count} sin costo."
+    },
+    "vehicleInterest": {
+      "title": "Vehículos más consultados",
+      "description": "Consultas llegadas desde la vitrina por WhatsApp",
+      "conversion": "terminaron en venta",
+      "inquiries": "{count} {count, plural, =1 {consulta} other {consultas}}",
+      "sold": "Vendido",
+      "empty": "Todavía no hay consultas de la vitrina",
+      "emptyHint": "Cuando alguien escriba desde el botón de WhatsApp de un vehículo, va a aparecer acá."
     },
     "emptyState": {
       "title": "Todavía no hay datos suficientes"
@@ -328,7 +395,7 @@
       "nameLabel": "Nombre",
       "namePlaceholder": "Juana Pérez",
       "phoneLabel": "Número de teléfono",
-      "phonePlaceholder": "+573001234567",
+      "phonePlaceholder": "+573178409975",
       "phoneHint": "Incluye el código de país, por ejemplo +57 para Colombia",
       "emailLabel": "Correo",
       "emailPlaceholder": "juana@ejemplo.com",
@@ -1404,7 +1471,7 @@
       "btnLabelPlaceholder": "Texto del botón",
       "urlPlaceholder": "https://ejemplo.com/ruta o con sufijo {{1}}",
       "urlSamplePlaceholder": "Valor de ejemplo para {{1}} (obligatorio si la URL tiene una variable)",
-      "phonePlaceholder": "+573001234567",
+      "phonePlaceholder": "+573178409975",
       "codePlaceholder": "Código de ejemplo (por ejemplo, VERANO20)",
       "cancel": "Cancelar",
       "saving": "Guardando…",
@@ -1715,7 +1782,7 @@
       "enable": "Activar vitrina",
       "enableHint": "La raíz del dominio mostrará tus vehículos disponibles.",
       "whatsapp": "WhatsApp del CTA (con código de país)",
-      "whatsappPlaceholder": "573001234567",
+      "whatsappPlaceholder": "573178409975",
       "whatsappHint": "Solo números. El botón “Me interesa” de cada vehículo abre wa.me con este número.",
       "businessTitle": "Información del negocio",
       "businessHint": "Se muestra en el pie de página de la vitrina.",
@@ -1852,8 +1919,24 @@
       "created": "Vehículo agregado",
       "saveFailed": "No se pudo guardar",
       "deleted": "Vehículo eliminado",
-      "deleteFailed": "No se pudo eliminar"
-    }
+      "deleteFailed": "No se pudo eliminar",
+      "soldPriceRequired": "Indica el precio final para marcarlo como vendido."
+    },
+    "purchase": {
+      "title": "Compra",
+      "hint": "Solo lo ven los administradores. Habilita el cálculo de margen.",
+      "cost": "Costo de compra",
+      "date": "Fecha de compra"
+    },
+    "sale": {
+      "title": "Datos de la venta",
+      "hint": "Con esto se calculan el margen, el ticket promedio y los días en inventario.",
+      "price": "Precio final",
+      "date": "Fecha de venta",
+      "buyer": "Comprador",
+      "noBuyer": "Sin especificar"
+    },
+    "confirmRevertSale": "Este vehículo figura como vendido. Si cambias el estado se borrarán el precio, la fecha y el comprador. ¿Continuar?"
   },
   "Documents": {
     "title": "Documentos",

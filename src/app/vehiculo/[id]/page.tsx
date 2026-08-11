@@ -18,6 +18,7 @@ import {
   BODY_TYPES,
   CONDITIONS,
 } from '@/lib/inventory/specs'
+import { formatRefTag } from '@/lib/inventory/public-ref'
 import { Gallery } from '@/components/storefront/gallery'
 import { StoreNav } from '@/components/storefront/store-nav'
 import { StoreFooter } from '@/components/storefront/footer'
@@ -94,9 +95,13 @@ export default async function VehiclePage({ params }: Params) {
   ]
 
   const waDigits = account.public_whatsapp?.replace(/\D/g, '') || null
+  // Igual que el CTA de consulta: lleva el código para poder atribuir la
+  // conversación a este vehículo. Una prueba de manejo es la consulta con
+  // más intención de compra que existe, así que perderla sería lo peor.
   const testDriveHref = waDigits
     ? `https://wa.me/${waDigits}?text=${encodeURIComponent(
-        `Hola, quiero agendar una prueba de manejo del ${v.brand} ${v.model} ${v.year}.`,
+        `Hola, quiero agendar una prueba de manejo del ${v.brand} ${v.model} ${v.year}.` +
+          (v.public_ref ? ` ${formatRefTag(v.public_ref)}` : ''),
       )}`
     : null
 

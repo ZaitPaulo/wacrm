@@ -5,6 +5,7 @@
 // ============================================================
 
 import { CURRENCIES } from '@/lib/currency'
+import { formatRefTag } from '@/lib/inventory/public-ref'
 
 export interface ShowcaseAccount {
   id: string
@@ -33,6 +34,8 @@ export interface ShowcaseVehicle {
   condition: string | null
   features: Record<string, unknown> | unknown[] | null
   images: string[] | null
+  /** Código corto para atribuir la consulta de WhatsApp a este vehículo. */
+  public_ref: string | null
 }
 
 export interface ShowcaseData {
@@ -73,12 +76,23 @@ export function featuresToList(features: ShowcaseVehicle['features']): string[] 
   return Object.entries(features).map(([k, v]) => (v === true ? k : `${k}: ${String(v)}`))
 }
 
-/** Construye el enlace wa.me con un mensaje prellenado sobre el vehículo. */
+/**
+ * Construye el enlace wa.me con un mensaje prellenado sobre el vehículo.
+ *
+ * El código de referencia va al final para que el mensaje siga leyéndose
+ * natural: el cliente ve una consulta normal y, si no borra la etiqueta,
+ * el webhook puede atribuir la conversación a este vehículo.
+ *
+ * Los botones generales de contacto (cabecera y pie de la vitrina) no
+ * pasan por aquí y siguen sin código: no corresponden a ningún vehículo.
+ */
 export function whatsappHref(
   number: string,
-  vehicle: Pick<ShowcaseVehicle, 'brand' | 'model' | 'year'>,
+  vehicle: Pick<ShowcaseVehicle, 'brand' | 'model' | 'year'> &
+    Partial<Pick<ShowcaseVehicle, 'public_ref'>>,
 ): string {
   const digits = number.replace(/\D/g, '')
-  const msg = `Hola, me interesa el ${vehicle.brand} ${vehicle.model} ${vehicle.year}. ¿Sigue disponible?`
+  let msg = `Hola, me interesa el ${vehicle.brand} ${vehicle.model} ${vehicle.year}. ¿Sigue disponible?`
+  if (vehicle.public_ref) msg += ` ${formatRefTag(vehicle.public_ref)}`
   return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`
 }

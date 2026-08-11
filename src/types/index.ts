@@ -655,6 +655,70 @@ export interface InventoryVehicle {
   kb_document_id: string | null;
   created_at: string;
   updated_at: string;
+
+  // --- Cierre de venta — migración 508 -----------------------
+  // Los tres viajan juntos: un vehículo que no está en 'sold' los
+  // tiene en null (lo impone el CHECK inventory_vehicles_sold_coherence).
+  /** Precio al que se cerró. Puede diferir de `price` (el de lista). */
+  sold_price: number | null;
+  sold_at: string | null;
+  /** Comprador. Queda en null si se elimina el contacto. */
+  sold_to_contact_id: string | null;
+
+  /**
+   * Código corto y opaco que identifica al vehículo en el mensaje de
+   * WhatsApp que abre la vitrina. Lo genera la base (DEFAULT), no la
+   * aplicación. No deriva de VIN ni placa.
+   */
+  public_ref: string;
+
+  /**
+   * Costo de compra, cuando la API lo adjunta. Llega `null` tanto si el
+   * vehículo no tiene adquisición registrada como si quien consulta no
+   * tiene permiso para verla (rol menor que admin): la RLS filtra en
+   * silencio y ambos casos son indistinguibles a propósito.
+   *
+   * Nunca interpretar la ausencia como costo 0.
+   */
+  acquisition?: { purchase_cost: number; purchase_date: string | null } | null;
+}
+
+/**
+ * Costo de compra de un vehículo — migración 508.
+ *
+ * Vive en su propia tabla, y no como columnas de `InventoryVehicle`,
+ * porque la RLS de Postgres filtra filas y no columnas: con el costo
+ * dentro del vehículo, un `agent` pidiendo `select=*` lo recibiría en
+ * el JSON. `vehicle_acquisitions` exige rol admin+ para leerse.
+ *
+ * Que este objeto llegue vacío no significa "sin costo": significa
+ * "sin permiso o sin registrar". Nunca tratarlo como costo 0.
+ */
+export interface VehicleAcquisition {
+  id: string;
+  account_id: string;
+  vehicle_id: string;
+  purchase_cost: number;
+  /** Anulable: se puede conocer el costo sin la fecha exacta. */
+  purchase_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Consulta originada en la vitrina — migración 508.
+ *
+ * Se crea cuando llega un mensaje de WhatsApp cuyo texto conserva el
+ * `public_ref` del vehículo. Es N:N con fecha propia: un contacto
+ * pregunta por varios autos y un auto lo consultan varios contactos.
+ */
+export interface VehicleInquiry {
+  id: string;
+  account_id: string;
+  vehicle_id: string;
+  contact_id: string | null;
+  conversation_id: string | null;
+  created_at: string;
 }
 
 // ============================================================

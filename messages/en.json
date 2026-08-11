@@ -73,7 +73,30 @@
       "newTodayVsYesterday": "new today vs yesterday",
       "vsYesterday": "vs yesterday",
       "openDeals": "{count} open {count, plural, =1 {deal} other {deals}}",
-      "noChange": "No change {suffix}"
+      "noChange": "No change {suffix}",
+      "sections": {
+        "inventory": "Inventory",
+        "sales": "Sales · last {days} days",
+        "conversations": "Conversations"
+      },
+      "stockAvailable": "Vehicles available",
+      "ofTotal": "of {total} total",
+      "stockValue": "Capital tied up",
+      "stockValueHint": "Total available stock",
+      "reserved": "Reserved",
+      "reservedHint": "With a deposit or commitment",
+      "soldTotal": "Sold",
+      "soldTotalHint": "All time",
+      "unitsSold": "Units sold",
+      "revenue": "Revenue",
+      "avgTicket": "Average ticket",
+      "daysInStock": "Days in stock",
+      "inRange": "in {days} days",
+      "noSales": "No sales in this period",
+      "perUnit": "Per unit sold",
+      "days": "{days} days",
+      "noPurchaseDates": "Purchase date missing",
+      "overUnits": "Over {count} {count, plural, =1 {unit} other {units}}"
     },
     "quickActions": {
       "newContact": "New Contact",
@@ -122,6 +145,50 @@
       "lastWeek": "Last week:",
       "noReplies": "No replies recorded yet",
       "noRepliesHint": "This chart fills in as you reply to customer messages."
+    },
+    "inventoryAging": {
+      "title": "Stock age",
+      "description": "How long each available vehicle has been sitting, since purchase",
+      "staleAlert": "{count} {count, plural, =1 {vehicle sitting} other {vehicles sitting}}",
+      "bucket": {
+        "fresh": "Up to 30 days",
+        "recent": "31 to 60 days",
+        "aging": "61 to 90 days",
+        "stale": "Over 90 days"
+      },
+      "empty": "No vehicles available",
+      "emptyHint": "Once you add vehicles, you'll see how long each one has been sitting."
+    },
+    "inventoryMix": {
+      "title": "Inventory mix",
+      "description": "How your stock breaks down",
+      "units": "Units",
+      "dimension": {
+        "brand": "Brand",
+        "bodyType": "Body type"
+      },
+      "empty": "No vehicles yet",
+      "emptyHint": "Add vehicles in Inventory to see how your stock breaks down."
+    },
+    "margins": {
+      "title": "Profit by brand",
+      "description": "Gross margin: sale price minus purchase cost",
+      "profit": "Profit",
+      "marginPct": "{pct}% margin",
+      "empty": "No profit to show yet",
+      "emptyHint": "Once you record a sale with its purchase cost, the margin shows up here.",
+      "emptyNoCost": "There are sales in this period, but none has a purchase cost on record.",
+      "sample": "Based on {withCost} {withCost, plural, =1 {unit} other {units}} with a recorded cost.",
+      "excluded": "{count} excluded for missing cost."
+    },
+    "vehicleInterest": {
+      "title": "Most asked-about vehicles",
+      "description": "Enquiries coming from the storefront via WhatsApp",
+      "conversion": "ended in a sale",
+      "inquiries": "{count} {count, plural, =1 {enquiry} other {enquiries}}",
+      "sold": "Sold",
+      "empty": "No storefront enquiries yet",
+      "emptyHint": "When someone messages from a vehicle's WhatsApp button, it shows up here."
     },
     "emptyState": {
       "title": "Not enough data yet"
@@ -1715,7 +1782,7 @@
       "enable": "Enable showcase",
       "enableHint": "The domain root will show your available vehicles.",
       "whatsapp": "CTA WhatsApp number (with country code)",
-      "whatsappPlaceholder": "573001234567",
+      "whatsappPlaceholder": "573178409975",
       "whatsappHint": "Digits only. Each vehicle's \"I'm interested\" button opens wa.me with this number.",
       "businessTitle": "Business details",
       "businessHint": "Shown in the showcase footer.",
@@ -1852,8 +1919,24 @@
       "created": "Vehicle added",
       "saveFailed": "Couldn't save",
       "deleted": "Vehicle deleted",
-      "deleteFailed": "Couldn't delete"
-    }
+      "deleteFailed": "Couldn't delete",
+      "soldPriceRequired": "Enter the final price to mark it as sold."
+    },
+    "purchase": {
+      "title": "Purchase",
+      "hint": "Only admins can see this. Enables margin calculation.",
+      "cost": "Purchase cost",
+      "date": "Purchase date"
+    },
+    "sale": {
+      "title": "Sale details",
+      "hint": "These drive margin, average ticket and days in stock.",
+      "price": "Final price",
+      "date": "Sale date",
+      "buyer": "Buyer",
+      "noBuyer": "Not specified"
+    },
+    "confirmRevertSale": "This vehicle is marked as sold. Changing its status will clear the price, date and buyer. Continue?"
   },
   "Documents": {
     "title": "Documents",

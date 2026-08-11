@@ -98,6 +98,21 @@ export function canViewOnly(role: AccountRole): boolean {
   return role === "viewer";
 }
 
+/**
+ * Owner / admin: see what a vehicle cost to acquire, and every metric
+ * derived from it (gross margin per unit, per brand, period profit).
+ *
+ * This predicate is cosmetic — it stops the dashboard from rendering an
+ * empty margin panel. The real boundary is the RLS on
+ * `vehicle_acquisitions` (migration 508), which requires
+ * `is_account_member(account_id, 'admin')`: an agent who bypasses the UI
+ * gate still gets zero rows back. Never rely on this alone, and never
+ * read acquisition data with the service-role key.
+ */
+export function canViewMargins(role: AccountRole): boolean {
+  return hasMinRole(role, "admin");
+}
+
 /** Owner only: irreversible destructive operations. */
 export function canDeleteAccount(role: AccountRole): boolean {
   return role === "owner";

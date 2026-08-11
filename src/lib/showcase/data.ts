@@ -52,7 +52,7 @@ export const getShowcase = cache(async (): Promise<ShowcaseData | null> => {
   const { data: vehicles, error: vehErr } = await db
     .from('inventory_vehicles')
     .select(
-      'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, condition, features, images',
+      'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, condition, features, images, public_ref',
     )
     .eq('account_id', account.id)
     .eq('status', 'available')
@@ -88,7 +88,7 @@ export const getShowcaseVehicle = cache(
     const { data: vehicle, error: vehErr } = await db
       .from('inventory_vehicles')
       .select(
-        'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, color, condition, doors, features, images',
+        'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, color, condition, doors, features, images, public_ref',
       )
       .eq('account_id', account.id)
       .eq('id', id)
