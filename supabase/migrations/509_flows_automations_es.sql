@@ -280,11 +280,18 @@ BEGIN
       'Pregunta vehículo de interés, presupuesto y forma de pago, y deriva al asesor con el resumen. Ajusta los rangos de presupuesto a tu inventario.',
       'draft',
       'first_inbound_message', '{}'::jsonb, 'start',
+      -- `handoff_assign_to` NO es opcional en la práctica: sin él la
+      -- derivación no asigna a nadie, el aviso "te asignamos un asesor"
+      -- se vuelve mentira y —peor— la compuerta del asistente de IA
+      -- (`if assigned_agent_id return`) no se activa, así que la IA toma
+      -- el mensaje siguiente y repite el mismo aviso. También cubre la
+      -- derivación por reintentos agotados, que no pasa por ningún nodo.
       jsonb_build_object(
         'on_unknown_reply', 'reprompt',
         'max_reprompts', 2,
         'on_timeout_hours', 24,
-        'on_exhaust', 'handoff'
+        'on_exhaust', 'handoff',
+        'handoff_assign_to', v_user::text
       )
     )
     RETURNING id INTO v_flow;
@@ -338,14 +345,11 @@ BEGIN
       (v_flow, 'compra_calificado', 'set_tag', jsonb_build_object(
          'mode', 'add',
          'tag_id', COALESCE(v_tag::text, ''),
-         'next_node_key', 'compra_cierre'), -260, 1020),
-
-      (v_flow, 'compra_cierre', 'send_message', jsonb_build_object(
-         'text', '¡Gracias! 🙌 Un asesor te escribe en un momento con las opciones que encajan.',
-         'next_node_key', 'compra_handoff'), -260, 1190),
+         'next_node_key', 'compra_handoff'), -260, 1020),
 
       (v_flow, 'compra_handoff', 'handoff', jsonb_build_object(
-         'note', 'COMPRA · Busca: {{vars.vehiculo_interes}} · Presupuesto: {{vars.compra_presupuesto}} · Pago: {{vars.compra_pago}} · Entrega en parte de pago: {{vars.vehiculo_permuta}}'), -260, 1360),
+         'assign_to', v_user::text,
+         'note', 'COMPRA · Busca: {{vars.vehiculo_interes}} · Presupuesto: {{vars.compra_presupuesto}} · Pago: {{vars.compra_pago}} · Entrega en parte de pago: {{vars.vehiculo_permuta}}'), -260, 1190),
 
       (v_flow, 'venta_vehiculo', 'collect_input', jsonb_build_object(
          'prompt_text', 'Cuéntame qué vehículo vendes: marca, modelo, año y kilometraje.',
@@ -355,16 +359,14 @@ BEGIN
       (v_flow, 'venta_calificado', 'set_tag', jsonb_build_object(
          'mode', 'add',
          'tag_id', COALESCE(v_tag::text, ''),
-         'next_node_key', 'venta_cierre'), 260, 510),
-
-      (v_flow, 'venta_cierre', 'send_message', jsonb_build_object(
-         'text', '¡Gracias! 🙌 Un asesor te contacta para coordinar la valoración.',
-         'next_node_key', 'venta_handoff'), 260, 680),
+         'next_node_key', 'venta_handoff'), 260, 510),
 
       (v_flow, 'venta_handoff', 'handoff', jsonb_build_object(
-         'note', 'VENTA · Ofrece: {{vars.vehiculo_ofrecido}} · Coordinar valoración.'), 260, 850),
+         'assign_to', v_user::text,
+         'note', 'VENTA · Ofrece: {{vars.vehiculo_ofrecido}} · Coordinar valoración.'), 260, 680),
 
       (v_flow, 'otro_handoff', 'handoff', jsonb_build_object(
+         'assign_to', v_user::text,
          'note', 'Consulta general. No entró a la calificación.'), 640, 340);
   END LOOP;
 END $$;
@@ -423,5 +425,58 @@ BEGIN
       'title', 'Prospecto calificado',
       'value', 0
     ), 0);
+  END LOOP;
+END $$;
+
+-- ============================================================
+-- C6. Reparación para instalaciones que aplicaron la versión previa
+--
+-- La primera versión de C4 creaba el flujo SIN agente de derivación y
+-- con dos nodos de despedida que hoy sobran. El síntoma en producción:
+-- el cliente tocaba una opción, el bot le decía "te asignamos un
+-- asesor" y no asignaba a nadie; como la conversación quedaba sin
+-- dueño, la compuerta del asistente de IA no se activaba, la IA tomaba
+-- el mensaje siguiente y repetía el mismo aviso.
+--
+-- Idempotente: en un flujo ya correcto no cambia nada.
+-- ============================================================
+DO $$
+DECLARE
+  v_flow  UUID;
+  v_user  UUID;
+BEGIN
+  FOR v_flow, v_user IN
+    SELECT id, user_id FROM flows WHERE name = 'Calificación de prospecto'
+  LOOP
+    -- Agente por defecto del flujo.
+    UPDATE flows
+    SET fallback_policy = fallback_policy || jsonb_build_object('handoff_assign_to', v_user::text)
+    WHERE id = v_flow
+      AND COALESCE(fallback_policy->>'handoff_assign_to', '') = '';
+
+    -- Destino en cada nodo de derivación que no lo tenga.
+    UPDATE flow_nodes
+    SET config = config || jsonb_build_object('assign_to', v_user::text)
+    WHERE flow_id = v_flow
+      AND node_type = 'handoff'
+      AND COALESCE(config->>'assign_to', '') = '';
+
+    -- Los nodos de despedida sobran: la derivación ya avisa al cliente,
+    -- así que dejarlos produce dos mensajes seguidos diciendo lo mismo.
+    -- Primero se reenruta la etiqueta directo a la derivación, y solo
+    -- después se borra el nodo, para no dejar el grafo apuntando al
+    -- vacío en ningún momento.
+    UPDATE flow_nodes
+    SET config = jsonb_set(config, '{next_node_key}', to_jsonb('compra_handoff'::text))
+    WHERE flow_id = v_flow AND node_key = 'compra_calificado'
+      AND config->>'next_node_key' = 'compra_cierre';
+
+    UPDATE flow_nodes
+    SET config = jsonb_set(config, '{next_node_key}', to_jsonb('venta_handoff'::text))
+    WHERE flow_id = v_flow AND node_key = 'venta_calificado'
+      AND config->>'next_node_key' = 'venta_cierre';
+
+    DELETE FROM flow_nodes
+    WHERE flow_id = v_flow AND node_key IN ('compra_cierre', 'venta_cierre');
   END LOOP;
 END $$;

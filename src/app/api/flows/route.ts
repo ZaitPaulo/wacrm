@@ -4,6 +4,7 @@ import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { getTranslations } from 'next-intl/server'
 import { getFlowTemplate } from '@/lib/flows/templates'
+import { DEFAULT_FALLBACK_POLICY } from '@/lib/flows/types'
 import { templateLabel, type LabelResolver } from '@/lib/templates/labels'
 
 /**
@@ -15,6 +16,24 @@ import { templateLabel, type LabelResolver } from '@/lib/templates/labels'
  * shows a "Beta" label so users know the surface is young, but the
  * routes themselves are open.
  */
+
+/**
+ * Fallback policy a new flow starts with.
+ *
+ * The column's DB default carries the reprompt and timeout knobs but no
+ * handoff agent, and a flow that hands off to nobody is worse than one
+ * that never hands off: the customer is told an agent is coming, the
+ * conversation stays unowned, and — because the AI assistant only
+ * stands down when someone IS assigned — the bot picks up the next
+ * message and repeats the notice. Seen in production exactly that way.
+ *
+ * The creator is the sane default; the editor can change it. Spread over
+ * the module default rather than writing `{ handoff_assign_to }` alone,
+ * which would store a partial blob and drop the other knobs.
+ */
+function seedFallbackPolicy(userId: string) {
+  return { ...DEFAULT_FALLBACK_POLICY, handoff_assign_to: userId }
+}
 
 async function requireUser(): Promise<
   | { ok: true; userId: string; supabase: Awaited<ReturnType<typeof createClient>> }
@@ -123,6 +142,7 @@ export async function POST(request: Request) {
         trigger_type: template.trigger_type,
         trigger_config: template.trigger_config,
         entry_node_id: template.entry_node_id,
+        fallback_policy: seedFallbackPolicy(userId),
       })
       .select()
       .single()
@@ -171,6 +191,7 @@ export async function POST(request: Request) {
       status: 'draft',
       trigger_type,
       trigger_config: body.trigger_config ?? {},
+      fallback_policy: seedFallbackPolicy(userId),
     })
     .select()
     .single()

@@ -62,6 +62,14 @@ compraventa de vehículos.
 - Las plantillas semilla eran de un SaaS por suscripción y estaban en
   inglés, con palabras clave (`pricing`, `quote`, `buy`) que nunca
   coincidían con lo que escribe un cliente hispanohablante.
+- **Un flujo nuevo derivaba a nadie.** Ni el `DEFAULT` de la columna
+  `flows.fallback_policy` ni el clonado desde la galería definían un
+  agente de derivación, así que la conversación quedaba sin dueño. El
+  cliente recibía «te asignamos un asesor» sin que fuera cierto y,
+  como el asistente de IA solo se aparta cuando hay alguien asignado,
+  el bot tomaba el mensaje siguiente y repetía el mismo aviso. Los
+  flujos nuevos arrancan con el creador como destino; el editor lo
+  cambia. La migración 509 repara los ya creados.
 
 ## [0.8.1] — 2026-07-10
 
