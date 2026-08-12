@@ -13,8 +13,9 @@
 --   * Su columna "MODELO" es el AÑO (convención colombiana). La línea
 --     del vehículo va en "VEHICULO" → nuestro `model`.
 --   * Su columna "PLACA" contiene ciudades (BARRANQUILLA, BOGOTA): es la
---     sede donde está el carro, mal rotulada. La placa real está en
---     "Nº DE PLACA" → nuestro `license_plate`.
+--     ciudad donde el vehículo está MATRICULADO, no dónde está parqueado.
+--     Importa para impuestos y para el costo del traspaso. La placa en sí
+--     está en "Nº DE PLACA" → nuestro `license_plate`.
 --
 -- Idempotente — seguro de re-ejecutar.
 -- ============================================================
@@ -25,10 +26,12 @@
 ALTER TABLE inventory_vehicles
   ADD COLUMN IF NOT EXISTS engine_displacement TEXT;
 
--- Sede donde se encuentra físicamente el vehículo. El negocio opera en
--- varias ciudades y la hoja ya lo registra por unidad.
+-- Ciudad de matrícula. NO es dónde está el carro: un vehículo parqueado
+-- en Barranquilla puede estar matriculado en Bogotá, y de eso dependen
+-- los impuestos y lo que cuesta el traspaso. Es de las primeras cosas
+-- que pregunta un comprador.
 ALTER TABLE inventory_vehicles
-  ADD COLUMN IF NOT EXISTS location_city TEXT;
+  ADD COLUMN IF NOT EXISTS plate_city TEXT;
 
 -- Precio con garantía incluida. Interno por ahora: la vitrina sigue
 -- publicando un solo precio, y el asesor decide cuándo ofrecerla.
@@ -66,14 +69,14 @@ ALTER TABLE inventory_vehicles
 
 -- Los tableros y la vitrina filtran por ciudad; el resto son campos de
 -- ficha que no se consultan en conjunto y no justifican un índice.
-CREATE INDEX IF NOT EXISTS idx_inventory_vehicles_city
-  ON inventory_vehicles (account_id, location_city)
-  WHERE location_city IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_inventory_vehicles_plate_city
+  ON inventory_vehicles (account_id, plate_city)
+  WHERE plate_city IS NOT NULL;
 
 COMMENT ON COLUMN inventory_vehicles.engine_displacement IS
   'Cilindraje tal como lo escribe el operador ("1.5", "2.0 TDI").';
-COMMENT ON COLUMN inventory_vehicles.location_city IS
-  'Sede donde está el vehículo. En la hoja del cliente venía bajo la cabecera "PLACA".';
+COMMENT ON COLUMN inventory_vehicles.plate_city IS
+  'Ciudad de matrícula del vehículo, no su ubicación. En la hoja del cliente venía bajo la cabecera "PLACA".';
 COMMENT ON COLUMN inventory_vehicles.warranty_price IS
   'Precio con garantía incluida. Interno: la vitrina no lo publica.';
 COMMENT ON COLUMN inventory_vehicles.on_display IS

@@ -38,7 +38,7 @@ export interface VehiclePayload {
   status?: VehicleStatusValue
   // Campos de la lista de precios del cliente (510).
   engine_displacement?: string | null
-  location_city?: string | null
+  plate_city?: string | null
   warranty_price?: number | null
   soat_expires_at?: string | null
   tecnomecanica_expires_at?: string | null
@@ -194,8 +194,8 @@ export function buildVehiclePayload(
   if (b.engine_displacement !== undefined) {
     out.engine_displacement = str(b.engine_displacement) || null
   }
-  if (b.location_city !== undefined) {
-    out.location_city = str(b.location_city) || null
+  if (b.plate_city !== undefined) {
+    out.plate_city = str(b.plate_city) || null
   }
 
   // Precio con garantía. Anulable: no todas las unidades la ofrecen.

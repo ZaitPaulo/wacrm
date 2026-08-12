@@ -2013,7 +2013,10 @@
       "plate": "Plate",
       "price": "Price",
       "mileage": "Mileage",
-      "status": "Status"
+      "status": "Status",
+      "plateCity": "Registration",
+      "spec": "Spec",
+      "warrantyPrice": "With warranty"
     },
     "status": {
       "available": "Available",
@@ -2055,8 +2058,6 @@
       "selectPlaceholder": "Select…",
       "engine": "Engine",
       "enginePlaceholder": "1.5",
-      "locationCity": "Branch / city",
-      "locationCityPlaceholder": "Barranquilla",
       "warrantyPrice": "Price with warranty",
       "warrantySuggest": "Suggest",
       "warrantyHint": "Suggested: {amount} (price + warranty markup). Internal only — not shown in the storefront.",
@@ -2067,7 +2068,10 @@
       "acceptsTradeIn": "Accepts trade-in",
       "acceptsTradeInHint": "Another vehicle is accepted as part payment for this unit.",
       "hasLien": "Has a lien",
-      "hasLienHint": "The vehicle carries a charge in favour of a third party."
+      "hasLienHint": "The vehicle carries a charge in favour of a third party.",
+      "plateCity": "Registration city",
+      "plateCityPlaceholder": "Barranquilla",
+      "plateCityHint": "Where it is registered, not where the car is."
     },
     "images": {
       "remove": "Remove",

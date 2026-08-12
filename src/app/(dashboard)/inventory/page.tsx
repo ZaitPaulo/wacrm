@@ -58,6 +58,7 @@ import {
   BODY_TYPES,
   CONDITIONS,
   suggestedWarrantyPrice,
+  labelOf,
 } from '@/lib/inventory/specs';
 import { uploadAccountMedia } from '@/lib/storage/upload-media';
 
@@ -90,7 +91,7 @@ interface VehicleDraft {
   status: VehicleStatus;
   // Lista de precios del cliente (510).
   engine_displacement: string;
-  location_city: string;
+  plate_city: string;
   warranty_price: string;
   soat_expires_at: string;
   tecnomecanica_expires_at: string;
@@ -125,7 +126,7 @@ const EMPTY_DRAFT: VehicleDraft = {
   doors: '',
   status: 'available',
   engine_displacement: '',
-  location_city: '',
+  plate_city: '',
   warranty_price: '',
   soat_expires_at: '',
   tecnomecanica_expires_at: '',
@@ -142,6 +143,25 @@ const EMPTY_DRAFT: VehicleDraft = {
   sold_at: '',
   sold_to_contact_id: '',
 };
+
+/**
+ * Ficha técnica en una línea: "AT · 1.5".
+ *
+ * Son las dos preguntas que más repite un comprador por teléfono, y no
+ * justifican una columna cada una. Se omite en silencio lo que falte, de
+ * modo que un vehículo con solo transmisión muestra "AT" y no "AT · —".
+ */
+function specSummary(
+  v: InventoryVehicle,
+  t: (key: string) => string,
+): string {
+  const parts: string[] = [];
+  if (v.transmission) {
+    parts.push(labelOf(t, TRANSMISSIONS, v.transmission));
+  }
+  if (v.engine_displacement) parts.push(v.engine_displacement);
+  return parts.join(' · ');
+}
 
 /** Fecha de hoy como YYYY-MM-DD, para prellenar los inputs de fecha. */
 function today(): string {
@@ -192,7 +212,7 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
     doors: v.doors != null ? String(v.doors) : '',
     status: v.status,
     engine_displacement: v.engine_displacement ?? '',
-    location_city: v.location_city ?? '',
+    plate_city: v.plate_city ?? '',
     warranty_price: v.warranty_price != null ? String(v.warranty_price) : '',
     soat_expires_at: v.soat_expires_at ?? '',
     tecnomecanica_expires_at: v.tecnomecanica_expires_at ?? '',
@@ -361,7 +381,7 @@ export default function InventoryPage() {
         doors: draft.doors.trim() === '' ? null : Number(draft.doors),
         status: draft.status,
         engine_displacement: draft.engine_displacement.trim() || null,
-        location_city: draft.location_city.trim() || null,
+        plate_city: draft.plate_city.trim() || null,
         warranty_price:
           draft.warranty_price.trim() === '' ? null : Number(draft.warranty_price),
         soat_expires_at: draft.soat_expires_at || null,
@@ -458,7 +478,16 @@ export default function InventoryPage() {
               <TableHead>{t('table.vehicle')}</TableHead>
               <TableHead>{t('table.year')}</TableHead>
               <TableHead>{t('table.plate')}</TableHead>
+              {/* Ciudad de matrícula y ficha técnica: lo que un asesor
+                  necesita responder sin abrir el vehículo. Se ocultan
+                  bajo lg para que la tabla siga siendo legible en
+                  pantallas angostas. */}
+              <TableHead className="hidden lg:table-cell">{t('table.plateCity')}</TableHead>
+              <TableHead className="hidden lg:table-cell">{t('table.spec')}</TableHead>
               <TableHead className="text-right">{t('table.price')}</TableHead>
+              <TableHead className="hidden text-right xl:table-cell">
+                {t('table.warrantyPrice')}
+              </TableHead>
               <TableHead className="text-right">{t('table.mileage')}</TableHead>
               <TableHead>{t('table.status')}</TableHead>
               <TableHead className="w-10" />
@@ -467,13 +496,13 @@ export default function InventoryPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={10} className="h-24 text-center">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : vehicles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
+                <TableCell colSpan={10} className="text-muted-foreground h-24 text-center">
                   {t('empty')}
                 </TableCell>
               </TableRow>
@@ -485,7 +514,18 @@ export default function InventoryPage() {
                   </TableCell>
                   <TableCell>{v.year}</TableCell>
                   <TableCell>{v.license_plate ?? '—'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {v.plate_city ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground hidden lg:table-cell">
+                    {specSummary(v, t) || '—'}
+                  </TableCell>
                   <TableCell className="text-right">{formatPrice(v.price, currency)}</TableCell>
+                  <TableCell className="text-muted-foreground hidden text-right xl:table-cell">
+                    {v.warranty_price != null
+                      ? formatPrice(v.warranty_price, currency)
+                      : '—'}
+                  </TableCell>
                   <TableCell className="text-right">
                     {v.mileage != null ? `${formatNumber(v.mileage)} km` : '—'}
                   </TableCell>
@@ -831,12 +871,12 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="location_city">{t('fields.locationCity')}</Label>
+              <Label htmlFor="plate_city">{t('fields.plateCity')}</Label>
               <Input
-                id="location_city"
-                placeholder={t('fields.locationCityPlaceholder')}
-                value={draft.location_city}
-                onChange={(e) => setDraft({ ...draft, location_city: e.target.value })}
+                id="plate_city"
+                placeholder={t('fields.plateCityPlaceholder')}
+                value={draft.plate_city}
+                onChange={(e) => setDraft({ ...draft, plate_city: e.target.value })}
               />
             </div>
             <div className="space-y-2">

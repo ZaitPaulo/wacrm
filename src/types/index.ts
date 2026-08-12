@@ -696,8 +696,8 @@ export interface InventoryVehicle {
   // --- Lista de precios del cliente — migración 510 -----------
   /** Cilindraje tal como lo escribe el operador: "1.5", "2.0 TDI". */
   engine_displacement: string | null;
-  /** Sede donde está el vehículo. En la hoja venía bajo "PLACA". */
-  location_city: string | null;
+  /** Ciudad de matrícula, no dónde está el carro. En la hoja venía bajo "PLACA". */
+  plate_city: string | null;
   /** Precio con garantía incluida. Interno: la vitrina no lo publica. */
   warranty_price: number | null;
   /** Vencimiento del SOAT (YYYY-MM-DD, sin hora). */

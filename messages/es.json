@@ -2006,7 +2006,10 @@
       "plate": "Placa",
       "price": "Precio",
       "mileage": "Kilometraje",
-      "status": "Estado"
+      "status": "Estado",
+      "plateCity": "Matrícula",
+      "spec": "Ficha",
+      "warrantyPrice": "Con garantía"
     },
     "status": {
       "available": "Disponible",
@@ -2048,8 +2051,6 @@
       "selectPlaceholder": "Selecciona…",
       "engine": "Cilindraje",
       "enginePlaceholder": "1.5",
-      "locationCity": "Sede / ciudad",
-      "locationCityPlaceholder": "Barranquilla",
       "warrantyPrice": "Precio con garantía",
       "warrantySuggest": "Sugerir",
       "warrantyHint": "Sugerido: {amount} (precio + recargo de garantía). Uso interno, no se publica en la vitrina.",
@@ -2060,7 +2061,10 @@
       "acceptsTradeIn": "Recibe permuta",
       "acceptsTradeInHint": "Se acepta otro vehículo como parte de pago por esta unidad.",
       "hasLien": "Tiene prenda",
-      "hasLienHint": "El vehículo tiene un gravamen a favor de un tercero."
+      "hasLienHint": "El vehículo tiene un gravamen a favor de un tercero.",
+      "plateCity": "Ciudad de matrícula",
+      "plateCityPlaceholder": "Barranquilla",
+      "plateCityHint": "Dónde está matriculado, no dónde está el carro."
     },
     "images": {
       "remove": "Quitar",

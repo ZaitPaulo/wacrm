@@ -13,9 +13,10 @@ and polish.
 
 ### Inventario alineado con la lista de precios del cliente
 
-> **Migración requerida:** aplica `supabase/migrations/510_inventory_lora_fields.sql`
-> **antes** de usar el formulario de inventario. Agrega ocho columnas que
-> la ficha ya escribe; sin ellas, guardar un vehículo falla.
+> **Migraciones requeridas:** aplica `510_inventory_lora_fields.sql` y
+> `511_rename_location_to_plate_city.sql` **antes** de desplegar. La 510
+> agrega ocho columnas que la ficha ya escribe; la 511 renombra una de
+> ellas. Sin ambas, la pantalla de inventario falla al cargar.
 
 - Ocho campos nuevos que la hoja de precios llevaba y el CRM no:
   cilindraje, sede, precio con garantía, vencimiento de SOAT,
@@ -29,6 +30,16 @@ and polish.
   vitrina web, que se sigue resolviendo con el estado del vehículo y el
   interruptor de la cuenta. La columna se llama `on_display` para que no
   se confundan al leer el esquema.
+- La lista de inventario gana tres columnas para el asesor: **ciudad de
+  matrícula**, **ficha** (transmisión y cilindraje en una línea) y
+  **precio con garantía**. Las dos primeras se ocultan bajo `lg` y la
+  tercera bajo `xl`, para que la tabla no se vuelva ilegible en
+  pantallas angostas.
+- La ciudad pasó de llamarse `location_city` a **`plate_city`**: es
+  dónde está *matriculado* el vehículo, no dónde está parqueado. Un
+  carro en Barranquilla puede tener placa de Bogotá, y de eso dependen
+  los impuestos y el costo del traspaso. El nombre viejo invitaba a
+  filtrar «vehículos en Barranquilla» y obtener otros carros.
 
 ### Arreglado
 
