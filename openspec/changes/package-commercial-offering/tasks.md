@@ -47,13 +47,24 @@
 - [ ] 6.3 Ocultarla por completo a roles `agent` y `viewer`
 - [ ] 6.4 Traducciones en `messages/{es,en,ko}.json`
 
-## 7. Entrega para licencia única
+## 7. Despliegue en producción y entrega
 
-- [ ] 7.1 Escribir `docs/self-hosting.md`: requisitos, variables de entorno, migraciones, primera cuenta y verificación
-- [ ] 7.2 Ejecutar el procedimiento completo en una máquina limpia y corregir lo que falle
-- [ ] 7.3 Revisar que el paquete de entrega no arrastre credenciales de desarrollo; sólo plantillas de ejemplo
-- [ ] 7.4 Documentar el procedimiento de actualización de una instalación en uso, con respaldo previo
-- [ ] 7.5 Revisar que `Dockerfile` y `docker-compose.yml` sigan vigentes tras los cambios de este change
+> El inventario de dependencias y las tres topologías están en `design.md`.
+> Decidir **cuál se soporta oficialmente** antes de escribir la guía: no es lo
+> mismo documentar Supabase gestionado que un stack completo en el servidor
+> del cliente.
+
+- [ ] 7.0 Decidir qué topologías se ofrecen y con cuál se compromete soporte
+- [ ] 7.1 Escribir `docs/self-hosting.md`: requisitos, las 5 variables obligatorias y las opcionales, migraciones, primera cuenta y verificación
+- [ ] 7.2 **`docker-compose` con el stack de Supabase.** El actual levanta un solo servicio (la app) y asume Supabase en otra parte; sin esto la topología B no existe
+- [ ] 7.3 Generación de `ENCRYPTION_KEY` propia por instalación, documentada — de ella dependen los tokens de Meta guardados
+- [ ] 7.4 Documentar cómo disparar los cron (`/api/automations/cron`, `/api/flows/cron`) fuera de una plataforma que los ofrezca, y cómo proteger `AUTOMATION_CRON_SECRET`
+- [ ] 7.5 Documentar respaldo y restauración de la base y del almacenamiento de archivos
+- [ ] 7.6 Ejecutar el procedimiento completo en una máquina limpia y corregir lo que falle
+- [ ] 7.7 Revisar que el paquete de entrega no arrastre credenciales de desarrollo; sólo plantillas de ejemplo
+- [ ] 7.8 Documentar el procedimiento de actualización de una instalación en uso, con respaldo previo
+- [ ] 7.9 Revisar que `Dockerfile` y `docker-compose.yml` sigan vigentes tras los cambios de este change
+- [ ] 7.10 Dejar por escrito, para la venta, que **WhatsApp Cloud API no es autohospedable**: el sistema es del cliente, el canal es de Meta
 
 ## 8. Cierre comercial
 

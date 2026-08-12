@@ -43,6 +43,71 @@ Los supuestos se declaran a la vista en la propuesta **a propósito**: la demo c
 
 ---
 
+---
+
+## Inventario de dependencias para producción (verificado 2026-08-11)
+
+Levantado del código, no de memoria: `.env.local.example` más todos los
+`process.env` del árbol.
+
+### Variables obligatorias
+
+```
+NEXT_PUBLIC_SUPABASE_URL          ┐
+NEXT_PUBLIC_SUPABASE_ANON_KEY     ├─ Supabase
+SUPABASE_SERVICE_ROLE_KEY         ┘
+ENCRYPTION_KEY                    ─ propia; cifra los tokens de Meta
+META_APP_SECRET                   ─ Meta; verifica la firma del webhook
+```
+
+### Variables opcionales
+
+| Variable | Para qué |
+|---|---|
+| `META_APP_ID` | Subir cabeceras de plantillas de WhatsApp |
+| `AUTOMATION_CRON_SECRET` | Proteger `/api/automations/cron` y `/api/flows/cron` |
+| `NEXT_PUBLIC_SITE_URL` | Enlaces absolutos: vitrina, invitaciones, OpenRouter |
+| `ALLOWED_INVITE_HOSTS` | Restringir a qué dominios apuntan las invitaciones |
+| `NEXT_PUBLIC_APP_LOCALE` | Idioma por defecto |
+| `AI_REQUEST_TIMEOUT_MS`, `AI_CONTEXT_MESSAGE_LIMIT`, `AI_REPLY_DEBOUNCE_MS` | Ajuste fino del asistente |
+| `ALLOWED_DEV_ORIGINS`, `WHATSAPP_TEMPLATES_DRY_RUN` | Sólo desarrollo |
+
+**Las claves de los proveedores de IA NO son variables de entorno.** Se
+guardan cifradas en la base, por cuenta, y las carga el propio cliente
+desde la interfaz. Eso importa para el modelo de licencia: cada
+instalación usa su propia clave sin que nadie toque el servidor.
+
+### Qué se puede autohospedar y qué no
+
+| Dependencia | Self-host | Nota |
+|---|---|---|
+| Aplicación Next.js | Sí | `Dockerfile` + `output: standalone` ya existen |
+| Supabase | Sí | Open source; son varios contenedores, no uno |
+| Proveedores de IA | Opcional | OpenAI, Anthropic, OpenRouter, Gemini. Sin clave el resto funciona |
+| **WhatsApp Cloud API** | **No** | Servicio de Meta. La API On-Premises fue descontinuada |
+
+**Meta es el único candado real y no tiene alternativa.** Conviene decirlo
+tal cual al vender una licencia: el sistema es del cliente y corre en su
+servidor, pero el canal de WhatsApp es de Meta y siempre lo será. Ningún
+competidor puede ofrecer otra cosa.
+
+### Tres topologías posibles
+
+- **A — Supabase gestionado + app propia.** El cliente paga Supabase y la
+  app corre donde sea. Funciona hoy sin construir nada.
+- **B — Todo en el servidor del cliente.** Cero dependencias fuera de
+  Meta, pero alguien opera respaldos, actualizaciones y disco.
+- **C — Todo en infraestructura del proveedor, multi-cliente.** Es el
+  modelo de suscripción: una instalación y cada compraventa es una
+  cuenta. El aislamiento ya lo da la RLS.
+
+**Brecha concreta para la topología B:** el `docker-compose.yml` actual
+levanta **un solo servicio, la app**, y da por hecho que Supabase vive en
+otra parte. Una instalación completa necesita además el stack de
+Supabase, que hoy no está en el repositorio.
+
+---
+
 ## Goals / Non-Goals
 
 **Goals**
