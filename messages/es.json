@@ -285,7 +285,12 @@
       "interactiveReply": "[Respuesta interactiva]",
       "unsupported": "[Tipo de mensaje no admitido]",
       "aiBadge": "IA",
-      "aiBadgeTitle": "Enviado automáticamente por el asistente de IA"
+      "aiBadgeTitle": "Enviado automáticamente por el asistente de IA",
+      "download": "Descargar",
+      "downloadFailed": "No se pudo descargar el archivo",
+      "viewImage": "Ver imagen",
+      "expandVideo": "Ampliar video",
+      "imageAlt": "Imagen compartida"
     },
     "actions": {
       "reply": "Responder",
@@ -341,6 +346,19 @@
       "resumed": "Se reanudó la IA.",
       "updateError": "No se pudo actualizar el asistente de IA.",
       "networkError": "No se pudo conectar con el servidor."
+    },
+    "mediaViewer": {
+      "counter": "{index} de {total}",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "zoomIn": "Ver a tamaño completo",
+      "zoomOut": "Ajustar a la pantalla",
+      "openOriginal": "Abrir original",
+      "download": "Descargar",
+      "downloadFailed": "No se pudo descargar el archivo",
+      "failed": "Este archivo ya no está disponible",
+      "imageAlt": "Imagen compartida",
+      "you": "Tú"
     }
   },
   "Contacts": {
@@ -725,7 +743,16 @@
         "failed": "Fallidos"
       },
       "toastFailedDelete": "No se pudo eliminar: {error}",
-      "toastDeleted": "Difusión eliminada"
+      "toastDeleted": "Difusión eliminada",
+      "resumeTitle": "Algunos destinatarios necesitan otro intento",
+      "resumeStalledTitle": "Esta campaña se detuvo a mitad de camino",
+      "resumeHint": "{count} destinatarios fallaron. Al reintentar se les envía de nuevo desde el servidor.",
+      "resumeStalledHint": "A {count} destinatarios nunca se les envió: la pestaña que corría la campaña se cerró antes de terminar. Al reanudar se completa desde el servidor.",
+      "resumePending": "Reanudar el envío ({count})",
+      "retryFailed": "Reintentar los fallidos ({count})",
+      "toastResumeStarted": "Enviando a {count} destinatarios en segundo plano.",
+      "toastResumeStartedCapped": "Enviando a {count} destinatarios en segundo plano. Quedan {remaining} para una próxima corrida.",
+      "toastResumeFailed": "No se pudo reanudar: {error}"
     },
     "new": {
       "title": "Nueva difusión",
@@ -1042,8 +1069,11 @@
         "matchType": "Tipo de coincidencia",
         "matchContains": "Contiene",
         "matchExact": "Exacta",
-        "closeConversationHint": "Pone la conversación en estado \"cerrada\". No necesita configuración."
-      }
+        "closeConversationHint": "Pone la conversación en estado \"cerrada\". No necesita configuración.",
+        "matchWord": "Palabra completa",
+        "matchWordHint": "Solo coincide cuando la palabra clave aparece suelta, así «k» deja de dispararse dentro de «gracias». Conviene para palabras cortas en idiomas que separan con espacios; para idiomas que se escriben sin espacios, usa Contiene."
+      },
+      "delete": "Eliminar"
     }
   },
   "Flows": {
@@ -2114,7 +2144,8 @@
     "rowTitle": "Título de la fila",
     "rowDescription": "Descripción (opcional)",
     "addRow": "Agregar fila",
-    "addSection": "Agregar sección"
+    "addSection": "Agregar sección",
+    "preview": "Vista previa"
   },
   "Storefront": {
     "notConfigured": "Vitrina no configurada",
@@ -2177,5 +2208,12 @@
     "networkError": "No se pudo conectar con el servidor",
     "signOutFailed": "No se pudo cerrar la sesión. Intenta recargar la página.",
     "wrongAccount": "Ya perteneces a otra cuenta. Inicia sesión con un correo distinto para unirte a esta."
+  },
+  "AccountAccess": {
+    "unlinkedTitle": "Este usuario no está vinculado a ninguna cuenta",
+    "unlinkedBody": "Mientras esto no se resuelva, nada de lo que cambies se va a guardar: la base rechaza cualquier escritura de un usuario sin cuenta ni rol. Si te invitaron a un equipo, pídele al propietario que te reenvíe la invitación. En una instalación propia, verifica que la migración de creación de cuenta haya corrido para este usuario.",
+    "errorTitle": "No se pudieron cargar tus permisos",
+    "errorBody": "Tu rol no cargó, así que todo queda como solo lectura y los cambios no se guardarán. Revisa tu conexión e inténtalo de nuevo.",
+    "retry": "Reintentar"
   }
 }
