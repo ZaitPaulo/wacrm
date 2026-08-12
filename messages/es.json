@@ -2045,7 +2045,22 @@
       "featuresPlaceholder": "Transmisión: Automática\nColor: Negro\nAire acondicionado",
       "images": "Imágenes",
       "internalNotes": "Notas internas",
-      "selectPlaceholder": "Selecciona…"
+      "selectPlaceholder": "Selecciona…",
+      "engine": "Cilindraje",
+      "enginePlaceholder": "1.5",
+      "locationCity": "Sede / ciudad",
+      "locationCityPlaceholder": "Barranquilla",
+      "warrantyPrice": "Precio con garantía",
+      "warrantySuggest": "Sugerir",
+      "warrantyHint": "Sugerido: {amount} (precio + recargo de garantía). Uso interno, no se publica en la vitrina.",
+      "soat": "Vence el SOAT",
+      "tecno": "Vence la tecnomecánica",
+      "onDisplay": "En vitrina física",
+      "onDisplayHint": "Está exhibido en el local. No afecta la vitrina web.",
+      "acceptsTradeIn": "Recibe permuta",
+      "acceptsTradeInHint": "Se acepta otro vehículo como parte de pago por esta unidad.",
+      "hasLien": "Tiene prenda",
+      "hasLienHint": "El vehículo tiene un gravamen a favor de un tercero."
     },
     "images": {
       "remove": "Quitar",

@@ -36,6 +36,15 @@ export interface VehiclePayload {
   condition?: string
   doors?: number | null
   status?: VehicleStatusValue
+  // Campos de la lista de precios del cliente (510).
+  engine_displacement?: string | null
+  location_city?: string | null
+  warranty_price?: number | null
+  soat_expires_at?: string | null
+  tecnomecanica_expires_at?: string | null
+  has_lien?: boolean
+  on_display?: boolean
+  accepts_trade_in?: boolean
   features?: Record<string, unknown> | unknown[]
   images?: string[]
   internal_notes?: string | null
@@ -177,6 +186,59 @@ export function buildVehiclePayload(
       return { error: 'status inválido' }
     }
     out.status = b.status as VehicleStatusValue
+  }
+
+  // --- Lista de precios del cliente (510) --------------------
+
+  // Cilindraje y sede: texto libre anulable.
+  if (b.engine_displacement !== undefined) {
+    out.engine_displacement = str(b.engine_displacement) || null
+  }
+  if (b.location_city !== undefined) {
+    out.location_city = str(b.location_city) || null
+  }
+
+  // Precio con garantía. Anulable: no todas las unidades la ofrecen.
+  if (b.warranty_price === null || b.warranty_price === '') {
+    out.warranty_price = null
+  } else if (b.warranty_price !== undefined) {
+    const n = Number(b.warranty_price)
+    if (!Number.isFinite(n) || n < 0) {
+      return { error: 'warranty_price debe ser un número >= 0' }
+    }
+    out.warranty_price = n
+  }
+
+  // Vencimientos de SOAT y tecnomecánica. Se guardan como DATE, así que
+  // se recorta a YYYY-MM-DD: conservar la hora haría que un vencimiento
+  // se corriera un día según la zona horaria de quien lo consulte.
+  const dateFields: ['soat_expires_at' | 'tecnomecanica_expires_at', unknown][] = [
+    ['soat_expires_at', b.soat_expires_at],
+    ['tecnomecanica_expires_at', b.tecnomecanica_expires_at],
+  ]
+  for (const [key, raw] of dateFields) {
+    if (raw === null || raw === '') {
+      out[key] = null
+    } else if (raw !== undefined) {
+      const v = str(raw)
+      if (!v || Number.isNaN(Date.parse(v))) {
+        return { error: `${key} debe ser una fecha válida` }
+      }
+      out[key] = new Date(v).toISOString().slice(0, 10)
+    }
+  }
+
+  // Banderas. NOT NULL en la base, así que un valor ausente se deja
+  // fuera del patch y conserva lo que ya hubiera.
+  const boolFields: ['has_lien' | 'on_display' | 'accepts_trade_in', unknown][] = [
+    ['has_lien', b.has_lien],
+    ['on_display', b.on_display],
+    ['accepts_trade_in', b.accepts_trade_in],
+  ]
+  for (const [key, raw] of boolFields) {
+    if (raw === undefined || raw === null) continue
+    if (typeof raw !== 'boolean') return { error: `${key} debe ser booleano` }
+    out[key] = raw
   }
 
   // features — objeto o arreglo JSON

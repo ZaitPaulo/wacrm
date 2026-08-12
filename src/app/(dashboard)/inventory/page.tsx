@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import type { InventoryVehicle, VehicleStatus } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -56,6 +57,7 @@ import {
   FUEL_TYPES,
   BODY_TYPES,
   CONDITIONS,
+  suggestedWarrantyPrice,
 } from '@/lib/inventory/specs';
 import { uploadAccountMedia } from '@/lib/storage/upload-media';
 
@@ -86,6 +88,15 @@ interface VehicleDraft {
   condition: string;
   doors: string;
   status: VehicleStatus;
+  // Lista de precios del cliente (510).
+  engine_displacement: string;
+  location_city: string;
+  warranty_price: string;
+  soat_expires_at: string;
+  tecnomecanica_expires_at: string;
+  has_lien: boolean;
+  on_display: boolean;
+  accepts_trade_in: boolean;
   featuresText: string;
   images: string[];
   internal_notes: string;
@@ -113,6 +124,15 @@ const EMPTY_DRAFT: VehicleDraft = {
   condition: 'used',
   doors: '',
   status: 'available',
+  engine_displacement: '',
+  location_city: '',
+  warranty_price: '',
+  soat_expires_at: '',
+  tecnomecanica_expires_at: '',
+  has_lien: false,
+  on_display: false,
+  // La norma del negocio es recibir permuta; se marca la excepción.
+  accepts_trade_in: true,
   featuresText: '',
   images: [],
   internal_notes: '',
@@ -171,6 +191,14 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
     condition: v.condition ?? 'used',
     doors: v.doors != null ? String(v.doors) : '',
     status: v.status,
+    engine_displacement: v.engine_displacement ?? '',
+    location_city: v.location_city ?? '',
+    warranty_price: v.warranty_price != null ? String(v.warranty_price) : '',
+    soat_expires_at: v.soat_expires_at ?? '',
+    tecnomecanica_expires_at: v.tecnomecanica_expires_at ?? '',
+    has_lien: v.has_lien ?? false,
+    on_display: v.on_display ?? false,
+    accepts_trade_in: v.accepts_trade_in ?? true,
     featuresText: featuresToText(v.features),
     images: v.images ?? [],
     internal_notes: v.internal_notes ?? '',
@@ -211,6 +239,18 @@ export default function InventoryPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryVehicle | null>(null);
   const [draft, setDraft] = useState<VehicleDraft>(EMPTY_DRAFT);
+
+  // Precio con garantía que propone el botón del formulario. Se recalcula
+  // con el precio y la carrocería porque el recargo depende de si es
+  // camioneta; queda en null mientras no haya precio del que partir.
+  const suggestedWarranty = useMemo(
+    () =>
+      suggestedWarrantyPrice(
+        draft.price.trim() === '' ? null : Number(draft.price),
+        draft.body_type || null,
+      ),
+    [draft.price, draft.body_type],
+  );
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -320,6 +360,15 @@ export default function InventoryPage() {
         condition: draft.condition || 'used',
         doors: draft.doors.trim() === '' ? null : Number(draft.doors),
         status: draft.status,
+        engine_displacement: draft.engine_displacement.trim() || null,
+        location_city: draft.location_city.trim() || null,
+        warranty_price:
+          draft.warranty_price.trim() === '' ? null : Number(draft.warranty_price),
+        soat_expires_at: draft.soat_expires_at || null,
+        tecnomecanica_expires_at: draft.tecnomecanica_expires_at || null,
+        has_lien: draft.has_lien,
+        on_display: draft.on_display,
+        accepts_trade_in: draft.accepts_trade_in,
         features: textToFeatures(draft.featuresText),
         images: draft.images,
         internal_notes: draft.internal_notes.trim() || null,
@@ -769,6 +818,126 @@ export default function InventoryPage() {
                 value={draft.doors}
                 onChange={(e) => setDraft({ ...draft, doors: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="engine_displacement">{t('fields.engine')}</Label>
+              <Input
+                id="engine_displacement"
+                placeholder={t('fields.enginePlaceholder')}
+                value={draft.engine_displacement}
+                onChange={(e) =>
+                  setDraft({ ...draft, engine_displacement: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="location_city">{t('fields.locationCity')}</Label>
+              <Input
+                id="location_city"
+                placeholder={t('fields.locationCityPlaceholder')}
+                value={draft.location_city}
+                onChange={(e) => setDraft({ ...draft, location_city: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warranty_price">{t('fields.warrantyPrice')}</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="warranty_price"
+                  type="number"
+                  value={draft.warranty_price}
+                  onChange={(e) =>
+                    setDraft({ ...draft, warranty_price: e.target.value })
+                  }
+                />
+                {/* Propone precio + recargo (1,5 M vehículo / 2,0 M
+                    camioneta) en vez de imponerlo: la regla se cumple en
+                    toda la lista del cliente, pero una excepción puntual
+                    no debe obligar a pelear con el formulario. */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={suggestedWarranty == null}
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      warranty_price: String(suggestedWarranty ?? ''),
+                    })
+                  }
+                >
+                  {t('fields.warrantySuggest')}
+                </Button>
+              </div>
+              {suggestedWarranty != null && (
+                <p className="text-muted-foreground text-xs">
+                  {t('fields.warrantyHint', {
+                    amount: formatPrice(suggestedWarranty, currency),
+                  })}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="soat_expires_at">{t('fields.soat')}</Label>
+              <Input
+                id="soat_expires_at"
+                type="date"
+                value={draft.soat_expires_at}
+                onChange={(e) =>
+                  setDraft({ ...draft, soat_expires_at: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tecnomecanica_expires_at">{t('fields.tecno')}</Label>
+              <Input
+                id="tecnomecanica_expires_at"
+                type="date"
+                value={draft.tecnomecanica_expires_at}
+                onChange={(e) =>
+                  setDraft({ ...draft, tecnomecanica_expires_at: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-3 sm:col-span-2">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="on_display">{t('fields.onDisplay')}</Label>
+                  <p className="text-muted-foreground text-xs">
+                    {t('fields.onDisplayHint')}
+                  </p>
+                </div>
+                <Switch
+                  id="on_display"
+                  checked={draft.on_display}
+                  onCheckedChange={(v) => setDraft({ ...draft, on_display: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="accepts_trade_in">{t('fields.acceptsTradeIn')}</Label>
+                  <p className="text-muted-foreground text-xs">
+                    {t('fields.acceptsTradeInHint')}
+                  </p>
+                </div>
+                <Switch
+                  id="accepts_trade_in"
+                  checked={draft.accepts_trade_in}
+                  onCheckedChange={(v) => setDraft({ ...draft, accepts_trade_in: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="has_lien">{t('fields.hasLien')}</Label>
+                  <p className="text-muted-foreground text-xs">
+                    {t('fields.hasLienHint')}
+                  </p>
+                </div>
+                <Switch
+                  id="has_lien"
+                  checked={draft.has_lien}
+                  onCheckedChange={(v) => setDraft({ ...draft, has_lien: v })}
+                />
+              </div>
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="features">{t('fields.features')}</Label>

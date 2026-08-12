@@ -2052,7 +2052,22 @@
       "featuresPlaceholder": "변속기: 자동\n색상: 검정\n에어컨",
       "images": "이미지",
       "internalNotes": "내부 메모",
-      "selectPlaceholder": "선택하세요…"
+      "selectPlaceholder": "선택하세요…",
+      "engine": "배기량",
+      "enginePlaceholder": "1.5",
+      "locationCity": "지점 / 도시",
+      "locationCityPlaceholder": "Barranquilla",
+      "warrantyPrice": "보증 포함 가격",
+      "warrantySuggest": "제안",
+      "warrantyHint": "제안: {amount} (가격 + 보증 추가금). 내부용이며 쇼룸에 표시되지 않습니다.",
+      "soat": "보험 만료일",
+      "tecno": "정기검사 만료일",
+      "onDisplay": "전시장 전시 중",
+      "onDisplayHint": "지점에 실제로 전시되어 있습니다. 웹 쇼룸에는 영향을 주지 않습니다.",
+      "acceptsTradeIn": "보상판매 가능",
+      "acceptsTradeInHint": "이 차량에 대해 다른 차량을 일부 대금으로 받습니다.",
+      "hasLien": "담보 설정됨",
+      "hasLienHint": "제3자에게 담보가 설정된 차량입니다."
     },
     "images": {
       "remove": "제거",

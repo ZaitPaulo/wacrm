@@ -11,6 +11,34 @@ and polish.
 
 ## [Unreleased]
 
+### Inventario alineado con la lista de precios del cliente
+
+> **Migración requerida:** aplica `supabase/migrations/510_inventory_lora_fields.sql`
+> **antes** de usar el formulario de inventario. Agrega ocho columnas que
+> la ficha ya escribe; sin ellas, guardar un vehículo falla.
+
+- Ocho campos nuevos que la hoja de precios llevaba y el CRM no:
+  cilindraje, sede, precio con garantía, vencimiento de SOAT,
+  vencimiento de tecnomecánica, prenda, exhibido en vitrina física y si
+  recibe permuta.
+- El precio con garantía se **sugiere** desde el precio de venta —
+  +1,5 M para vehículos, +2,0 M para camionetas (SUV, pick-up y van)—
+  y se puede sobrescribir. Es interno: la vitrina sigue publicando un
+  solo precio.
+- «Vitrina» aquí es la **física** (el local). No tiene relación con la
+  vitrina web, que se sigue resolviendo con el estado del vehículo y el
+  interruptor de la cuenta. La columna se llama `on_display` para que no
+  se confundan al leer el esquema.
+
+### Arreglado
+
+- **Editar un vehículo borraba seis campos.** `GET /api/inventory`
+  enumera columnas por nombre y nunca se le agregaron las
+  especificaciones de la migración 504 —transmisión, combustible,
+  carrocería, color, condición y puertas—. El formulario las inicializaba
+  vacías porque no llegaban, y al guardar las mandaba como `null`. Los
+  datos estaban en la base y se perdían en cada edición.
+
 Pone en español los flujos y automatizaciones, y los reescribe para
 compraventa de vehículos.
 

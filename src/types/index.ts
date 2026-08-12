@@ -693,6 +693,24 @@ export interface InventoryVehicle {
    */
   public_ref: string;
 
+  // --- Lista de precios del cliente — migración 510 -----------
+  /** Cilindraje tal como lo escribe el operador: "1.5", "2.0 TDI". */
+  engine_displacement: string | null;
+  /** Sede donde está el vehículo. En la hoja venía bajo "PLACA". */
+  location_city: string | null;
+  /** Precio con garantía incluida. Interno: la vitrina no lo publica. */
+  warranty_price: number | null;
+  /** Vencimiento del SOAT (YYYY-MM-DD, sin hora). */
+  soat_expires_at: string | null;
+  /** Vencimiento de la tecnomecánica (YYYY-MM-DD, sin hora). */
+  tecnomecanica_expires_at: string | null;
+  /** El vehículo tiene un gravamen a favor de un tercero. */
+  has_lien: boolean;
+  /** Exhibido en la vitrina FÍSICA del local. No es la vitrina web. */
+  on_display: boolean;
+  /** Si en esta unidad se acepta recibir otro en parte de pago. */
+  accepts_trade_in: boolean;
+
   /**
    * Costo de compra, cuando la API lo adjunta. Llega `null` tanto si el
    * vehículo no tiene adquisición registrada como si quien consulta no

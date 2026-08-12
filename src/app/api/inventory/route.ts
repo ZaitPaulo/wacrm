@@ -11,8 +11,16 @@ import { syncVehicleKnowledge } from '@/lib/inventory/knowledge-sync'
 
 // Lista nominal a propósito (nunca `*`): mantiene bajo control qué sale
 // hacia el cliente cuando se agregan columnas.
+//
+// El precio a pagar por esa decisión es que OLVIDAR una columna aquí no
+// falla: el formulario de /inventory carga desde esta ruta, inicializa
+// en vacío lo que no llega y al guardar lo manda como null. Así se
+// perdían en cada edición las seis especificaciones de la migración 504
+// —transmisión, combustible, carrocería, color, condición y puertas—,
+// que nunca se agregaron a esta lista. Al sumar columnas nuevas hay que
+// añadirlas aquí en el mismo cambio.
 const VEHICLE_COLUMNS =
-  'id, brand, model, year, license_plate, vin, price, mileage, status, features, images, internal_notes, kb_document_id, created_at, updated_at, sold_price, sold_at, sold_to_contact_id, public_ref'
+  'id, brand, model, year, license_plate, vin, price, mileage, status, features, images, internal_notes, kb_document_id, created_at, updated_at, sold_price, sold_at, sold_to_contact_id, public_ref, transmission, fuel_type, body_type, color, condition, doors, engine_displacement, location_city, warranty_price, soat_expires_at, tecnomecanica_expires_at, has_lien, on_display, accepts_trade_in'
 
 // El costo de compra se pide como tabla embebida, no como columna. Para
 // un 'agent' o un 'viewer' la RLS de vehicle_acquisitions (migración 508)
