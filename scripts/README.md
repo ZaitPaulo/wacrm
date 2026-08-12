@@ -58,6 +58,29 @@ No borra ni sobrescribe carpetas. Si entran vehículos nuevos al Excel,
 se crean solo los que faltan y las carpetas que ya tienen fotos quedan
 intactas. Está probado con fotos dentro.
 
+### Qué pestaña lee
+
+La **primera visible en el orden de las lengüetas**, saltando las ocultas.
+Y lo imprime en pantalla (`Pestana leida : ...`), que es lo único que
+delata una elección equivocada antes de mirar los nombres de las carpetas.
+
+Esto no es trivial: el nombre del archivo interno (`sheet1.xml`,
+`sheet2.xml`…) es un número de creación y **no corresponde al orden de
+las pestañas**. Si alguna vez se borró una hoja o se reordenaron
+arrastrando, deja de coincidir — en la lista del cliente se nota, porque
+su única pestaña tiene `sheetId="2"`. Quedarse con "el primer archivo de
+hoja" puede leer la pestaña de vendidos, o una oculta, y terminar sin
+error.
+
+Si la lista buena no es la primera visible, hay dos formas de forzarla:
+
+```powershell
+.\Crear-Carpetas-Fotos.ps1 -Hoja "LISTA DE PRECIO ACTUALIZADA"
+```
+
+o, para el cliente, descomentando la línea `set HOJA=` del `.bat`. Con un
+nombre inexistente falla enumerando las pestañas del libro.
+
 ### Detalles que el script resuelve
 
 - **La fila de encabezados no es la primera** (arriba hay un título), así

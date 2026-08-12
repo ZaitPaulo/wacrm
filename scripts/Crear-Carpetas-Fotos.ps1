@@ -20,6 +20,11 @@
     Ruta del archivo .xlsx. Si se omite, busca el más reciente en la carpeta
     del script.
 
+.PARAMETER Hoja
+    Nombre de la pestana a leer. Si se omite, usa la primera VISIBLE en el
+    orden en que aparecen las lenguetas en Excel. Indicala cuando el libro
+    tenga varias y la lista buena no sea la primera.
+
 .PARAMETER Destino
     Carpeta donde crear la estructura. Por defecto, "Fotos Vehiculos" junto
     al script.
@@ -32,6 +37,7 @@
 [CmdletBinding()]
 param(
     [string]$Excel,
+    [string]$Hoja,
     [string]$Destino
 )
 
@@ -89,12 +95,81 @@ function Read-XlsxCells {
             }
         }
 
-        # --- primera hoja ---
-        $nombreHoja = ($zip.Entries |
-            Where-Object { $_.FullName -like 'xl/worksheets/*.xml' } |
-            Sort-Object FullName | Select-Object -First 1).FullName
-        if (-not $nombreHoja) { throw "El archivo no tiene ninguna hoja de cálculo." }
-        $hoja = [xml](Get-EntryText $nombreHoja)
+        # --- elegir la pestaña ---
+        #
+        # El nombre del archivo interno (sheet1.xml, sheet2.xml...) NO
+        # corresponde al orden de las pestañas que se ven en Excel. Es un
+        # número de creación: si alguna vez se borró una hoja, o se
+        # reordenaron arrastrando, deja de coincidir. En la lista de precios
+        # del cliente se nota — su única pestaña tiene sheetId="2", prueba de
+        # que hubo otra antes.
+        #
+        # El orden real está en workbook.xml, que nombra las pestañas en el
+        # orden de las lengüetas y apunta a cada archivo por un identificador
+        # que se resuelve en workbook.xml.rels. Tomar "el primer archivo de
+        # hoja" en vez de esto puede leer una pestaña oculta, o la de
+        # vendidos, y terminar sin error: carpetas equivocadas y un "listo"
+        # en pantalla.
+        $rutaHoja = $null
+        $nombrePestana = $null
+
+        $wbXml = Get-EntryText 'xl/workbook.xml'
+        $relsXml = Get-EntryText 'xl/_rels/workbook.xml.rels'
+        if ($wbXml -and $relsXml) {
+            $NS_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+
+            # id de relación -> archivo dentro del zip
+            $destinoDe = @{}
+            foreach ($rel in ([xml]$relsXml).Relationships.Relationship) {
+                $destino = [string]$rel.Target
+                if (-not $destino) { continue }
+                # El destino es relativo a xl/, salvo que venga absoluto.
+                $destino = if ($destino.StartsWith('/')) { $destino.TrimStart('/') } else { "xl/$destino" }
+                $destinoDe[[string]$rel.Id] = ($destino -replace '\\', '/')
+            }
+
+            $pestanas = @(([xml]$wbXml).workbook.sheets.sheet)
+            foreach ($p in $pestanas) {
+                $nombre = [string]$p.name
+                # Sin atributo `state`, la pestaña es visible.
+                $estado = [string]$p.state
+                $rid = $p.GetAttribute('id', $NS_REL)
+                if (-not $rid -or -not $destinoDe.ContainsKey($rid)) { continue }
+
+                if ($Hoja) {
+                    # Comparación tolerante: el nombre real de su hoja termina
+                    # en espacio ("LISTA DE PRECIO ACTUALIZADA ").
+                    if ((Normalize-Header $nombre) -ne (Normalize-Header $Hoja)) { continue }
+                } elseif ($estado -and $estado -ne 'visible') {
+                    continue   # ocultas: se saltan salvo que se pidan por nombre
+                }
+
+                $rutaHoja = $destinoDe[$rid]
+                $nombrePestana = $nombre
+                break
+            }
+
+            if ($Hoja -and -not $rutaHoja) {
+                $disponibles = ($pestanas | ForEach-Object { '"' + $_.name + '"' }) -join ', '
+                throw "No hay ninguna pestaña llamada `"$Hoja`". Las de este archivo son: $disponibles"
+            }
+        }
+
+        if (-not $rutaHoja) {
+            # Sin workbook.xml legible no queda de dónde sacar el orden. Se
+            # cae al primer archivo de hoja, que es lo que hacía antes, pero
+            # avisando: es justo el caso en el que puede leer la pestaña
+            # equivocada sin fallar.
+            $rutaHoja = ($zip.Entries |
+                Where-Object { $_.FullName -like 'xl/worksheets/*.xml' } |
+                Sort-Object FullName | Select-Object -First 1).FullName
+            $nombrePestana = '(no se pudo determinar)'
+            Write-Host "  Aviso: no pude leer el orden de las pestanas; uso la primera del archivo." -ForegroundColor DarkYellow
+        }
+
+        if (-not $rutaHoja) { throw "El archivo no tiene ninguna hoja de cálculo." }
+        $script:HojaLeida = $nombrePestana
+        $hoja = [xml](Get-EntryText $rutaHoja)
 
         $celdas = @{}
         foreach ($fila in $hoja.worksheet.sheetData.row) {
@@ -201,6 +276,10 @@ Write-Host ""
 # ============================================================
 
 $celdas = Read-XlsxCells -Ruta $Excel
+
+# Se imprime siempre: si alguna vez lee la pestana equivocada, esta linea
+# es lo unico que lo delata antes de mirar los nombres de las carpetas.
+Write-Host "  Pestana leida    : $script:HojaLeida" -ForegroundColor Cyan
 
 # La hoja empieza con un título ("FORMATO DE LISTA DE PRECIO..."), así que
 # la fila de encabezados no es la primera. Se busca la que contenga a la vez
