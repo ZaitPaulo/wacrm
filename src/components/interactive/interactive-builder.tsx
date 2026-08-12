@@ -66,6 +66,14 @@ interface InteractiveBuilderProps {
  * and surfaces a single validation error via `validateInteractivePayload`
  * — the same check the server runs before sending. Shared by the inbox
  * composer, the automation Send node, and the quick-replies manager.
+ *
+ * i18n note: this component and its two editors below each call
+ * `useTranslations("Interactive")` on their own rather than threading a
+ * `t` down through props. It reads like duplication and isn't — next-intl
+ * resolves the namespace from context, so passing it would only couple the
+ * editors to their parent for no gain. Worth knowing because upstream owns
+ * this file and its merges keep arriving with the strings hardcoded in
+ * English; re-applying the translations means re-adding all three hooks.
  */
 export function InteractiveBuilder({
   value,
