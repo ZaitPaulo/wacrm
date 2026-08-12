@@ -698,18 +698,44 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
         // If the server blocked activation with validation issues,
         // surface the first concrete problem so the user can fix it
         // without opening DevTools for the full array.
-        const firstIssue: { path?: string; message?: string } | undefined =
-          body?.issues?.[0]
-        if (firstIssue?.message) {
-          toast.error(firstIssue.message, {
-            description: firstIssue.path ? `at ${firstIssue.path}` : undefined,
-          })
+        //
+        // The server sends a code plus its values, never a sentence: it
+        // has no idea what language this operator reads. Wording is
+        // resolved here, where the locale is known.
+        const firstIssue:
+          | {
+              path?: string
+              code?: string
+              params?: Record<string, string | number>
+            }
+          | undefined = body?.issues?.[0]
+        if (firstIssue?.code) {
+          toast.error(
+            t(
+              `validation.issues.${firstIssue.code}` as never,
+              (firstIssue.params ?? {}) as never,
+            ),
+            {
+              description: firstIssue.path
+                ? t("validation.at", { path: firstIssue.path })
+                : undefined,
+            },
+          )
         } else {
           toast.error(body?.error ?? t("toasts.saveFailed"))
         }
         return
       }
       toast.success(isEditing ? t("toasts.saved") : t("toasts.created"))
+      // Saved fine, but the customer would hear us twice. Separate toast
+      // so the success is not swallowed by the caveat, and long-lived
+      // because it describes something the operator has to go decide.
+      if (body?.warning_flow_conflict) {
+        toast.warning(
+          t("toasts.flowConflict", { flow: body.warning_flow_conflict }),
+          { duration: 10_000 },
+        )
+      }
       if (!isEditing && body?.automation?.id) {
         router.replace(`/automations/${body.automation.id}/edit`)
       }
@@ -861,7 +887,7 @@ function TriggerCard({
             {type === "tag_added" && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Tag
+                  {t("tags.label")}
                 </label>
                 <TagSelect
                   value={(config.tag_id as string) ?? ""}
@@ -876,7 +902,7 @@ function TriggerCard({
                   {t("schedule")}
                 </label>
                 <Input
-                  placeholder="Cron expression or HH:mm"
+                  placeholder={t("schedulePlaceholder")}
                   value={(config.schedule as string) ?? ""}
                   onChange={(e) =>
                     onConfigChange({ ...config, schedule: e.target.value })
@@ -1133,7 +1159,13 @@ function StepRenderer({
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                {isCondition ? "Condition" : step.step_type === "wait" ? "Wait" : "Action"}
+                {t(
+                  isCondition
+                    ? "kinds.condition"
+                    : step.step_type === "wait"
+                      ? "kinds.wait"
+                      : "kinds.action",
+                )}
               </div>
               <div className="truncate text-sm font-medium text-foreground">{t(`steps.${meta.label}`)}</div>
               <div className="truncate text-[11px] text-muted-foreground">{previewFor(step)}</div>
@@ -1154,7 +1186,7 @@ function StepRenderer({
                     variant="ghost"
                     size="icon"
                     disabled={index === 0}
-                    aria-label="Move up"
+                    aria-label={t("moveUp")}
                     onClick={() => props.moveStepAt(path, -1)}
                   >
                     <ArrowUp className="h-4 w-4" />
@@ -1163,7 +1195,7 @@ function StepRenderer({
                     variant="ghost"
                     size="icon"
                     disabled={index === total - 1}
-                    aria-label="Move down"
+                    aria-label={t("moveDown")}
                     onClick={() => props.moveStepAt(path, 1)}
                   >
                     <ArrowDown className="h-4 w-4" />
@@ -1473,7 +1505,7 @@ function StepEditor({
             />
           </FieldBlock>
           {(cfg.subject === "contact_field" || cfg.subject === "message_content") && (
-            <FieldBlock label="Value">
+            <FieldBlock label={t("config.valueLabel")}>
               <Input
                 value={(cfg.value as string) ?? ""}
                 onChange={(e) => set({ value: e.target.value })}

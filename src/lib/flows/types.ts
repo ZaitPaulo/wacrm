@@ -270,7 +270,15 @@ export interface FlowRunRow {
     | "handed_off"
     | "timed_out"
     | "paused_by_agent"
-    | "failed";
+    | "failed"
+    /**
+     * Ended because the flow stopped being active, not because of
+     * anything the customer did or didn't do. Distinct from `timed_out`
+     * on purpose: reporting "the customer went quiet" for a run the
+     * operator themselves cut short is a small lie that costs real
+     * debugging time later.
+     */
+    | "cancelled";
   current_node_key: string | null;
   last_prompt_message_id: string | null;
   vars: Record<string, unknown>;

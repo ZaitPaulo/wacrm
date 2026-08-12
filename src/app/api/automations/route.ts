@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
+import { getTranslations } from 'next-intl/server'
 import { getTemplate } from '@/lib/automations/templates'
+import { detectTriggerConflict } from '@/lib/automations/trigger-conflict'
+import { templateLabel, type LabelResolver } from '@/lib/templates/labels'
 import { insertSteps, type BuilderStepInput } from '@/lib/automations/steps-tree'
 import {
   validateStepsForActivation,
@@ -70,8 +73,12 @@ export async function POST(request: Request) {
   if (template && (!steps || steps.length === 0)) {
     const t = getTemplate(template)
     if (t) {
-      effectiveName = effectiveName ?? t.name
-      effectiveDescription = effectiveDescription ?? t.description
+      const label = (await getTranslations(
+        'Automations.templates',
+      )) as LabelResolver
+      effectiveName = effectiveName ?? templateLabel(label, t.slug, 'name')
+      effectiveDescription =
+        effectiveDescription ?? templateLabel(label, t.slug, 'description')
       effectiveTriggerType = effectiveTriggerType ?? t.trigger_type
       effectiveTriggerConfig = effectiveTriggerConfig ?? t.trigger_config
       effectiveSteps = t.steps as unknown as BuilderStepInput[]
@@ -131,5 +138,22 @@ export async function POST(request: Request) {
     if (err) return NextResponse.json({ error: err }, { status: 500 })
   }
 
-  return NextResponse.json({ automation }, { status: 201 })
+  // Courtesy warning, never a blocker: an automation that sends on a
+  // relationship trigger a live flow also owns will greet the customer
+  // twice. See lib/automations/trigger-conflict.ts.
+  const conflictingFlow = await detectTriggerConflict({
+    db: admin,
+    accountId,
+    triggerType: effectiveTriggerType as string,
+    steps: effectiveSteps as { step_type: string }[] | undefined,
+    willBeActive: !!is_active,
+  })
+
+  return NextResponse.json(
+    {
+      automation,
+      ...(conflictingFlow ? { warning_flow_conflict: conflictingFlow } : {}),
+    },
+    { status: 201 },
+  )
 }

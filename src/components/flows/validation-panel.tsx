@@ -57,7 +57,7 @@ export function ValidationPanel() {
       </div>
       <div className="flex flex-col gap-1">
         {issues.map((i, ix) => (
-          <IssueLine key={ix} issue={i} onJump={requestFlash} t={t} />
+          <IssueLine key={ix} issue={i} onJump={requestFlash} />
         ))}
       </div>
     </div>
@@ -73,12 +73,15 @@ export function ValidationPanel() {
 export function IssueLine({
   issue,
   onJump,
-  t,
 }: {
   issue: ValidationIssue;
   onJump?: (key: string) => void;
-  t?: ReturnType<typeof useTranslations>;
 }) {
+  // Resolved here rather than passed down: the validator reports codes,
+  // and every call site would otherwise have to thread the same
+  // namespace through — which is how the untranslated English fallback
+  // on the jump label survived as long as it did.
+  const t = useTranslations("Flows.validation");
   const tone =
     issue.severity === "error" ? "text-red-300" : "text-amber-300";
   const iconTone =
@@ -92,7 +95,10 @@ export function IssueLine({
             {issue.node_key}
           </code>
         )}
-        {issue.message}
+        {t(
+          `issues.${issue.code}` as never,
+          issue.params as never,
+        )}
       </span>
     </>
   );
@@ -109,7 +115,7 @@ export function IssueLine({
           "flex w-full items-start gap-2 rounded-md px-2 py-1 text-left text-xs transition-colors hover:bg-muted/60",
           tone,
         )}
-        aria-label={t ? t("jumpToNode", { key: issue.node_key! }) : `Jump to node ${issue.node_key}`}
+        aria-label={t("jumpToNode", { key: issue.node_key! })}
       >
         {body}
       </button>

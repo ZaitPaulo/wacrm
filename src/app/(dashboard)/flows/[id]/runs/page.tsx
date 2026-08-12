@@ -7,6 +7,7 @@ import {
   Loader2,
   CircleCheck,
   CircleAlert,
+  CircleSlash,
   Clock,
   UserPlus,
   PlayCircle,
@@ -41,7 +42,8 @@ interface RunRow {
     | "handed_off"
     | "timed_out"
     | "paused_by_agent"
-    | "failed";
+    | "failed"
+    | "cancelled";
   current_node_key: string | null;
   started_at: string;
   last_advanced_at: string;
@@ -93,6 +95,11 @@ const STATUS_META: Record<
     label: "Failed",
     classes: "border-red-600/40 bg-red-500/10 text-red-300",
     icon: CircleAlert,
+  },
+  cancelled: {
+    label: "Cancelled",
+    classes: "border-border bg-muted text-muted-foreground",
+    icon: CircleSlash,
   },
 };
 
@@ -265,6 +272,8 @@ function RunCard({
                   ? "statusTimedOut"
                   : run.status === "paused_by_agent"
                   ? "statusPaused"
+                  : run.status === "cancelled"
+                  ? "statusCancelled"
                   : "statusFailed"
               )}
             </Badge>

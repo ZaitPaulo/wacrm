@@ -17,16 +17,43 @@
  * data; (b) keeps templates portable across self-hosted instances
  * without migrations; (c) editing in source is the lowest-friction
  * way to add the next template.
+ *
+ * ── Content language and audience ────────────────────────────────
+ * The scripts are written in neutral Latin American Spanish for a
+ * used-vehicle dealership, because that is what this install sells.
+ * The gallery's own labels (`name`, `description`) do NOT live here —
+ * they are interface text and come from the message catalogue under
+ * `Flows.templates.<slug>`. What stays here is the seed content: the
+ * moment a template is cloned, those strings become rows the operator
+ * owns and edits, so they must not be re-resolved at render time.
+ *
+ * Two authoring rules the engine enforces, easy to break by hand:
+ *
+ *   1. Answers the customer picks from a fixed set use buttons or a
+ *      list, never free text. Free text is reserved for what only they
+ *      can phrase (which car they want). Field evidence: of the five
+ *      runs of the previous English script, three captured noise in
+ *      free-text fields because nobody understood the question.
+ *   2. Interpolation is `{{vars.key}}` — see `interpolateVars` in
+ *      engine.ts. A tapped option is stored under the *asking node's*
+ *      `node_key`, so `{{vars.compra_pago}}` is the answer given on
+ *      the `compra_pago` node. Only `collect_input` uses its own
+ *      `var_key`.
+ *
+ * WhatsApp caps every template here must respect (validate.ts checks
+ * them, and `INTERACTIVE_LIMITS` is the source of truth): at most 3
+ * buttons per message, button titles ≤20 chars, ≤10 list rows across
+ * all sections, row titles ≤24 chars.
  */
 
 import type {
   CollectInputNodeConfig,
-  ConditionNodeConfig,
   HandoffNodeConfig,
   KeywordTriggerConfig,
   SendButtonsNodeConfig,
   SendListNodeConfig,
   SendMessageNodeConfig,
+  SetTagNodeConfig,
   StartNodeConfig,
 } from "./types";
 
@@ -50,15 +77,13 @@ export interface FlowTemplateNode {
     | SendButtonsNodeConfig
     | SendListNodeConfig
     | CollectInputNodeConfig
-    | ConditionNodeConfig
+    | SetTagNodeConfig
     | HandoffNodeConfig
     | Record<string, unknown>;
 }
 
 export interface FlowTemplate {
   slug: string;
-  name: string;
-  description: string;
   /** Used by the gallery to surface a relevant icon. lucide-react name. */
   icon: "MessageSquare" | "HelpCircle" | "UserPlus";
   trigger_type: "keyword" | "first_inbound_message" | "manual";
@@ -68,72 +93,14 @@ export interface FlowTemplate {
 }
 
 // ============================================================
-// 1. Welcome menu — the example from the owner's brief
+// 1. Menú de bienvenida — enruta por intención y deriva
 // ============================================================
 const WELCOME_MENU: FlowTemplate = {
   slug: "welcome_menu",
-  name: "Welcome menu",
-  description:
-    "Greet customers who type a keyword and route them to the right agent based on whether they're new or existing.",
   icon: "MessageSquare",
   trigger_type: "keyword",
-  trigger_config: { keywords: ["support", "help", "hi"], match_type: "contains" },
-  entry_node_id: "start",
-  nodes: [
-    {
-      node_key: "start",
-      node_type: "start",
-      config: { next_node_key: "welcome" },
-    },
-    {
-      node_key: "welcome",
-      node_type: "send_buttons",
-      config: {
-        text: "Hi! 👋 Welcome to support. Are you an existing customer or new here?",
-        footer_text: "Tap a button below to continue.",
-        buttons: [
-          {
-            reply_id: "existing",
-            title: "Existing customer",
-            next_node_key: "existing_handoff",
-          },
-          {
-            reply_id: "new",
-            title: "New customer",
-            next_node_key: "new_handoff",
-          },
-        ],
-      } as SendButtonsNodeConfig,
-    },
-    {
-      node_key: "existing_handoff",
-      node_type: "handoff",
-      config: {
-        note: "Existing customer needs assistance — please check account history before replying.",
-      } as HandoffNodeConfig,
-    },
-    {
-      node_key: "new_handoff",
-      node_type: "handoff",
-      config: {
-        note: "New customer — share pricing + onboarding link.",
-      } as HandoffNodeConfig,
-    },
-  ],
-};
-
-// ============================================================
-// 2. FAQ bot — list-message answers, fully automated
-// ============================================================
-const FAQ_BOT: FlowTemplate = {
-  slug: "faq_bot",
-  name: "FAQ bot",
-  description:
-    "Answer common questions automatically. Customer picks a topic from a list; the bot replies with the answer and ends.",
-  icon: "HelpCircle",
-  trigger_type: "keyword",
   trigger_config: {
-    keywords: ["faq", "question", "info"],
+    keywords: ["hola", "buenas", "info", "informacion"],
     match_type: "contains",
   },
   entry_node_id: "start",
@@ -141,42 +108,114 @@ const FAQ_BOT: FlowTemplate = {
     {
       node_key: "start",
       node_type: "start",
-      config: { next_node_key: "topics" },
+      config: { next_node_key: "saludo" },
     },
     {
-      node_key: "topics",
+      node_key: "saludo",
+      node_type: "send_buttons",
+      config: {
+        text: "¡Hola! 👋 Gracias por escribirnos. ¿Con qué te ayudamos hoy?",
+        footer_text: "Toca una opción para continuar.",
+        buttons: [
+          {
+            reply_id: "comprar",
+            title: "Quiero comprar",
+            next_node_key: "handoff_compra",
+          },
+          {
+            reply_id: "vender",
+            title: "Vendo mi auto",
+            next_node_key: "handoff_venta",
+          },
+          {
+            reply_id: "otro",
+            title: "Otra consulta",
+            next_node_key: "handoff_otro",
+          },
+        ],
+      } as SendButtonsNodeConfig,
+    },
+    {
+      node_key: "handoff_compra",
+      node_type: "handoff",
+      config: {
+        note: "Quiere comprar. Llega desde el menú de bienvenida; todavía no dijo qué vehículo busca.",
+      } as HandoffNodeConfig,
+    },
+    {
+      node_key: "handoff_venta",
+      node_type: "handoff",
+      config: {
+        note: "Quiere vender o permutar su vehículo. Pedir marca, modelo, año y kilometraje.",
+      } as HandoffNodeConfig,
+    },
+    {
+      node_key: "handoff_otro",
+      node_type: "handoff",
+      config: {
+        note: "Consulta general desde el menú de bienvenida.",
+      } as HandoffNodeConfig,
+    },
+  ],
+};
+
+// ============================================================
+// 2. Preguntas frecuentes — responde solo y termina
+// ============================================================
+const FAQ_BOT: FlowTemplate = {
+  slug: "faq_bot",
+  icon: "HelpCircle",
+  trigger_type: "keyword",
+  trigger_config: {
+    keywords: ["horario", "financiacion", "garantia", "preguntas"],
+    match_type: "contains",
+  },
+  entry_node_id: "start",
+  nodes: [
+    {
+      node_key: "start",
+      node_type: "start",
+      config: { next_node_key: "temas" },
+    },
+    {
+      node_key: "temas",
       node_type: "send_list",
       config: {
-        text: "What can I help you with?",
-        button_label: "View topics",
+        text: "¿Sobre qué te gustaría saber?",
+        button_label: "Ver temas",
         sections: [
           {
-            title: "Common questions",
+            title: "Preguntas frecuentes",
             rows: [
               {
-                reply_id: "hours",
-                title: "Opening hours",
-                next_node_key: "answer_hours",
+                reply_id: "horarios",
+                title: "Horarios de atención",
+                next_node_key: "resp_horarios",
               },
               {
-                reply_id: "pricing",
-                title: "Pricing",
-                next_node_key: "answer_pricing",
+                reply_id: "financiacion",
+                title: "Financiación y cuotas",
+                next_node_key: "resp_financiacion",
               },
               {
-                reply_id: "refunds",
-                title: "Refund policy",
-                next_node_key: "answer_refunds",
+                reply_id: "garantia",
+                title: "Garantía y papeles",
+                next_node_key: "resp_garantia",
+              },
+              {
+                reply_id: "permuta",
+                title: "¿Reciben mi auto?",
+                next_node_key: "resp_permuta",
               },
             ],
           },
           {
-            title: "Other",
+            title: "Otro",
             rows: [
               {
-                reply_id: "human",
-                title: "Talk to a human",
-                next_node_key: "human_handoff",
+                reply_id: "asesor",
+                title: "Hablar con un asesor",
+                next_node_key: "handoff_asesor",
               },
             ],
           },
@@ -184,38 +223,48 @@ const FAQ_BOT: FlowTemplate = {
       } as SendListNodeConfig,
     },
     {
-      node_key: "answer_hours",
+      node_key: "resp_horarios",
       node_type: "send_message",
       config: {
-        text: "We're open Mon–Fri, 9am–6pm local time. Weekend support is limited to urgent issues.",
-        next_node_key: "end",
+        // Los datos concretos los ajusta el operador desde el editor:
+        // ninguna plantilla puede conocer el horario del negocio.
+        text: "Atendemos de lunes a viernes de 8:00 a 18:00 y los sábados de 9:00 a 13:00.",
+        next_node_key: "fin",
       } as SendMessageNodeConfig,
     },
     {
-      node_key: "answer_pricing",
+      node_key: "resp_financiacion",
       node_type: "send_message",
       config: {
-        text: "Our pricing starts at $9/mo. Visit https://example.com/pricing for the full breakdown.",
-        next_node_key: "end",
+        text: "Trabajamos con financiación bancaria y crédito directo. La cuota depende de la cuota inicial y del plazo; un asesor te arma la simulación con el vehículo que elijas.",
+        next_node_key: "fin",
       } as SendMessageNodeConfig,
     },
     {
-      node_key: "answer_refunds",
+      node_key: "resp_garantia",
       node_type: "send_message",
       config: {
-        text: "Refunds are honored within 30 days of purchase. Reply with your order number and we'll process it.",
-        next_node_key: "end",
+        text: "Todos nuestros vehículos se entregan con traspaso incluido y papeles al día. Consulta con el asesor la garantía puntual del que te interese.",
+        next_node_key: "fin",
       } as SendMessageNodeConfig,
     },
     {
-      node_key: "human_handoff",
+      node_key: "resp_permuta",
+      node_type: "send_message",
+      config: {
+        text: "Sí, recibimos tu vehículo como parte de pago. Lo valoramos según año, kilometraje y estado.",
+        next_node_key: "fin",
+      } as SendMessageNodeConfig,
+    },
+    {
+      node_key: "handoff_asesor",
       node_type: "handoff",
       config: {
-        note: "Customer asked to talk to a human from the FAQ bot.",
+        note: "Pidió hablar con un asesor desde las preguntas frecuentes.",
       } as HandoffNodeConfig,
     },
     {
-      node_key: "end",
+      node_key: "fin",
       node_type: "end",
       config: {},
     },
@@ -223,13 +272,19 @@ const FAQ_BOT: FlowTemplate = {
 };
 
 // ============================================================
-// 3. Lead capture — collect_input chain, ends in a handoff
+// 3. Calificación de prospecto — el guion principal
+//
+// No lleva mensaje de despedida antes de derivar: `executeHandoff`
+// avisa al cliente que se le asignó un asesor, así que un nodo extra
+// aquí produciría dos mensajes seguidos diciendo lo mismo.
+//
+// Dos ramas que no se mezclan: quien compra y quien vende terminan en
+// derivaciones distintas, cada una con su propia nota. Compartir un
+// solo nodo de derivación ahorraría cuatro nodos, pero dejaría al
+// agente leyendo campos vacíos de la rama que el cliente no recorrió.
 // ============================================================
 const LEAD_CAPTURE: FlowTemplate = {
   slug: "lead_capture",
-  name: "Lead capture",
-  description:
-    "Greet first-time inbounds, capture name + email + company, then hand off to sales with the answers in the note.",
   icon: "UserPlus",
   trigger_type: "first_inbound_message",
   trigger_config: {},
@@ -238,48 +293,175 @@ const LEAD_CAPTURE: FlowTemplate = {
     {
       node_key: "start",
       node_type: "start",
-      config: { next_node_key: "intro" },
+      config: { next_node_key: "saludo" },
     },
     {
-      node_key: "intro",
-      node_type: "send_message",
+      node_key: "saludo",
+      node_type: "send_buttons",
       config: {
-        text: "Welcome! 👋 I'll ask a few quick questions so we can get you to the right person.",
-        next_node_key: "ask_name",
-      } as SendMessageNodeConfig,
+        text: "¡Hola! 👋 Gracias por escribirnos. ¿Con qué te ayudamos hoy?",
+        footer_text: "Toca una opción para continuar.",
+        buttons: [
+          {
+            reply_id: "comprar",
+            title: "Quiero comprar",
+            next_node_key: "compra_vehiculo",
+          },
+          {
+            reply_id: "vender",
+            title: "Vendo mi auto",
+            next_node_key: "venta_vehiculo",
+          },
+          {
+            reply_id: "otro",
+            title: "Otra consulta",
+            next_node_key: "otro_handoff",
+          },
+        ],
+      } as SendButtonsNodeConfig,
     },
+
+    // ---- Rama de compra ----
     {
-      node_key: "ask_name",
+      node_key: "compra_vehiculo",
       node_type: "collect_input",
       config: {
-        prompt_text: "What's your name?",
-        var_key: "name",
-        next_node_key: "ask_email",
+        prompt_text:
+          "¿Qué vehículo te interesa? Dime marca, modelo y año, o el código del aviso.",
+        var_key: "vehiculo_interes",
+        next_node_key: "compra_presupuesto",
       } as CollectInputNodeConfig,
     },
     {
-      node_key: "ask_email",
+      node_key: "compra_presupuesto",
+      node_type: "send_list",
+      config: {
+        text: "¿En qué rango de presupuesto te mueves?",
+        button_label: "Ver rangos",
+        sections: [
+          {
+            title: "Presupuesto",
+            // Los cortes salen del inventario real, no de una
+            // estimación: cada rango tiene stock que ofrecer. Revísalos
+            // cuando el stock se corra de forma sostenida.
+            rows: [
+              {
+                reply_id: "presup_1",
+                title: "Hasta $60 millones",
+                next_node_key: "compra_pago",
+              },
+              {
+                reply_id: "presup_2",
+                title: "$60 a $90 millones",
+                next_node_key: "compra_pago",
+              },
+              {
+                reply_id: "presup_3",
+                title: "$90 a $130 millones",
+                next_node_key: "compra_pago",
+              },
+              {
+                reply_id: "presup_4",
+                title: "Más de $130 millones",
+                next_node_key: "compra_pago",
+              },
+              {
+                reply_id: "presup_0",
+                title: "Aún no lo defino",
+                next_node_key: "compra_pago",
+              },
+            ],
+          },
+        ],
+      } as SendListNodeConfig,
+    },
+    {
+      node_key: "compra_pago",
+      node_type: "send_buttons",
+      config: {
+        text: "¿Cómo piensas pagarlo?",
+        buttons: [
+          {
+            reply_id: "contado",
+            title: "De contado",
+            next_node_key: "compra_calificado",
+          },
+          {
+            reply_id: "credito",
+            title: "Con financiación",
+            next_node_key: "compra_calificado",
+          },
+          {
+            reply_id: "permuta",
+            title: "Entrego mi auto",
+            next_node_key: "permuta_vehiculo",
+          },
+        ],
+      } as SendButtonsNodeConfig,
+    },
+    {
+      node_key: "permuta_vehiculo",
       node_type: "collect_input",
       config: {
-        prompt_text: "Thanks {{vars.name}}! What's your work email?",
-        var_key: "email",
-        next_node_key: "ask_company",
+        prompt_text:
+          "¿Qué vehículo entregarías? Marca, modelo, año y kilometraje aproximado.",
+        var_key: "vehiculo_permuta",
+        next_node_key: "compra_calificado",
       } as CollectInputNodeConfig,
     },
     {
-      node_key: "ask_company",
-      node_type: "collect_input",
+      node_key: "compra_calificado",
+      node_type: "set_tag",
       config: {
-        prompt_text: "Almost done — what's your company name?",
-        var_key: "company",
-        next_node_key: "handoff",
-      } as CollectInputNodeConfig,
+        mode: "add",
+        // Vacío a propósito: el id de la etiqueta es de cada cuenta.
+        // Elígela en el editor antes de activar; la validación lo exige.
+        tag_id: "",
+        next_node_key: "compra_handoff",
+      } as SetTagNodeConfig,
     },
     {
-      node_key: "handoff",
+      node_key: "compra_handoff",
       node_type: "handoff",
       config: {
-        note: "New lead — name={{vars.name}}, email={{vars.email}}, company={{vars.company}}.",
+        note: "COMPRA · Busca: {{vars.vehiculo_interes}} · Presupuesto: {{vars.compra_presupuesto}} · Pago: {{vars.compra_pago}} · Entrega en parte de pago: {{vars.vehiculo_permuta}}",
+      } as HandoffNodeConfig,
+    },
+
+    // ---- Rama de venta / permuta ----
+    {
+      node_key: "venta_vehiculo",
+      node_type: "collect_input",
+      config: {
+        prompt_text:
+          "Cuéntame qué vehículo vendes: marca, modelo, año y kilometraje.",
+        var_key: "vehiculo_ofrecido",
+        next_node_key: "venta_calificado",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "venta_calificado",
+      node_type: "set_tag",
+      config: {
+        mode: "add",
+        tag_id: "",
+        next_node_key: "venta_handoff",
+      } as SetTagNodeConfig,
+    },
+    {
+      node_key: "venta_handoff",
+      node_type: "handoff",
+      config: {
+        note: "VENTA · Ofrece: {{vars.vehiculo_ofrecido}} · Coordinar valoración.",
+      } as HandoffNodeConfig,
+    },
+
+    // ---- Fuera de guion ----
+    {
+      node_key: "otro_handoff",
+      node_type: "handoff",
+      config: {
+        note: "Consulta general. No entró a la calificación.",
       } as HandoffNodeConfig,
     },
   ],

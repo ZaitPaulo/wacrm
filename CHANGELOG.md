@@ -9,6 +9,60 @@ Versions follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0, `MINOR` bumps cover new modules; `PATCH` bumps cover bug fixes
 and polish.
 
+## [Unreleased]
+
+Pone en español los flujos y automatizaciones, y los reescribe para
+compraventa de vehículos.
+
+> **Migración requerida:** aplica `supabase/migrations/509_flows_automations_es.sql`.
+> Amplía el CHECK de `flow_runs.status` para admitir `cancelled` —**el
+> código ya escribe ese estado, así que sin esta migración desactivar un
+> flujo falla**—, traduce lo que siga siendo la semilla en inglés,
+> renombra las etapas del embudo y agrega el guion de calificación como
+> flujo en borrador. No borra filas ni cambia identificadores, y solo
+> reescribe textos que aún coincidan exactamente con el inglés original:
+> lo que hayas editado a mano queda intacto.
+
+### Cambios de comportamiento
+
+- **La nota de derivación ahora se resuelve y le llega al agente.** Antes
+  se guardaba cruda dentro del registro de la ejecución: los
+  `{{vars.…}}` llegaban como llaves literales y solo se veían abriendo el
+  visor de ejecuciones. Ahora se interpola y se escribe como nota del
+  contacto, que es lo que el agente ya tiene al lado de la conversación.
+  Si tenías flujos con notas plantilladas, empezarán a producir notas de
+  contacto donde antes no había ninguna.
+- **Un toque de botón o de fila de lista queda registrado** en
+  `vars[<clave del nodo>]`. Hasta ahora solo las preguntas de texto
+  guardaban la respuesta, así que un flujo que preguntara con botones no
+  podía reportar nada de lo elegido.
+- **Desactivar o archivar un flujo cierra sus ejecuciones vivas** con
+  estado `cancelled`. Antes quedaban en `active` para siempre, dejando al
+  cliente esperando y bloqueando a ese contacto para cualquier otro flujo.
+
+### Añadido
+
+- Guion de calificación para compraventa: vehículo de interés,
+  presupuesto y forma de pago, con opciones tocables en vez de texto
+  libre.
+- Aviso al activar una automatización que enviaría un segundo mensaje
+  porque un flujo activo ya responde al mismo disparador. Avisa, no
+  bloquea, y nombra el flujo en conflicto.
+- `Flows.validation.issues.*` y `Automations.builder.validation.*`: los
+  mensajes de validación pasan por el catálogo en los tres idiomas.
+
+### Arreglado
+
+- Los mensajes de validación de flujos y automatizaciones se mostraban
+  siempre en inglés, incluso con la interfaz en español.
+- `{{ vars.x }}` con espacios no interpolaba en flujos (sí en
+  automatizaciones) y entregaba las llaves al cliente sin registrar nada.
+- Textos sin traducir en los editores: `aria-label`, marcadores de
+  posición, el diálogo de borrado de un flujo y varios avisos de error.
+- Las plantillas semilla eran de un SaaS por suscripción y estaban en
+  inglés, con palabras clave (`pricing`, `quote`, `buy`) que nunca
+  coincidían con lo que escribe un cliente hispanohablante.
+
 ## [0.8.1] — 2026-07-10
 
 Fixes inbound chats fragmenting into multiple threads for the same

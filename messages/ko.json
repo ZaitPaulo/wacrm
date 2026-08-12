@@ -901,7 +901,9 @@
         "updateError": "업데이트하지 못했습니다",
         "duplicateError": "복제하지 못했습니다",
         "deleteError": "삭제하지 못했습니다"
-      }
+      },
+      "openMenu": "메뉴 열기",
+      "loadError": "자동화를 불러오지 못했습니다."
     },
     "edit": {
       "loading": "불러오는 중...",
@@ -993,12 +995,14 @@
       "toasts": {
         "saved": "자동화가 저장되었습니다",
         "created": "자동화가 생성되었습니다",
-        "saveFailed": "저장 실패"
+        "saveFailed": "저장 실패",
+        "flowConflict": "참고: 플로우 “{flow}”이(가) 이미 고객의 첫 메시지에 응답합니다. 둘 다 활성화하면 메시지를 두 번 받게 됩니다."
       },
       "tags": {
         "select": "태그 선택…",
         "placeholder": "태그 id",
-        "unknown": "{id} (알 수 없는 태그)"
+        "unknown": "{id} (알 수 없는 태그)",
+        "label": "태그"
       },
       "fields": {
         "name": "이름",
@@ -1080,6 +1084,67 @@
         "matchWordHint": "키워드가 독립된 단어일 때만 일치하므로 \"k\"가 \"thanks\"에서 실행되지 않습니다. 공백으로 단어를 구분하는 언어의 짧은 키워드에 적합하며, 공백 없이 표기하는 언어에는 \"포함\"을 사용하세요.",
         "matchExact": "정확히 일치",
         "closeConversationHint": "대화 상태를 \"닫힘\"으로 설정합니다. 추가 설정이 필요 없습니다."
+      },
+      "validation": {
+        "at": "{path} 위치",
+        "issues": {
+          "stepsRequired": "활성 자동화에는 단계가 최소 하나 필요합니다.",
+          "messageTextRequired": "메시지 본문은 필수입니다.",
+          "interactiveInvalid": "인터랙티브 메시지가 올바르지 않습니다: {detail}",
+          "templateNameRequired": "템플릿 이름은 필수입니다.",
+          "tagRequired": "태그를 선택하세요.",
+          "agentRequiredForSpecific": "모드가 “특정 상담원”일 때는 상담원을 선택해야 합니다.",
+          "fieldNameRequired": "필드 이름은 필수입니다.",
+          "fieldValueRequired": "필드 값은 필수입니다.",
+          "pipelineRequired": "파이프라인을 선택하세요.",
+          "stageRequired": "단계를 선택하세요.",
+          "titleRequired": "제목은 필수입니다.",
+          "waitAmountPositive": "대기 시간은 0보다 커야 합니다.",
+          "waitUnitInvalid": "대기 단위는 분, 시간 또는 일이어야 합니다.",
+          "conditionSubjectRequired": "조건 대상은 필수입니다.",
+          "conditionOperandRequired": "조건 비교 값은 필수입니다.",
+          "webhookUrlRequired": "웹훅 URL은 필수입니다.",
+          "webhookUrlScheme": "웹훅 URL은 http 또는 https를 사용해야 합니다.",
+          "webhookUrlInvalid": "웹훅 URL이 올바르지 않습니다.",
+          "unknownStepType": "알 수 없는 단계 유형 “{stepType}”.",
+          "triggerKeywordsRequired": "키워드가 최소 하나 필요합니다.",
+          "triggerKeywordsEmpty": "키워드는 비워 둘 수 없습니다.",
+          "triggerMatchTypeInvalid": "일치 방식은 정확히, 포함 또는 단어여야 합니다.",
+          "triggerScheduleRequired": "일정은 필수입니다.",
+          "triggerTagRequired": "태그를 선택하세요.",
+          "triggerReplyIdsRequired": "응답 id가 최소 하나 필요합니다.",
+          "triggerReplyIdsEmpty": "응답 id는 비워 둘 수 없습니다."
+        }
+      },
+      "schedulePlaceholder": "Cron 표현식 또는 HH:mm",
+      "moveUp": "위로 이동",
+      "moveDown": "아래로 이동",
+      "kinds": {
+        "condition": "조건",
+        "wait": "대기",
+        "action": "작업"
+      }
+    },
+    "templates": {
+      "welcome_message": {
+        "name": "환영 메시지",
+        "description": "신규 연락처의 첫 메시지에 답장하고 태그를 지정합니다."
+      },
+      "out_of_office": {
+        "name": "영업시간 외",
+        "description": "영업시간 외에 답장하여 고객을 기다리게 하지 않습니다."
+      },
+      "lead_qualifier": {
+        "name": "가격 문의",
+        "description": "가격이나 금융을 문의하면 반응하고 대화를 배정합니다."
+      },
+      "follow_up_reminder": {
+        "name": "후속 알림",
+        "description": "하루 동안 답이 없으면 다시 연락합니다."
+      },
+      "deal_on_qualified": {
+        "name": "자격 확인 시 거래 생성",
+        "description": "잠재 고객이 자격을 갖추면 값 없이 파이프라인 거래를 만듭니다."
       }
     }
   },
@@ -1139,7 +1204,8 @@
       "statusHandedOff": "인계됨",
       "statusTimedOut": "시간 초과",
       "statusPaused": "상담원이 일시 중지함",
-      "statusFailed": "실패"
+      "statusFailed": "실패",
+      "statusCancelled": "취소됨 (플로우 비활성화)"
     },
     "builder": {
       "triggerTitle": "트리거",
@@ -1232,7 +1298,10 @@
         "handoffAgentHint": "지정하지 않으면 플로우의 기본 상담원이 사용됩니다.",
         "agentUnassigned": "— 미배정 —",
         "agentIdPlaceholder": "상담원 ID",
-        "agentUnknown": "{id} (알 수 없는 상담원)"
+        "agentUnknown": "{id} (알 수 없는 상담원)",
+        "removeSection": "섹션 제거",
+        "fileUploaded": "파일이 업로드되었습니다.",
+        "uploadFailed": "업로드에 실패했습니다."
       },
       "categories": {
         "messaging": "메시징",
@@ -1280,19 +1349,80 @@
           "label": "종료",
           "blurb": "플로우를 종료합니다"
         }
-      }
+      },
+      "editorView": "편집기 보기"
     },
     "validation": {
       "noIssues": "문제가 없습니다. 활성화할 준비가 되었습니다.",
       "summary": "오류 {errorCount}건, 경고 {warningCount}건",
-      "jumpToNode": "{key} 노드로 이동"
+      "jumpToNode": "{key} 노드로 이동",
+      "issues": {
+        "flowNameRequired": "플로우 이름이 필요합니다.",
+        "entryNodeRequired": "활성화하기 전에 시작 노드를 선택하세요.",
+        "noNodes": "플로우를 활성화하려면 노드가 최소 하나 필요합니다.",
+        "entryNodeMissing": "시작 노드 “{key}”이(가) 존재하지 않습니다.",
+        "duplicateNodeKey": "노드 키 “{key}”이(가) 중복되었습니다.",
+        "nodeUnreachable": "노드 “{key}”에 시작 노드에서 도달할 수 없습니다.",
+        "keywordsRequired": "키워드 트리거에는 키워드가 최소 하나 필요합니다.",
+        "keywordsBlank": "{count, plural, other {키워드 #개가 비어 있습니다}} — 아무것도 일치하지 않습니다.",
+        "startNoNext": "시작 노드는 다음 노드를 지정해야 합니다.",
+        "startNextMissing": "시작 노드가 존재하지 않는 노드 “{key}”을(를) 가리킵니다.",
+        "sendMessageNoText": "메시지 전송 노드에는 본문이 필요합니다.",
+        "sendMessageNoNext": "메시지 전송 노드는 다음 노드를 지정해야 합니다.",
+        "sendMessageNextMissing": "메시지 전송이 존재하지 않는 노드 “{key}”을(를) 가리킵니다.",
+        "sendMediaNoType": "미디어 전송 노드에는 유형(이미지, 동영상, 문서)이 필요합니다.",
+        "sendMediaNoFile": "미디어 전송 노드에는 파일이 필요합니다. 활성화 전에 업로드하세요.",
+        "captionTooLong": "캡션이 WhatsApp 제한인 {max}자를 초과합니다.",
+        "sendMediaNoNext": "미디어 전송 노드는 다음 노드를 지정해야 합니다.",
+        "sendMediaNextMissing": "미디어 전송이 존재하지 않는 노드 “{key}”을(를) 가리킵니다.",
+        "sendButtonsNoText": "버튼 전송 노드에는 본문이 필요합니다.",
+        "buttonsAtLeastOne": "버튼 전송에는 버튼이 최소 하나 필요합니다.",
+        "buttonsTooMany": "WhatsApp은 메시지당 최대 {max}개의 버튼을 허용합니다.",
+        "buttonNoReplyId": "{position}번 버튼에는 응답 id가 필요합니다.",
+        "buttonDuplicateReplyId": "버튼 응답 id “{replyId}”이(가) 중복되었습니다.",
+        "buttonNoTitle": "{position}번 버튼에는 제목이 필요합니다.",
+        "buttonTitleTooLong": "{position}번 버튼 제목이 WhatsApp 제한인 {max}자를 초과합니다.",
+        "buttonNoNext": "{position}번 버튼에는 다음 노드가 필요합니다.",
+        "buttonNextMissing": "{position}번 버튼이 존재하지 않는 노드 “{key}”을(를) 가리킵니다.",
+        "sendListNoText": "목록 전송 노드에는 본문이 필요합니다.",
+        "sendListNoButtonLabel": "목록 전송에는 펼치기 버튼의 문구가 필요합니다.",
+        "sendListNoRows": "목록 전송에는 행이 최소 하나 필요합니다.",
+        "sendListTooManyRows": "목록 전송은 전체 섹션에서 최대 {max}개의 행만 허용합니다.",
+        "rowNoReplyId": "{section}번 섹션의 {position}번 행에는 응답 id가 필요합니다.",
+        "rowDuplicateReplyId": "목록 행 id “{replyId}”이(가) 중복되었습니다.",
+        "rowNoTitle": "{position}번 행에는 제목이 필요합니다.",
+        "rowTitleTooLong": "{position}번 행 제목이 {max}자를 초과합니다.",
+        "rowDescriptionTooLong": "{position}번 행 설명이 {max}자를 초과합니다.",
+        "rowNoNext": "{position}번 행에는 다음 노드가 필요합니다.",
+        "rowNextMissing": "{position}번 행이 존재하지 않는 노드 “{key}”을(를) 가리킵니다.",
+        "collectInputNoPrompt": "입력 수집 노드에는 고객에게 보낼 질문이 필요합니다.",
+        "collectInputNoVarKey": "입력 수집 노드에는 답변을 저장할 변수 키가 필요합니다.",
+        "collectInputBadVarKey": "변수 키 “{varKey}”은(는) 영문·숫자·밑줄만 사용할 수 있으며 문자나 밑줄로 시작해야 합니다.",
+        "collectInputNoNext": "입력 수집 노드는 다음 노드를 지정해야 합니다.",
+        "collectInputNextMissing": "입력 수집이 존재하지 않는 노드 “{key}”을(를) 가리킵니다.",
+        "conditionNoSubject": "조건에는 대상(변수, 태그, 연락처 필드)이 필요합니다.",
+        "conditionNoSubjectKey": "조건에는 대상 키(변수명, 태그 id, 필드명)가 필요합니다.",
+        "conditionNoOperator": "조건에는 연산자가 필요합니다.",
+        "conditionValueEmpty": "연산자 “{operator}”은(는) 보통 비교 값을 필요로 합니다. 값이 비어 있으면 빈 대상만 일치합니다.",
+        "conditionNoBranch": "조건에는 {branch, select, true_next {참} other {거짓}} 분기의 노드가 필요합니다.",
+        "conditionBranchMissing": "조건의 {branch, select, true_next {참} other {거짓}} 분기가 존재하지 않는 노드 “{key}”을(를) 가리킵니다.",
+        "setTagNoMode": "태그 노드에는 모드(추가 또는 제거)가 필요합니다.",
+        "setTagNoTag": "태그 노드에는 적용할 태그가 필요합니다.",
+        "setTagNoNext": "태그 노드는 다음 노드를 지정해야 합니다.",
+        "setTagNextMissing": "태그 노드가 존재하지 않는 노드 “{key}”을(를) 가리킵니다.",
+        "unknownNodeType": "알 수 없는 노드 유형 “{nodeType}”."
+      }
     },
     "editorState": {
       "saved": "저장되었습니다.",
       "fixIssues": "활성화하기 전에 아래 문제를 해결하세요.",
       "statusActivated": "플로우가 활성화되었습니다.",
       "statusArchived": "보관되었습니다.",
-      "statusDraft": "초안으로 저장되었습니다."
+      "statusDraft": "초안으로 저장되었습니다.",
+      "deleteConfirm": "“{name}”을(를) 삭제할까요? 진행 중인 실행이 즉시 종료되며 되돌릴 수 없습니다.",
+      "deleteError": "플로우를 삭제하지 못했습니다.",
+      "saveError": "플로우를 저장하지 못했습니다.",
+      "statusError": "플로우 상태를 변경하지 못했습니다."
     },
     "summary": {
       "options": "옵션 {count}개",
@@ -1326,6 +1456,20 @@
       "statusDraft": "초안",
       "statusActive": "활성",
       "statusArchived": "보관됨"
+    },
+    "templates": {
+      "welcome_menu": {
+        "name": "환영 메뉴",
+        "description": "문의한 고객에게 인사하고 구매·판매·기타 문의로 안내합니다."
+      },
+      "faq_bot": {
+        "name": "자주 묻는 질문",
+        "description": "영업시간, 금융, 보증, 보상판매 등 일반적인 질문에 자동으로 답합니다."
+      },
+      "lead_capture": {
+        "name": "잠재 고객 자격 확인",
+        "description": "관심 차량, 예산, 결제 방법을 묻고 요약과 함께 상담원에게 넘깁니다. 예산 구간은 재고에 맞게 조정하세요."
+      }
     }
   },
   "Settings": {
@@ -2215,5 +2359,8 @@
     "networkError": "서버에 연결하지 못했습니다",
     "signOutFailed": "로그아웃하지 못했습니다. 페이지를 새로고침해 보세요.",
     "wrongAccount": "이미 다른 계정에 속해 있습니다. 이 계정에 참여하려면 다른 이메일로 로그인하세요."
+  },
+  "Handoff": {
+    "customerNotice": "담당 상담원을 배정했습니다. 곧 연락드리겠습니다. 🙌"
   }
 }

@@ -2,6 +2,7 @@
 
 import { Suspense, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
+import { useTranslations } from "next-intl"
 
 import {
   AutomationBuilder,
@@ -9,6 +10,7 @@ import {
   type BuilderStep,
 } from "@/components/automations/automation-builder"
 import { AUTOMATION_TEMPLATES, type TemplateSlug } from "@/lib/automations/templates"
+import { templateLabel, type LabelResolver } from "@/lib/templates/labels"
 import type { AutomationStepType, AutomationTriggerType } from "@/types"
 
 // `useSearchParams` requires a Suspense boundary or the production build
@@ -25,6 +27,9 @@ export default function NewAutomationPage() {
 function NewAutomationPageInner() {
   const params = useSearchParams()
   const template = params.get("template") as TemplateSlug | null
+  // The template module holds seed content; its gallery labels are
+  // interface text and come from the catalogue.
+  const label = useTranslations("Automations.templates") as LabelResolver
 
   const initial: BuilderInitial = useMemo(() => {
     if (template && AUTOMATION_TEMPLATES[template]) {
@@ -39,8 +44,8 @@ function NewAutomationPageInner() {
         })),
       )
       return {
-        name: t.name,
-        description: t.description,
+        name: templateLabel(label, t.slug, "name"),
+        description: templateLabel(label, t.slug, "description"),
         trigger_type: t.trigger_type,
         trigger_config: t.trigger_config as Record<string, unknown>,
         is_active: false,

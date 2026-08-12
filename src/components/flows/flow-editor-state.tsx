@@ -373,12 +373,12 @@ export function FlowEditorProvider({
       setDirty(false);
       toast.success(t("saved"));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Save failed";
-      toast.error(msg);
+      console.error(err);
+      toast.error(t("saveError"));
     } finally {
       setSaving(false);
     }
-  }, [initialFlow.id, state]);
+  }, [initialFlow.id, state, t]);
 
   // ---- Activate / Pause / Archive ----
   const setStatus = useCallback(
@@ -413,20 +413,18 @@ export function FlowEditorProvider({
               : t("statusDraft")
         );
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Status update failed";
-        toast.error(msg);
+        console.error(err);
+        toast.error(t("statusError"));
       } finally {
         setActivating(false);
       }
     },
-    [canActivate, save, initialFlow.id],
+    [canActivate, save, initialFlow.id, t],
   );
 
   // ---- Delete ----
   const deleteFlow = useCallback(async () => {
-    const yes = window.confirm(
-      `Delete "${state.name}"? Any active runs end immediately. This can't be undone.`,
-    );
+    const yes = window.confirm(t("deleteConfirm", { name: state.name }));
     if (!yes) return;
     try {
       const res = await fetch(`/api/flows/${initialFlow.id}`, {
@@ -435,10 +433,13 @@ export function FlowEditorProvider({
       if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
       router.push("/flows");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Delete failed";
-      toast.error(msg);
+      // The thrown text is diagnostic — it carries the HTTP status and
+      // belongs in the console. What the operator sees comes from the
+      // catalogue.
+      console.error(err);
+      toast.error(t("deleteError"));
     }
-  }, [initialFlow.id, router, state.name]);
+  }, [initialFlow.id, router, state.name, t]);
 
   // ---- Node mutations ----
   const updateNode = useCallback(

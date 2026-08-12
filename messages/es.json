@@ -894,7 +894,9 @@
         "updateError": "No se pudo actualizar",
         "duplicateError": "No se pudo duplicar",
         "deleteError": "No se pudo eliminar"
-      }
+      },
+      "openMenu": "Abrir menú",
+      "loadError": "No se pudieron cargar las automatizaciones."
     },
     "edit": {
       "loading": "Cargando...",
@@ -986,12 +988,14 @@
       "toasts": {
         "saved": "Automatización guardada",
         "created": "Automatización creada",
-        "saveFailed": "No se pudo guardar"
+        "saveFailed": "No se pudo guardar",
+        "flowConflict": "Ojo: el flujo «{flow}» ya responde al primer mensaje del cliente. Con los dos activos, va a recibir dos mensajes."
       },
       "tags": {
         "select": "Elige una etiqueta…",
         "placeholder": "Id de la etiqueta",
-        "unknown": "{id} (etiqueta desconocida)"
+        "unknown": "{id} (etiqueta desconocida)",
+        "label": "Etiqueta"
       },
       "fields": {
         "name": "Nombre",
@@ -1073,7 +1077,68 @@
         "matchWord": "Palabra completa",
         "matchWordHint": "Solo coincide cuando la palabra clave aparece suelta, así «k» deja de dispararse dentro de «gracias». Conviene para palabras cortas en idiomas que separan con espacios; para idiomas que se escriben sin espacios, usa Contiene."
       },
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "validation": {
+        "at": "en {path}",
+        "issues": {
+          "stepsRequired": "Una automatización activa necesita al menos un paso.",
+          "messageTextRequired": "El texto del mensaje es obligatorio.",
+          "interactiveInvalid": "El mensaje interactivo no es válido: {detail}",
+          "templateNameRequired": "El nombre de la plantilla es obligatorio.",
+          "tagRequired": "Falta elegir la etiqueta.",
+          "agentRequiredForSpecific": "Cuando el modo es «agente específico» hay que elegir el agente.",
+          "fieldNameRequired": "Falta indicar el campo.",
+          "fieldValueRequired": "Falta indicar el valor del campo.",
+          "pipelineRequired": "Falta elegir el embudo.",
+          "stageRequired": "Falta elegir la etapa.",
+          "titleRequired": "El título es obligatorio.",
+          "waitAmountPositive": "La espera debe ser mayor que cero.",
+          "waitUnitInvalid": "La unidad de espera debe ser minutos, horas o días.",
+          "conditionSubjectRequired": "La condición necesita un sujeto.",
+          "conditionOperandRequired": "La condición necesita un valor con el que comparar.",
+          "webhookUrlRequired": "La URL del webhook es obligatoria.",
+          "webhookUrlScheme": "La URL del webhook debe usar http o https.",
+          "webhookUrlInvalid": "La URL del webhook no es válida.",
+          "unknownStepType": "Tipo de paso desconocido: «{stepType}».",
+          "triggerKeywordsRequired": "Hace falta al menos una palabra clave.",
+          "triggerKeywordsEmpty": "Las palabras clave no pueden quedar vacías.",
+          "triggerMatchTypeInvalid": "El tipo de coincidencia debe ser exacta, contiene o palabra.",
+          "triggerScheduleRequired": "La programación es obligatoria.",
+          "triggerTagRequired": "Falta elegir la etiqueta.",
+          "triggerReplyIdsRequired": "Hace falta al menos un id de respuesta.",
+          "triggerReplyIdsEmpty": "Los ids de respuesta no pueden quedar vacíos."
+        }
+      },
+      "schedulePlaceholder": "Expresión cron u HH:mm",
+      "moveUp": "Subir",
+      "moveDown": "Bajar",
+      "kinds": {
+        "condition": "Condición",
+        "wait": "Espera",
+        "action": "Acción"
+      }
+    },
+    "templates": {
+      "welcome_message": {
+        "name": "Mensaje de bienvenida",
+        "description": "Responde al primer mensaje de un contacto nuevo y lo etiqueta."
+      },
+      "out_of_office": {
+        "name": "Fuera de horario",
+        "description": "Contesta fuera del horario de atención para que nadie quede esperando."
+      },
+      "lead_qualifier": {
+        "name": "Consulta de precio",
+        "description": "Reacciona a quien pregunta por precio o financiación y asigna la conversación."
+      },
+      "follow_up_reminder": {
+        "name": "Recordatorio de seguimiento",
+        "description": "Retoma el contacto si pasa un día sin respuesta."
+      },
+      "deal_on_qualified": {
+        "name": "Registrar negocio al calificar",
+        "description": "Crea el negocio en el embudo cuando el prospecto queda calificado, sin valor asignado."
+      }
     }
   },
   "Flows": {
@@ -1132,7 +1197,8 @@
       "statusHandedOff": "Derivada",
       "statusTimedOut": "Se agotó el tiempo",
       "statusPaused": "Pausada por un agente",
-      "statusFailed": "Fallida"
+      "statusFailed": "Fallida",
+      "statusCancelled": "Cancelada (el flujo se desactivó)"
     },
     "builder": {
       "triggerTitle": "Disparador",
@@ -1225,7 +1291,10 @@
         "handoffAgentHint": "Si lo dejas sin elegir, se usa el agente por defecto del flujo.",
         "agentUnassigned": "— Sin asignar —",
         "agentIdPlaceholder": "Id del agente",
-        "agentUnknown": "{id} (agente desconocido)"
+        "agentUnknown": "{id} (agente desconocido)",
+        "removeSection": "Quitar sección",
+        "fileUploaded": "Archivo subido.",
+        "uploadFailed": "No se pudo subir el archivo."
       },
       "categories": {
         "messaging": "Mensajería",
@@ -1273,19 +1342,80 @@
           "label": "Fin",
           "blurb": "Termina el flujo"
         }
-      }
+      },
+      "editorView": "Vista del editor"
     },
     "validation": {
       "noIssues": "Sin problemas. Listo para activar.",
       "summary": "{errorCount} {errorCount, plural, =1 {error} other {errores}}, {warningCount} {warningCount, plural, =1 {advertencia} other {advertencias}}",
-      "jumpToNode": "Ir al nodo {key}"
+      "jumpToNode": "Ir al nodo {key}",
+      "issues": {
+        "flowNameRequired": "El flujo necesita un nombre.",
+        "entryNodeRequired": "Elige un nodo de entrada antes de activar.",
+        "noNodes": "Un flujo necesita al menos un nodo para activarse.",
+        "entryNodeMissing": "El nodo de entrada «{key}» no existe.",
+        "duplicateNodeKey": "La clave de nodo «{key}» está repetida.",
+        "nodeUnreachable": "Al nodo «{key}» no se llega desde el nodo de entrada.",
+        "keywordsRequired": "Los disparadores por palabra clave necesitan al menos una palabra.",
+        "keywordsBlank": "{count, plural, =1 {Hay 1 palabra clave vacía} other {Hay # palabras clave vacías}}: no van a coincidir con nada.",
+        "startNoNext": "El nodo de inicio debe apuntar a un nodo siguiente.",
+        "startNextMissing": "El inicio apunta al nodo «{key}», que no existe.",
+        "sendMessageNoText": "El nodo de enviar mensaje necesita un texto.",
+        "sendMessageNoNext": "El nodo de enviar mensaje debe apuntar a un nodo siguiente.",
+        "sendMessageNextMissing": "Enviar mensaje apunta al nodo «{key}», que no existe.",
+        "sendMediaNoType": "El nodo de enviar archivo necesita un tipo (imagen, video o documento).",
+        "sendMediaNoFile": "El nodo de enviar archivo necesita un archivo: súbelo antes de activar.",
+        "captionTooLong": "El texto del archivo supera los {max} caracteres que permite WhatsApp.",
+        "sendMediaNoNext": "El nodo de enviar archivo debe apuntar a un nodo siguiente.",
+        "sendMediaNextMissing": "Enviar archivo apunta al nodo «{key}», que no existe.",
+        "sendButtonsNoText": "El nodo de enviar botones necesita un texto.",
+        "buttonsAtLeastOne": "Enviar botones necesita al menos un botón.",
+        "buttonsTooMany": "WhatsApp permite como máximo {max} botones por mensaje.",
+        "buttonNoReplyId": "El botón {position} necesita un id de respuesta.",
+        "buttonDuplicateReplyId": "El id de respuesta «{replyId}» está repetido entre los botones.",
+        "buttonNoTitle": "El botón {position} necesita un título.",
+        "buttonTitleTooLong": "El título del botón {position} supera los {max} caracteres que permite WhatsApp.",
+        "buttonNoNext": "El botón {position} necesita un nodo siguiente.",
+        "buttonNextMissing": "El botón {position} apunta al nodo «{key}», que no existe.",
+        "sendListNoText": "El nodo de enviar lista necesita un texto.",
+        "sendListNoButtonLabel": "Enviar lista necesita el texto del botón que despliega las opciones.",
+        "sendListNoRows": "Enviar lista necesita al menos una fila.",
+        "sendListTooManyRows": "Enviar lista permite como máximo {max} filas entre todas las secciones.",
+        "rowNoReplyId": "La fila {position} de la sección {section} necesita un id de respuesta.",
+        "rowDuplicateReplyId": "El id de fila «{replyId}» está repetido en la lista.",
+        "rowNoTitle": "La fila {position} necesita un título.",
+        "rowTitleTooLong": "El título de la fila {position} supera los {max} caracteres.",
+        "rowDescriptionTooLong": "La descripción de la fila {position} supera los {max} caracteres.",
+        "rowNoNext": "La fila {position} necesita un nodo siguiente.",
+        "rowNextMissing": "La fila {position} apunta al nodo «{key}», que no existe.",
+        "collectInputNoPrompt": "El nodo de pregunta necesita un texto que enviarle al cliente.",
+        "collectInputNoVarKey": "El nodo de pregunta necesita una clave de variable donde guardar la respuesta.",
+        "collectInputBadVarKey": "La clave de variable «{varKey}» solo admite letras, números y guion bajo, y debe empezar por letra o guion bajo.",
+        "collectInputNoNext": "El nodo de pregunta debe apuntar a un nodo siguiente.",
+        "collectInputNextMissing": "El nodo de pregunta apunta al nodo «{key}», que no existe.",
+        "conditionNoSubject": "La condición necesita un sujeto: variable, etiqueta o campo del contacto.",
+        "conditionNoSubjectKey": "La condición necesita indicar cuál: el nombre de la variable, el id de la etiqueta o el campo.",
+        "conditionNoOperator": "La condición necesita un operador.",
+        "conditionValueEmpty": "El operador «{operator}» normalmente espera un valor con el que comparar; vacío solo va a coincidir con sujetos vacíos.",
+        "conditionNoBranch": "La condición necesita un nodo para la rama {branch, select, true_next {verdadera} other {falsa}}.",
+        "conditionBranchMissing": "La rama {branch, select, true_next {verdadera} other {falsa}} de la condición apunta al nodo «{key}», que no existe.",
+        "setTagNoMode": "El nodo de etiqueta necesita un modo: agregar o quitar.",
+        "setTagNoTag": "El nodo de etiqueta necesita una etiqueta que aplicar.",
+        "setTagNoNext": "El nodo de etiqueta debe apuntar a un nodo siguiente.",
+        "setTagNextMissing": "El nodo de etiqueta apunta al nodo «{key}», que no existe.",
+        "unknownNodeType": "Tipo de nodo desconocido: «{nodeType}»."
+      }
     },
     "editorState": {
       "saved": "Guardado.",
       "fixIssues": "Corrige los problemas de abajo antes de activar.",
       "statusActivated": "Flujo activado.",
       "statusArchived": "Archivado.",
-      "statusDraft": "Guardado como borrador."
+      "statusDraft": "Guardado como borrador.",
+      "deleteConfirm": "¿Eliminar «{name}»? Las ejecuciones en curso terminan de inmediato. No se puede deshacer.",
+      "deleteError": "No se pudo eliminar el flujo.",
+      "saveError": "No se pudo guardar el flujo.",
+      "statusError": "No se pudo cambiar el estado del flujo."
     },
     "summary": {
       "options": "{count} {count, plural, =1 {opción} other {opciones}}",
@@ -1319,6 +1449,20 @@
       "statusDraft": "Borrador",
       "statusActive": "Activo",
       "statusArchived": "Archivado"
+    },
+    "templates": {
+      "welcome_menu": {
+        "name": "Menú de bienvenida",
+        "description": "Saluda a quien escribe y lo enruta según quiera comprar, vender o consultar otra cosa."
+      },
+      "faq_bot": {
+        "name": "Preguntas frecuentes",
+        "description": "Responde solo las dudas habituales: horarios, financiación, garantía y permuta."
+      },
+      "lead_capture": {
+        "name": "Calificación de prospecto",
+        "description": "Pregunta vehículo de interés, presupuesto y forma de pago, y deriva al asesor con el resumen. Ajusta los rangos de presupuesto a tu inventario."
+      }
     }
   },
   "Settings": {
@@ -2215,5 +2359,8 @@
     "errorTitle": "No se pudieron cargar tus permisos",
     "errorBody": "Tu rol no cargó, así que todo queda como solo lectura y los cambios no se guardarán. Revisa tu conexión e inténtalo de nuevo.",
     "retry": "Reintentar"
+  },
+  "Handoff": {
+    "customerNotice": "Te asignamos un asesor comercial. Se comunicará contigo muy pronto. 🙌"
   }
 }

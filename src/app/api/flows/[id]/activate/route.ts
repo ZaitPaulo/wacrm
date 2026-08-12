@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
+import { cancelRunsForInactiveFlow } from '@/lib/flows/engine'
 import { validateFlowForActivation } from '@/lib/flows/validate'
 
 /**
@@ -115,5 +116,16 @@ export async function POST(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  return NextResponse.json({ flow: updated })
+
+  // Leaving 'active' strands anyone mid-conversation: nothing advances a
+  // run whose flow isn't active, and the one-active-run-per-contact index
+  // would then lock that contact out of every other flow. Done after the
+  // status write so a failure here can't leave runs cancelled under a
+  // flow that is still live.
+  let cancelled_runs = 0
+  if (status !== 'active') {
+    cancelled_runs = await cancelRunsForInactiveFlow(admin, id)
+  }
+
+  return NextResponse.json({ flow: updated, cancelled_runs })
 }

@@ -7,12 +7,12 @@ import {
 describe("validateStepsForActivation", () => {
   it("rejects empty or missing step lists", () => {
     expect(validateStepsForActivation([])).toEqual([
-      { path: "steps", message: "active automations need at least one step" },
+      { path: "steps", code: "stepsRequired" },
     ]);
     expect(
       validateStepsForActivation(undefined as unknown as never[]),
     ).toEqual([
-      { path: "steps", message: "active automations need at least one step" },
+      { path: "steps", code: "stepsRequired" },
     ]);
   });
 
@@ -72,7 +72,7 @@ describe("validateStepsForActivation", () => {
     const noUrl = validateStepsForActivation([
       { step_type: "send_webhook", step_config: {} },
     ]);
-    expect(noUrl.map((i) => i.message)).toContain("webhook URL is required");
+    expect(noUrl.map((i) => i.code)).toContain("webhookUrlRequired");
 
     const wrongProtocol = validateStepsForActivation([
       {
@@ -80,16 +80,12 @@ describe("validateStepsForActivation", () => {
         step_config: { url: "ftp://files.example.com" },
       },
     ]);
-    expect(wrongProtocol.map((i) => i.message)).toContain(
-      "webhook URL must use http or https",
-    );
+    expect(wrongProtocol.map((i) => i.code)).toContain("webhookUrlScheme");
 
     const garbage = validateStepsForActivation([
       { step_type: "send_webhook", step_config: { url: "not a url" } },
     ]);
-    expect(garbage.map((i) => i.message)).toContain(
-      "webhook URL is not a valid URL",
-    );
+    expect(garbage.map((i) => i.code)).toContain("webhookUrlInvalid");
   });
 
   it("validates assign_conversation only when mode is 'specific'", () => {
@@ -192,7 +188,11 @@ describe("validateStepsForActivation", () => {
       { step_type: "do_a_barrel_roll", step_config: {} },
     ]);
     expect(issues).toEqual([
-      { path: "steps[0]", message: "unknown step type: do_a_barrel_roll" },
+      {
+        path: "steps[0]",
+        code: "unknownStepType",
+        params: { stepType: "do_a_barrel_roll" },
+      },
     ]);
   });
 
@@ -230,9 +230,7 @@ describe("validateTriggerForActivation", () => {
       keywords: ["hi", "   "],
       match_type: "contains",
     });
-    expect(issues.map((i) => i.message)).toContain(
-      "keywords cannot be empty strings",
-    );
+    expect(issues.map((i) => i.code)).toContain("triggerKeywordsEmpty");
   });
 
   it("rejects keyword_match with an unknown match_type", () => {
@@ -263,7 +261,7 @@ describe("validateTriggerForActivation", () => {
 
   it("requires schedule on time_based triggers", () => {
     expect(validateTriggerForActivation("time_based", {})).toEqual([
-      { path: "trigger.schedule", message: "schedule is required" },
+      { path: "trigger.schedule", code: "triggerScheduleRequired" },
     ]);
     expect(
       validateTriggerForActivation("time_based", { schedule: "0 9 * * *" }),
@@ -272,7 +270,7 @@ describe("validateTriggerForActivation", () => {
 
   it("requires tag_id on tag_added triggers", () => {
     expect(validateTriggerForActivation("tag_added", {})).toEqual([
-      { path: "trigger.tag_id", message: "tag is required" },
+      { path: "trigger.tag_id", code: "triggerTagRequired" },
     ]);
     expect(
       validateTriggerForActivation("tag_added", { tag_id: "tag-uuid" }),
@@ -281,7 +279,7 @@ describe("validateTriggerForActivation", () => {
 
   it("requires reply_ids on interactive_reply triggers", () => {
     expect(validateTriggerForActivation("interactive_reply", {})).toEqual([
-      { path: "trigger.reply_ids", message: "at least one reply id is required" },
+      { path: "trigger.reply_ids", code: "triggerReplyIdsRequired" },
     ]);
     expect(
       validateTriggerForActivation("interactive_reply", { reply_ids: ["yes", "no"] }),
@@ -289,9 +287,7 @@ describe("validateTriggerForActivation", () => {
     const empties = validateTriggerForActivation("interactive_reply", {
       reply_ids: ["yes", "  "],
     });
-    expect(empties.map((i) => i.message)).toContain(
-      "reply ids cannot be empty strings",
-    );
+    expect(empties.map((i) => i.code)).toContain("triggerReplyIdsEmpty");
   });
 
   it("does not flag unknown trigger types (handled elsewhere)", () => {

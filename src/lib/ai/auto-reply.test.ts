@@ -205,10 +205,18 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
 })
 
 describe('dispatchInboundToAiReply — handoff', () => {
-  it('disables auto-reply, writes a summary, and does not send on handoff', async () => {
+  it('disables auto-reply, writes a summary, and tells the customer on handoff', async () => {
     h.generateReply.mockResolvedValue({ text: '', handoff: true })
     await dispatchInboundToAiReply(ARGS)
-    expect(h.engineSendText).not.toHaveBeenCalled()
+    // Exactly one send, and it is NOT the model's output — that was
+    // empty, which is what triggered the handoff. It is the notice that
+    // an agent is taking over. Before this, the assistant went silent
+    // mid-conversation and the customer had no way to tell "someone is
+    // coming" from "it broke".
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    // Language-agnostic on purpose: the notice comes from the catalogue
+    // for whatever locale the install runs in.
+    expect(h.engineSendText.mock.calls[0][0].text).toMatch(/agent|asesor/i)
     // The slot is claimed before generating now, so a handoff burns one.
     // Harmless: handoff sets ai_autoreply_disabled, so the thread won't
     // auto-reply again regardless of the remaining count.
@@ -222,6 +230,20 @@ describe('dispatchInboundToAiReply — handoff', () => {
   })
 
   it('routes to the configured handoff agent on handoff', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
+    h.generateReply.mockResolvedValue({ text: '', handoff: true })
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.updatePayload).toMatchObject({
+      ai_autoreply_disabled: true,
+      assigned_agent_id: 'agent-7',
+    })
+  })
+
+  it('still hands off when the customer notice cannot be delivered', async () => {
+    // The courtesy message is best-effort: the thread must still be
+    // parked and routed even if the send fails, or a Meta hiccup would
+    // strand the customer with nobody assigned.
+    h.engineSendText.mockRejectedValue(new Error('meta down'))
     h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
     h.generateReply.mockResolvedValue({ text: '', handoff: true })
     await dispatchInboundToAiReply(ARGS)

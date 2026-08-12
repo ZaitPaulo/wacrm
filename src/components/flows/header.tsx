@@ -67,7 +67,7 @@ export function EditorHeader() {
           type="button"
           onClick={() => router.push("/flows")}
           title={t('header.backToFlows')}
-          aria-label="Back to Flows"
+          aria-label={t('header.backToFlows')}
           className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -80,7 +80,7 @@ export function EditorHeader() {
           onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
           placeholder={t('header.flowName')}
           spellCheck={false}
-          aria-label="Flow name"
+          aria-label={t('header.flowName')}
           className="min-w-[120px] max-w-[340px] rounded-lg border border-transparent bg-transparent px-2 py-1 text-lg font-bold leading-tight tracking-tight text-foreground outline-none transition-colors hover:bg-muted focus:border-primary focus:bg-transparent focus:shadow-[0_0_0_3px_var(--primary-soft)]"
         />
         <StatusChip status={state.status} />
@@ -169,7 +169,7 @@ export function EditorHeader() {
           setState((s) => ({ ...s, description: e.target.value }))
         }
         placeholder={t('header.descriptionPlaceholder')}
-        aria-label="Flow description"
+        aria-label={t('header.descriptionPlaceholder')}
         className="w-full max-w-[78ch] rounded-md border border-transparent bg-transparent px-2 py-1 text-[13px] text-muted-foreground outline-none transition-colors placeholder:text-muted-foreground/60 hover:bg-muted/50 focus:border-primary focus:bg-transparent focus:text-foreground"
       />
     </div>

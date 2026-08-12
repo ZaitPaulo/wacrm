@@ -9,6 +9,7 @@ import { buildHandoffSummary } from './handoff'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { engineSendText } from '@/lib/flows/meta-send'
+import { notifyCustomerOfHandoff } from '@/lib/handoff/notify-customer'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 interface DispatchArgs {
@@ -206,6 +207,15 @@ export async function dispatchInboundToAiReply(
         update.assigned_agent_id = config.handoffAgentId
       }
       await db.from('conversations').update(update).eq('id', conversationId)
+      // Until this landed the assistant simply stopped replying: the
+      // agent got notified, the customer got silence mid-conversation
+      // and no way to tell "someone is coming" from "it broke".
+      await notifyCustomerOfHandoff({
+        accountId,
+        userId: configOwnerUserId,
+        conversationId,
+        contactId,
+      })
       return
     }
 

@@ -901,7 +901,9 @@
         "updateError": "Failed to update",
         "duplicateError": "Failed to duplicate",
         "deleteError": "Failed to delete"
-      }
+      },
+      "openMenu": "Open menu",
+      "loadError": "Could not load automations."
     },
     "edit": {
       "loading": "Loading...",
@@ -993,12 +995,14 @@
       "toasts": {
         "saved": "Automation saved",
         "created": "Automation created",
-        "saveFailed": "Save failed"
+        "saveFailed": "Save failed",
+        "flowConflict": "Heads-up: the flow “{flow}” already answers the customer’s first message. With both active, they will get two messages."
       },
       "tags": {
         "select": "Select a tag…",
         "placeholder": "Tag id",
-        "unknown": "{id} (unknown tag)"
+        "unknown": "{id} (unknown tag)",
+        "label": "Tag"
       },
       "fields": {
         "name": "Name",
@@ -1080,6 +1084,67 @@
         "matchWordHint": "Matches the keyword only as a standalone word, so \"k\" no longer fires on \"thanks\". Best for short keywords in space-separated languages; use Contains for languages written without spaces.",
         "matchExact": "Exact",
         "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
+      },
+      "validation": {
+        "at": "at {path}",
+        "issues": {
+          "stepsRequired": "An active automation needs at least one step.",
+          "messageTextRequired": "Message text is required.",
+          "interactiveInvalid": "The interactive message is not valid: {detail}",
+          "templateNameRequired": "Template name is required.",
+          "tagRequired": "Pick a tag.",
+          "agentRequiredForSpecific": "An agent is required when the mode is “specific”.",
+          "fieldNameRequired": "Field name is required.",
+          "fieldValueRequired": "Field value is required.",
+          "pipelineRequired": "Pick a pipeline.",
+          "stageRequired": "Pick a stage.",
+          "titleRequired": "Title is required.",
+          "waitAmountPositive": "Wait amount must be greater than zero.",
+          "waitUnitInvalid": "Wait unit must be minutes, hours, or days.",
+          "conditionSubjectRequired": "Condition subject is required.",
+          "conditionOperandRequired": "Condition operand is required.",
+          "webhookUrlRequired": "Webhook URL is required.",
+          "webhookUrlScheme": "Webhook URL must use http or https.",
+          "webhookUrlInvalid": "Webhook URL is not a valid URL.",
+          "unknownStepType": "Unknown step type “{stepType}”.",
+          "triggerKeywordsRequired": "At least one keyword is required.",
+          "triggerKeywordsEmpty": "Keywords cannot be empty.",
+          "triggerMatchTypeInvalid": "Match type must be exact, contains, or word.",
+          "triggerScheduleRequired": "Schedule is required.",
+          "triggerTagRequired": "Pick a tag.",
+          "triggerReplyIdsRequired": "At least one reply id is required.",
+          "triggerReplyIdsEmpty": "Reply ids cannot be empty."
+        }
+      },
+      "schedulePlaceholder": "Cron expression or HH:mm",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "kinds": {
+        "condition": "Condition",
+        "wait": "Wait",
+        "action": "Action"
+      }
+    },
+    "templates": {
+      "welcome_message": {
+        "name": "Welcome message",
+        "description": "Replies to a new contact’s first message and tags them."
+      },
+      "out_of_office": {
+        "name": "Out of office",
+        "description": "Replies outside business hours so nobody is left waiting."
+      },
+      "lead_qualifier": {
+        "name": "Price enquiry",
+        "description": "Reacts to anyone asking about price or financing and assigns the conversation."
+      },
+      "follow_up_reminder": {
+        "name": "Follow-up reminder",
+        "description": "Nudges the contact after a day without a reply."
+      },
+      "deal_on_qualified": {
+        "name": "Create deal on qualification",
+        "description": "Creates the pipeline deal once the lead is qualified, with no value set."
       }
     }
   },
@@ -1139,7 +1204,8 @@
       "statusHandedOff": "Handed off",
       "statusTimedOut": "Timed out",
       "statusPaused": "Paused by agent",
-      "statusFailed": "Failed"
+      "statusFailed": "Failed",
+      "statusCancelled": "Cancelled (flow deactivated)"
     },
     "builder": {
       "triggerTitle": "Trigger",
@@ -1232,7 +1298,10 @@
         "handoffAgentHint": "Left unset, the flow's default agent is used.",
         "agentUnassigned": "— Unassigned —",
         "agentIdPlaceholder": "Agent id",
-        "agentUnknown": "{id} (unknown agent)"
+        "agentUnknown": "{id} (unknown agent)",
+        "removeSection": "Remove section",
+        "fileUploaded": "File uploaded.",
+        "uploadFailed": "Upload failed."
       },
       "categories": {
         "messaging": "Messaging",
@@ -1280,19 +1349,80 @@
           "label": "End",
           "blurb": "Ends the flow"
         }
-      }
+      },
+      "editorView": "Editor view"
     },
     "validation": {
       "noIssues": "No issues. Ready to activate.",
       "summary": "{errorCount} {errorCount, plural, =1 {error} other {errors}}, {warningCount} {warningCount, plural, =1 {warning} other {warnings}}",
-      "jumpToNode": "Jump to node {key}"
+      "jumpToNode": "Jump to node {key}",
+      "issues": {
+        "flowNameRequired": "Flow name is required.",
+        "entryNodeRequired": "Pick an entry node before activating.",
+        "noNodes": "A flow needs at least one node before activation.",
+        "entryNodeMissing": "Entry node “{key}” does not exist.",
+        "duplicateNodeKey": "Duplicate node key “{key}”.",
+        "nodeUnreachable": "Node “{key}” is unreachable from the entry node.",
+        "keywordsRequired": "Keyword triggers need at least one keyword.",
+        "keywordsBlank": "{count, plural, =1 {1 keyword is blank} other {# keywords are blank}} — they will not match anything.",
+        "startNoNext": "Start node must point to a next node.",
+        "startNextMissing": "Start points to non-existent node “{key}”.",
+        "sendMessageNoText": "Send-message node needs a text body.",
+        "sendMessageNoNext": "Send-message node must point to a next node.",
+        "sendMessageNextMissing": "Send-message points to non-existent node “{key}”.",
+        "sendMediaNoType": "Send-media node needs a media type (image, video, or document).",
+        "sendMediaNoFile": "Send-media node needs a file (upload one before activating).",
+        "captionTooLong": "Caption exceeds {max} chars (WhatsApp limit).",
+        "sendMediaNoNext": "Send-media node must point to a next node.",
+        "sendMediaNextMissing": "Send-media points to non-existent node “{key}”.",
+        "sendButtonsNoText": "Send-buttons node needs a text body.",
+        "buttonsAtLeastOne": "Send-buttons needs at least one button.",
+        "buttonsTooMany": "WhatsApp allows at most {max} buttons per message.",
+        "buttonNoReplyId": "Button {position} needs a reply id.",
+        "buttonDuplicateReplyId": "Duplicate button reply id “{replyId}”.",
+        "buttonNoTitle": "Button {position} needs a title.",
+        "buttonTitleTooLong": "Button {position} title is over {max} chars (WhatsApp limit).",
+        "buttonNoNext": "Button {position} needs a next node.",
+        "buttonNextMissing": "Button {position} points to non-existent node “{key}”.",
+        "sendListNoText": "Send-list node needs a text body.",
+        "sendListNoButtonLabel": "Send-list needs a button label (the tap-to-expand text).",
+        "sendListNoRows": "Send-list needs at least one row.",
+        "sendListTooManyRows": "Send-list allows at most {max} rows total across sections.",
+        "rowNoReplyId": "Row {position} in section {section} needs a reply id.",
+        "rowDuplicateReplyId": "Duplicate list row id “{replyId}”.",
+        "rowNoTitle": "Row {position} needs a title.",
+        "rowTitleTooLong": "Row {position} title exceeds {max} chars.",
+        "rowDescriptionTooLong": "Row {position} description exceeds {max} chars.",
+        "rowNoNext": "Row {position} needs a next node.",
+        "rowNextMissing": "Row {position} points to non-existent node “{key}”.",
+        "collectInputNoPrompt": "Collect-input needs a prompt to send the customer.",
+        "collectInputNoVarKey": "Collect-input needs a var key to store the answer under.",
+        "collectInputBadVarKey": "Var key “{varKey}” must be alphanumeric plus underscore, and start with a letter or underscore.",
+        "collectInputNoNext": "Collect-input must point to a next node.",
+        "collectInputNextMissing": "Collect-input points to non-existent node “{key}”.",
+        "conditionNoSubject": "Condition needs a subject (variable, tag, or contact field).",
+        "conditionNoSubjectKey": "Condition needs a subject key (variable name, tag id, or field name).",
+        "conditionNoOperator": "Condition needs an operator.",
+        "conditionValueEmpty": "Operator “{operator}” usually expects a comparison value — an empty value will only match empty subjects.",
+        "conditionNoBranch": "Condition needs a node for the {branch, select, true_next {true} other {false}} branch.",
+        "conditionBranchMissing": "The condition’s {branch, select, true_next {true} other {false}} branch points to non-existent node “{key}”.",
+        "setTagNoMode": "Set-tag needs a mode (add or remove).",
+        "setTagNoTag": "Set-tag needs a tag to apply.",
+        "setTagNoNext": "Set-tag must point to a next node.",
+        "setTagNextMissing": "Set-tag points to non-existent node “{key}”.",
+        "unknownNodeType": "Unknown node type “{nodeType}”."
+      }
     },
     "editorState": {
       "saved": "Saved.",
       "fixIssues": "Fix the issues below before activating.",
       "statusActivated": "Flow activated.",
       "statusArchived": "Archived.",
-      "statusDraft": "Saved as draft."
+      "statusDraft": "Saved as draft.",
+      "deleteConfirm": "Delete “{name}”? Any runs in progress end immediately. This cannot be undone.",
+      "deleteError": "Could not delete the flow.",
+      "saveError": "Could not save the flow.",
+      "statusError": "Could not change the flow status."
     },
     "summary": {
       "options": "{count} {count, plural, =1 {option} other {options}}",
@@ -1326,6 +1456,20 @@
       "statusDraft": "Draft",
       "statusActive": "Active",
       "statusArchived": "Archived"
+    },
+    "templates": {
+      "welcome_menu": {
+        "name": "Welcome menu",
+        "description": "Greets whoever writes in and routes them by whether they want to buy, sell, or ask something else."
+      },
+      "faq_bot": {
+        "name": "Frequently asked questions",
+        "description": "Answers the usual questions on its own: hours, financing, warranty, and trade-ins."
+      },
+      "lead_capture": {
+        "name": "Lead qualification",
+        "description": "Asks which vehicle, what budget, and how they will pay, then hands off to an agent with the summary. Adapt the budget ranges to your stock."
+      }
     }
   },
   "Settings": {
@@ -2215,5 +2359,8 @@
     "networkError": "Could not reach the server",
     "signOutFailed": "Could not sign out. Try refreshing the page.",
     "wrongAccount": "You are already in another account. Sign in with a different email to join this one."
+  },
+  "Handoff": {
+    "customerNotice": "We have assigned a sales agent to you. They will be in touch very soon. 🙌"
   }
 }

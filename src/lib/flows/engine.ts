@@ -40,6 +40,7 @@ import {
   engineSendText,
 } from "./meta-send";
 import { decideFallback, resolveFallbackPolicy } from "./fallback";
+import { notifyCustomerOfHandoff } from "@/lib/handoff/notify-customer";
 import { addContactTagAndDispatch } from "@/lib/contacts/tag-events";
 import { removeContactTag } from "@/lib/contacts/tag-write";
 import {
@@ -71,24 +72,51 @@ import {
  * Given a node + the customer's reply_id, return the next_node_key
  * to advance to, or `null` if no option matches.
  */
-export function matchReplyId(
+/** The option a tap resolved to: where it goes, and what it said. */
+export interface MatchedReplyOption {
+  next_node_key: string;
+  /** The label the customer actually saw and tapped. */
+  title: string;
+}
+
+/**
+ * Resolve a button / list tap to its configured option.
+ *
+ * Returns the visible title alongside the destination because the title
+ * is the only human-readable trace of the answer: `reply_id` is an
+ * internal token ("presup_2") and the raw inbound text of an interactive
+ * reply is the title anyway. `handleReplyForActiveRun` stores it so a
+ * handoff note can tell the agent what the customer picked.
+ */
+export function matchReplyOption(
   node: { node_type: string; config: Record<string, unknown> },
   reply_id: string,
-): string | null {
+): MatchedReplyOption | null {
   if (node.node_type === "send_buttons") {
     const cfg = node.config as unknown as SendButtonsNodeConfig;
     const hit = cfg.buttons?.find((b) => b.reply_id === reply_id);
-    return hit?.next_node_key ?? null;
+    return hit?.next_node_key
+      ? { next_node_key: hit.next_node_key, title: hit.title ?? "" }
+      : null;
   }
   if (node.node_type === "send_list") {
     const cfg = node.config as unknown as SendListNodeConfig;
     for (const section of cfg.sections ?? []) {
       const hit = section.rows?.find((r) => r.reply_id === reply_id);
-      if (hit) return hit.next_node_key;
+      if (hit?.next_node_key) {
+        return { next_node_key: hit.next_node_key, title: hit.title ?? "" };
+      }
     }
     return null;
   }
   return null;
+}
+
+export function matchReplyId(
+  node: { node_type: string; config: Record<string, unknown> },
+  reply_id: string,
+): string | null {
+  return matchReplyOption(node, reply_id)?.next_node_key ?? null;
 }
 
 /**
@@ -519,6 +547,11 @@ async function executeHandoff(
 ): Promise<void> {
   const cfg = node.config as unknown as HandoffNodeConfig;
   const assignTo = resolveHandoffAgent(cfg, policy);
+  // Resolve `{{vars.*}}` before the note goes anywhere. It used to be
+  // persisted raw, which made every templated note dead text: the whole
+  // point of a handoff note is to carry what the customer answered, and
+  // the agent was reading the literal braces instead.
+  const note = interpolateVars(cfg.note ?? "", run.vars).trim();
   const convUpdate: Record<string, unknown> = {
     status: "pending",
     updated_at: new Date().toISOString(),
@@ -533,8 +566,40 @@ async function executeHandoff(
       .update(convUpdate)
       .eq("id", run.conversation_id);
   }
+  // Put the note where the agent already looks. The run's event log is a
+  // diagnostic surface nobody opens mid-conversation; `contact_notes` is
+  // rendered beside the thread by the inbox contact sidebar, so the
+  // answers arrive with the conversation instead of waiting to be found.
+  //
+  // Best-effort by design: a note that fails to save must not stop the
+  // handoff itself, which is the part the customer is waiting on.
+  if (note && run.contact_id) {
+    const { error: noteErr } = await db.from("contact_notes").insert({
+      contact_id: run.contact_id,
+      // Audit column, and the flow's owner is the closest thing to an
+      // author here. Written via service role, so the table's
+      // `auth.uid() = user_id` policy doesn't apply.
+      user_id: run.user_id,
+      note_text: note,
+    });
+    if (noteErr) {
+      console.error("[flows] handoff note insert failed:", noteErr);
+    }
+  }
+  // Tell the customer someone is coming. Reaching this node used to end
+  // the conversation in silence unless the author remembered to put a
+  // send_message in front of it — and the fallback-exhausted route had
+  // no way to do that at all.
+  await notifyCustomerOfHandoff({
+    accountId: run.account_id,
+    userId: run.user_id,
+    conversationId: run.conversation_id,
+    contactId: run.contact_id,
+  });
   await logEvent(db, run.id, "handoff", node.node_key, {
-    note: cfg.note ?? null,
+    // The resolved text, not the template: this is the audit record of
+    // what the agent was actually told.
+    note: note || null,
     // What was actually assigned, not what was configured: a run with
     // no conversation writes nothing, and "handed off to nobody" is
     // precisely the case worth telling apart in the events viewer.
@@ -601,10 +666,17 @@ async function evaluateConditionNode(
  * prompt text so a captured `name` can show up in the next prompt
  * ("Thanks {{vars.name}}, what's your email?"). Missing vars render as
  * empty string — the same behavior as the automations engine.
+ *
+ * Inner whitespace is tolerated (`{{ vars.name }}` === `{{vars.name}}`).
+ * It wasn't, until the automations engine's own `interpolate` was found
+ * to accept it: authors moving between the two builders wrote the spaced
+ * form here and got the raw braces delivered to the customer, with
+ * nothing logged. Accepting both costs one `\s*` and removes a failure
+ * mode that is invisible until someone reads the sent message.
  */
 function interpolateVars(template: string, vars: Record<string, unknown>): string {
   if (!template) return "";
-  return template.replace(/\{\{vars\.([a-zA-Z0-9_]+)\}\}/g, (_, key) => {
+  return template.replace(/\{\{\s*vars\.([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
     const v = vars[key];
     return v === undefined || v === null ? "" : String(v);
   });
@@ -613,7 +685,7 @@ function interpolateVars(template: string, vars: Record<string, unknown>): strin
 async function endRun(
   db: AdminClient,
   runId: string,
-  status: "completed" | "handed_off" | "timed_out" | "failed",
+  status: "completed" | "handed_off" | "timed_out" | "failed" | "cancelled",
   reason: string,
 ): Promise<void> {
   await db
@@ -624,6 +696,44 @@ async function endRun(
       end_reason: reason,
     })
     .eq("id", runId);
+}
+
+/**
+ * End every live run of a flow that just stopped being active.
+ *
+ * A run is a customer mid-conversation. When the flow behind it goes to
+ * draft or archived, nothing will ever answer them again: the dispatcher
+ * only advances runs whose flow is active. Leaving the row in `active`
+ * strands the person silently and — because of the partial unique index
+ * `idx_one_active_run_per_contact` — also blocks that contact from ever
+ * entering another flow.
+ *
+ * That is not hypothetical: this shipped alongside a run stuck on
+ * `ask_name` since the flow was flipped back to draft weeks earlier.
+ *
+ * Returns how many runs were closed. Best-effort: the status change the
+ * operator asked for is the priority, so a failure here is logged and
+ * swallowed rather than failing their request.
+ */
+export async function cancelRunsForInactiveFlow(
+  db: AdminClient,
+  flowId: string,
+): Promise<number> {
+  const { data, error } = await db
+    .from("flow_runs")
+    .update({
+      status: "cancelled",
+      ended_at: new Date().toISOString(),
+      end_reason: "flow_deactivated",
+    })
+    .eq("flow_id", flowId)
+    .eq("status", "active")
+    .select("id");
+  if (error) {
+    console.error("[flows] cancelRunsForInactiveFlow error:", error.message);
+    return 0;
+  }
+  return (data as { id: string }[] | null)?.length ?? 0;
 }
 
 // ============================================================
@@ -1030,7 +1140,34 @@ async function handleReplyForActiveRun(
     (currentNode.node_type === "send_buttons" ||
       currentNode.node_type === "send_list")
   ) {
-    matched = matchReplyId(currentNode, message.reply_id);
+    const option = matchReplyOption(currentNode, message.reply_id);
+    matched = option?.next_node_key ?? null;
+    if (option) {
+      // Record WHICH option was tapped, keyed by the node that asked.
+      //
+      // Until this landed, only `collect_input` wrote to `vars`, so a
+      // flow that asked for budget or payment method with buttons —
+      // the shape that actually produces clean answers — could not
+      // report either one to the agent it handed off to. Everything the
+      // customer tapped was lost the moment it routed.
+      //
+      // The key is the asking node's `node_key`: already stable, already
+      // unique within the flow, already shown in the builder as the
+      // node's internal id, and — unlike a new config field — it works
+      // for flows authored before this existed. A `collect_input` whose
+      // `var_key` equals some node's key would overwrite it; last write
+      // wins, which is harmless and vanishingly unlikely.
+      const newVars = { ...run.vars, [currentNode.node_key]: option.title };
+      const { error: tapErr } = await db
+        .from("flow_runs")
+        .update({ vars: newVars })
+        .eq("id", run.id);
+      // Mirror in-memory so the advance loop interpolates the fresh
+      // value without re-SELECTing, same as the capture branch below.
+      // A failed write is not fatal: routing is what matters, and the
+      // note simply renders that answer as empty.
+      if (!tapErr) run.vars = newVars;
+    }
   } else if (
     message.kind === "text" &&
     currentNode.node_type === "collect_input"

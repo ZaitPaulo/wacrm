@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  cancelRunsForInactiveFlow,
   matchReplyId,
   matchesKeywordTrigger,
   isAutoAdvancing,
@@ -368,5 +369,85 @@ describe("resolveFallbackHandoffAgent", () => {
   it("returns null when the flow declares no default", () => {
     expect(resolveFallbackHandoffAgent({}, null)).toBeNull();
     expect(resolveFallbackHandoffAgent({ handoff_assign_to: "" }, null)).toBeNull();
+  });
+});
+
+describe("cancelRunsForInactiveFlow", () => {
+  /**
+   * Records the query the helper builds. The db handle is injected, so
+   * this needs no module mock — just an object shaped like the two calls
+   * the helper makes.
+   */
+  function fakeDb(result: { data: unknown; error: { message: string } | null }) {
+    const calls = {
+      table: "",
+      update: null as Record<string, unknown> | null,
+      filters: [] as [string, unknown][],
+      selected: "",
+    };
+    const chain: Record<string, unknown> = {
+      update: (row: Record<string, unknown>) => {
+        calls.update = row;
+        return chain;
+      },
+      eq: (col: string, val: unknown) => {
+        calls.filters.push([col, val]);
+        return chain;
+      },
+      select: (cols: string) => {
+        calls.selected = cols;
+        return Promise.resolve(result);
+      },
+    };
+    const db = {
+      from: (t: string) => {
+        calls.table = t;
+        return chain;
+      },
+    };
+    return { db, calls };
+  }
+
+  it("cancels only the live runs of that flow", async () => {
+    const { db, calls } = fakeDb({
+      data: [{ id: "run-1" }, { id: "run-2" }],
+      error: null,
+    });
+
+    const closed = await cancelRunsForInactiveFlow(
+      db as never,
+      "flow-1",
+    );
+
+    expect(closed).toBe(2);
+    expect(calls.table).toBe("flow_runs");
+    // Scoped to this flow AND to runs still active — never a blanket
+    // rewrite of finished runs, whose end_reason is historical record.
+    expect(calls.filters).toEqual([
+      ["flow_id", "flow-1"],
+      ["status", "active"],
+    ]);
+  });
+
+  it("records why the run ended, not just that it did", async () => {
+    const { db, calls } = fakeDb({ data: [{ id: "run-1" }], error: null });
+
+    await cancelRunsForInactiveFlow(db as never, "flow-1");
+
+    expect(calls.update).toMatchObject({
+      status: "cancelled",
+      end_reason: "flow_deactivated",
+    });
+    expect(calls.update?.ended_at).toEqual(expect.any(String));
+  });
+
+  it("reports zero when nothing was live", async () => {
+    const { db } = fakeDb({ data: [], error: null });
+    expect(await cancelRunsForInactiveFlow(db as never, "flow-1")).toBe(0);
+  });
+
+  it("swallows a failure so the operator's status change still stands", async () => {
+    const { db } = fakeDb({ data: null, error: { message: "boom" } });
+    expect(await cancelRunsForInactiveFlow(db as never, "flow-1")).toBe(0);
   });
 });

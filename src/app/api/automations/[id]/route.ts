@@ -7,6 +7,7 @@ import {
   replaceSteps,
   type BuilderStepInput,
 } from '@/lib/automations/steps-tree'
+import { detectTriggerConflict } from '@/lib/automations/trigger-conflict'
 import {
   validateStepsForActivation,
   validateTriggerForActivation,
@@ -70,7 +71,7 @@ export async function PATCH(
   // to compute the post-patch "effective" state for validation.
   const { data: existing } = await admin
     .from('automations')
-    .select('id, user_id, is_active, trigger_type, trigger_config')
+    .select('id, user_id, account_id, is_active, trigger_type, trigger_config')
     .eq('id', id)
     .maybeSingle()
   if (!existing || existing.user_id !== user.id) {
@@ -115,6 +116,18 @@ export async function PATCH(
     }
   }
 
+  // Non-blocking: computed before the write so the operator hears about
+  // it in the same response that confirms the save.
+  const conflictingFlow = await detectTriggerConflict({
+    db: admin,
+    accountId: existing.account_id as string,
+    triggerType: (update.trigger_type ?? existing.trigger_type) as string,
+    steps: Array.isArray(body.steps)
+      ? (body.steps as { step_type: string }[])
+      : await loadStepsTree(id),
+    willBeActive,
+  })
+
   if (Object.keys(update).length > 0) {
     const { error: updErr } = await admin
       .from('automations')
@@ -128,7 +141,10 @@ export async function PATCH(
     if (err) return NextResponse.json({ error: err }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({
+    ok: true,
+    ...(conflictingFlow ? { warning_flow_conflict: conflictingFlow } : {}),
+  })
 }
 
 export async function DELETE(

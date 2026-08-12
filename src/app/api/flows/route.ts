@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
+import { getTranslations } from 'next-intl/server'
 import { getFlowTemplate } from '@/lib/flows/templates'
+import { templateLabel, type LabelResolver } from '@/lib/templates/labels'
 
 /**
  * GET /api/flows — list the caller's flows.
@@ -107,13 +109,16 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
+    // Resolved once here: from this point the strings belong to the
+    // operator's row, not to the catalogue.
+    const label = (await getTranslations('Flows.templates')) as LabelResolver
     const { data: flow, error: flowErr } = await admin
       .from('flows')
       .insert({
         user_id: userId,
         account_id: accountId,
-        name: body.name?.trim() || template.name,
-        description: template.description,
+        name: body.name?.trim() || templateLabel(label, template.slug, 'name'),
+        description: templateLabel(label, template.slug, 'description'),
         status: 'draft',
         trigger_type: template.trigger_type,
         trigger_config: template.trigger_config,

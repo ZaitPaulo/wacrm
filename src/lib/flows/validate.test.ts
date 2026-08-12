@@ -66,7 +66,8 @@ describe("validateFlowForActivation — flow-level", () => {
       issues.some(
         (i) =>
           i.field === "entry_node_id" &&
-          i.message.includes('"ghost"'),
+          i.code === "entryNodeMissing" &&
+          i.params?.key === "ghost",
       ),
     ).toBe(true);
   });
@@ -77,7 +78,7 @@ describe("validateFlowForActivation — flow-level", () => {
       [],
     );
     expect(
-      issues.some((i) => i.message.includes("at least one node")),
+      issues.some((i) => i.code === "noNodes"),
     ).toBe(true);
   });
 
@@ -94,7 +95,7 @@ describe("validateFlowForActivation — flow-level", () => {
     expect(
       issues.some(
         (i) =>
-          i.message.includes("Duplicate node_key") &&
+          i.code === "duplicateNodeKey" &&
           i.node_key === "a",
       ),
     ).toBe(true);
@@ -114,7 +115,7 @@ describe("validateFlowForActivation — trigger", () => {
       issues.some(
         (i) =>
           i.scope === "trigger" &&
-          i.message.includes("at least one keyword"),
+          i.code === "keywordsRequired",
       ),
     ).toBe(true);
   });
@@ -140,7 +141,7 @@ describe("validateFlowForActivation — trigger", () => {
         (i) =>
           i.scope === "trigger" &&
           i.severity === "warning" &&
-          i.message.includes("blank"),
+          i.code === "keywordsBlank",
       ),
     ).toBe(true);
   });
@@ -199,7 +200,7 @@ describe("validateFlowForActivation — nodes", () => {
         (i) =>
           i.node_key === "b" &&
           i.field === "buttons" &&
-          i.message.includes("at least one"),
+          i.code === "buttonsAtLeastOne",
       ),
     ).toBe(true);
   });
@@ -231,7 +232,8 @@ describe("validateFlowForActivation — nodes", () => {
         (i) =>
           i.node_key === "b" &&
           i.field === "buttons" &&
-          i.message.includes("at most 3"),
+          i.code === "buttonsTooMany" &&
+          i.params?.max === 3,
       ),
     ).toBe(true);
   });
@@ -261,7 +263,8 @@ describe("validateFlowForActivation — nodes", () => {
         (i) =>
           i.node_key === "b" &&
           i.field === "buttons.0.title" &&
-          i.message.includes("over 20"),
+          i.code === "buttonTitleTooLong" &&
+          i.params?.max === 20,
       ),
     ).toBe(true);
   });
@@ -288,7 +291,8 @@ describe("validateFlowForActivation — nodes", () => {
       issues.some(
         (i) =>
           i.field === "buttons.0.next_node_key" &&
-          i.message.includes("ghost"),
+          i.code === "buttonNextMissing" &&
+          i.params?.key === "ghost",
       ),
     ).toBe(true);
   });
@@ -314,7 +318,7 @@ describe("validateFlowForActivation — nodes", () => {
       nodes,
     );
     expect(
-      issues.some((i) => i.message.includes("Duplicate button reply id")),
+      issues.some((i) => i.code === "buttonDuplicateReplyId"),
     ).toBe(true);
   });
 
@@ -346,7 +350,8 @@ describe("validateFlowForActivation — nodes", () => {
         (i) =>
           i.node_key === "l" &&
           i.field === "sections" &&
-          i.message.includes("at most 10"),
+          i.code === "sendListTooManyRows" &&
+          i.params?.max === 10,
       ),
     ).toBe(true);
   });
@@ -381,7 +386,9 @@ describe("validateFlowForActivation — nodes", () => {
       nodes,
     );
     expect(
-      issues.some((i) => i.message.includes("exceeds 24 chars")),
+      issues.some(
+        (i) => i.code === "rowTitleTooLong" && i.params?.max === 24,
+      ),
     ).toBe(true);
   });
 
@@ -401,7 +408,7 @@ describe("validateFlowForActivation — nodes", () => {
         (i) =>
           i.node_key === "orphan" &&
           i.severity === "warning" &&
-          i.message.includes("unreachable"),
+          i.code === "nodeUnreachable",
       ),
     ).toBe(true);
   });
@@ -415,7 +422,7 @@ describe("validateFlowForActivation — nodes", () => {
       nodes,
     );
     expect(
-      issues.some((i) => i.message.includes("Unknown node type")),
+      issues.some((i) => i.code === "unknownNodeType"),
     ).toBe(true);
   });
 });
@@ -483,7 +490,8 @@ describe("validateFlowForActivation — send_media", () => {
         (i) =>
           i.node_key === "m" &&
           i.field === "next_node_key" &&
-          i.message.includes("ghost"),
+          i.code === "sendMediaNextMissing" &&
+          i.params?.key === "ghost",
       ),
     ).toBe(true);
   });
