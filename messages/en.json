@@ -575,6 +575,18 @@
       "toastRenameFailed": "Could not rename field.",
       "toastDeleteFailed": "Could not delete field.",
       "toastDeleted": "Deleted \"{name}\"."
+    },
+    "tabs": {
+      "threads": "Threads"
+    },
+    "threads": {
+      "loading": "Loading threads…",
+      "empty": "No conversations with this contact yet.",
+      "noMessages": "No messages yet",
+      "windowOpen": "You can reply",
+      "windowOpenUntil": "You can reply until {when}",
+      "windowTemplateOnly": "Closed — template only",
+      "windowClosed": "Closed"
     }
   },
   "Pipelines": {

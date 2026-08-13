@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CHANNEL_WINDOW_RULES, evaluateWindow } from './window';
+import { CHANNEL_WINDOW_RULES, describeWindow, evaluateWindow } from './window';
 
 const AHORA = new Date('2026-08-12T12:00:00Z');
 
@@ -199,5 +199,67 @@ describe('las reglas están declaradas en un solo lugar', () => {
     expect(CHANNEL_WINDOW_RULES.whatsapp.humanExtensionMs).toBeNull();
     expect(CHANNEL_WINDOW_RULES.instagram.humanExtensionMs).not.toBeNull();
     expect(CHANNEL_WINDOW_RULES.messenger.humanExtensionMs).not.toBeNull();
+  });
+});
+
+describe('describeWindow — lo que se muestra en la ficha del contacto', () => {
+  it('informa hasta cuándo se puede responder', () => {
+    const status = describeWindow({
+      channel: 'whatsapp',
+      senderKind: 'human',
+      lastInboundAt: haceHoras(2),
+      now: AHORA,
+    });
+
+    expect(status.open).toBe(true);
+    // 24 h desde el mensaje del cliente, o sea 22 h desde ahora.
+    expect(status.closesAt?.toISOString()).toBe(
+      new Date(AHORA.getTime() + 22 * 60 * 60 * 1000).toISOString()
+    );
+  });
+
+  it('a un humano en Instagram le da los 7 días, no las 24 h', () => {
+    // Es la diferencia que hace útil el indicador: por WhatsApp ya no
+    // se puede y por Instagram sí, el mismo día.
+    const wa = describeWindow({
+      channel: 'whatsapp',
+      senderKind: 'human',
+      lastInboundAt: haceHoras(30),
+      now: AHORA,
+    });
+    const ig = describeWindow({
+      channel: 'instagram',
+      senderKind: 'human',
+      lastInboundAt: haceHoras(30),
+      now: AHORA,
+    });
+
+    expect(wa.open).toBe(false);
+    expect(ig.open).toBe(true);
+  });
+
+  it('cerrada en WhatsApp deja la plantilla como alternativa', () => {
+    const status = describeWindow({
+      channel: 'whatsapp',
+      senderKind: 'human',
+      lastInboundAt: haceHoras(30),
+      now: AHORA,
+    });
+
+    expect(status.open).toBe(false);
+    expect(status.closesAt).toBeNull();
+    expect(status.alternative).toBe('template');
+  });
+
+  it('un hilo sin mensajes del cliente nunca abrió', () => {
+    const status = describeWindow({
+      channel: 'instagram',
+      senderKind: 'human',
+      lastInboundAt: null,
+      now: AHORA,
+    });
+
+    expect(status.open).toBe(false);
+    expect(status.closesAt).toBeNull();
   });
 });

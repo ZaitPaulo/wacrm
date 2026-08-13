@@ -19,6 +19,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ContactThreads } from './contact-threads';
 import { ContactDocuments } from './contact-documents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -462,6 +463,12 @@ export function ContactDetailView({
                   {t('tabs.details')}
                 </TabsTrigger>
                 <TabsTrigger
+                  value="threads"
+                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
+                >
+                  {t('tabs.threads')}
+                </TabsTrigger>
+                <TabsTrigger
                   value="tags"
                   className="data-active:bg-muted data-active:text-primary text-muted-foreground"
                 >
@@ -706,6 +713,13 @@ export function ContactDetailView({
               </TabsContent>
 
               {/* Deals Tab */}
+              <TabsContent
+                value="threads"
+                className="flex-1 overflow-y-auto px-4 py-3"
+              >
+                {contactId && <ContactThreads contactId={contactId} />}
+              </TabsContent>
+
               <TabsContent value="deals" className="flex-1 overflow-y-auto px-4 py-3">
                 {loadingDeals ? (
                   <div className="flex items-center justify-center py-8">

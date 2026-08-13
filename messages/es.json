@@ -568,6 +568,18 @@
       "toastRenameFailed": "No se pudo renombrar el campo.",
       "toastDeleteFailed": "No se pudo eliminar el campo.",
       "toastDeleted": "Se eliminó \"{name}\"."
+    },
+    "tabs": {
+      "threads": "Hilos"
+    },
+    "threads": {
+      "loading": "Cargando los hilos…",
+      "empty": "Todavía no hay conversaciones con este contacto.",
+      "noMessages": "Sin mensajes aún",
+      "windowOpen": "Puedes responder",
+      "windowOpenUntil": "Puedes responder hasta {when}",
+      "windowTemplateOnly": "Cerrada — solo con plantilla",
+      "windowClosed": "Cerrada"
     }
   },
   "Pipelines": {

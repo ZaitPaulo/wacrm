@@ -87,6 +87,53 @@ export type WindowVerdict =
       alternative: OutsideWindowOption;
     };
 
+export interface WindowStatus {
+  /** Si ahora mismo se puede responder libremente. */
+  open: boolean;
+  /** Hasta cuándo. `null` si está cerrada o si nunca llegó a abrirse. */
+  closesAt: Date | null;
+  /** Qué se podría mandar igual cuando está cerrada. */
+  alternative: OutsideWindowOption;
+}
+
+/**
+ * Describe el estado de la ventana de un hilo, para MOSTRARLO.
+ *
+ * Distinta de `evaluateWindow`, que decide si un envío concreto sale.
+ * Esta responde la pregunta que se hace alguien mirando la ficha de un
+ * contacto: "¿por cuál de sus canales le puedo escribir, y hasta
+ * cuándo?". Sin eso, la única forma de saberlo es intentar y fallar.
+ */
+export function describeWindow(args: {
+  channel: MessageChannel;
+  senderKind: SenderKind;
+  lastInboundAt: Date | null;
+  now?: Date;
+}): WindowStatus {
+  const { channel, senderKind, lastInboundAt, now = new Date() } = args;
+  const rules = CHANNEL_WINDOW_RULES[channel];
+
+  if (!lastInboundAt) {
+    return { open: false, closesAt: null, alternative: rules.outside };
+  }
+
+  // El límite que aplica a QUIEN pregunta: una persona en Instagram
+  // llega a los 7 días, un envío automático se queda en las 24 horas.
+  const limitMs =
+    senderKind === 'human' && rules.humanExtensionMs !== null
+      ? rules.humanExtensionMs
+      : rules.standardMs;
+
+  const closesAt = new Date(lastInboundAt.getTime() + limitMs);
+  const open = now.getTime() <= closesAt.getTime();
+
+  return {
+    open,
+    closesAt: open ? closesAt : null,
+    alternative: rules.outside,
+  };
+}
+
 export interface EvaluateWindowArgs {
   channel: MessageChannel;
   senderKind: SenderKind;

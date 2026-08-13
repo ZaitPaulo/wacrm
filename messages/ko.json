@@ -575,6 +575,18 @@
       "toastRenameFailed": "필드 이름을 변경할 수 없습니다.",
       "toastDeleteFailed": "필드를 삭제할 수 없습니다.",
       "toastDeleted": "\"{name}\"을(를) 삭제했습니다."
+    },
+    "tabs": {
+      "threads": "대화"
+    },
+    "threads": {
+      "loading": "대화를 불러오는 중…",
+      "empty": "이 연락처와의 대화가 아직 없습니다.",
+      "noMessages": "메시지 없음",
+      "windowOpen": "답장할 수 있습니다",
+      "windowOpenUntil": "{when}까지 답장할 수 있습니다",
+      "windowTemplateOnly": "마감됨 — 템플릿만 가능",
+      "windowClosed": "마감됨"
     }
   },
   "Pipelines": {
