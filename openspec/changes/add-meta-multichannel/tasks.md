@@ -49,9 +49,9 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 
 ## 6. Reglas de ventana por canal
 
-- [ ] 6.1 Declarar las reglas de cada canal en un único lugar: ventana ordinaria de 24 h y qué se permite fuera de ella por canal (decisión 8)
+- [x] 6.1 Declarar las reglas de cada canal en un único lugar: ventana ordinaria de 24 h y qué se permite fuera de ella por canal (decisión 8) — `src/lib/outbound/window.ts`, función pura con 14 tests
 - [ ] 6.2 `src/lib/ai/reply-window.ts` pasa a evaluar según el canal **y** según quién responde
-- [ ] 6.3 Impedir el envío fuera de ventana antes de intentarlo, con motivo explicado y alternativa si el canal la ofrece
+- [ ] 6.3 Impedir el envío fuera de ventana antes de intentarlo, con motivo explicado y alternativa si el canal la ofrece — **es comportamiento NUEVO, no un refactor**: hoy no existe ninguna verificación de ventana y los envíos tardíos los rechaza Meta. Encenderlo cambia lo que ve un usuario de WhatsApp en producción
 - [ ] 6.4 La etiqueta `human_agent` la decide la puerta de salida a partir de quién envía; **ningún camino puede pedirla como parámetro**
 - [ ] 6.5 Verificar que la IA nunca la usa: a los 5 días un asesor puede responder por Instagram y el asistente no
 - [ ] 6.6 Las plantillas de WhatsApp solo se ofrecen en conversaciones de WhatsApp
