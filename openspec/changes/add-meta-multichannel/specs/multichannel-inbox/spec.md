@@ -16,6 +16,22 @@ Las conversaciones anteriores a este cambio SHALL quedar registradas como WhatsA
 - **WHEN** se despliega el cambio sobre una instalación existente
 - **THEN** todas las conversaciones existentes quedan como WhatsApp y siguen funcionando igual
 
+### Requirement: Todo mensaje es atribuible a un canal
+
+Cualquier mensaje, entrante o saliente, SHALL poder atribuirse al canal por el que ocurrió, de modo que el consumo pueda medirse por canal y no solo en total.
+
+Este cambio NO SHALL definir topes ni precios: solo garantiza que el dato exista para quien los defina.
+
+#### Scenario: Se mide el consumo de una cuenta
+
+- **WHEN** se cuentan los mensajes de una cuenta en un periodo
+- **THEN** el resultado puede desglosarse por canal
+
+#### Scenario: Mensajes anteriores al cambio
+
+- **WHEN** se cuentan mensajes anteriores a este cambio
+- **THEN** aparecen atribuidos a WhatsApp, igual que sus conversaciones
+
 ### Requirement: La respuesta sale siempre por el canal de la conversación
 
 El canal de salida SHALL leerse de la conversación. NUNCA SHALL inferirse del contenido, del contacto ni de un valor por defecto.

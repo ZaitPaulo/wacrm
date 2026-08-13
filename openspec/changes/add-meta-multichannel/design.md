@@ -14,6 +14,20 @@ Ventana    ai/reply-window.ts  →  la regla de WhatsApp, como si fuera universa
 
 Ese último punto merece atención antes de empezar: **ya existen tres caminos de envío en paralelo**, los tres apuntando a la API de WhatsApp. Añadir canales sin resolver eso primero triplica la superficie del problema.
 
+**Lo que exige Meta**, leído de su documentación vigente el 2026-08-12:
+
+```
+Ventana        24 h en los tres canales, desde el último mensaje del cliente
+Fuera de ella  WhatsApp   → plantilla aprobada
+               IG / MSGR  → etiqueta human_agent, hasta 7 días
+human_agent    "to provide human agent support" — es para RESPUESTAS
+               HUMANAS. Un bot no puede usarla.
+Atribución     ig.me/m/<usuario>?ref=<param>, hasta 2083 caracteres;
+               llega como evento messaging_referral (source SHORTLINKS)
+```
+
+La segunda línea de `human_agent` es la que más consecuencias tiene y se trata en la decisión 8: la ventana no depende solo del canal, depende también de quién responde.
+
 ## Goals / Non-Goals
 
 **Goals**
@@ -68,13 +82,60 @@ Los dos `meta-send.ts` de automatizaciones y flujos pasan a delegar en esa puert
 
 Cada canal declara su ventana de respuesta y qué se permite fuera de ella, en una tabla de reglas del código, no repartida en condicionales.
 
-**Los plazos concretos no se fijan en esta spec a propósito.** Son política de Meta, cambian con el tiempo y difieren por canal. Al implementar hay que leerlos de la documentación vigente y dejarlos en ese único lugar. Lo que sí es requisito es el comportamiento: fuera de ventana, el sistema **no intenta enviar y falla**, sino que lo impide antes y lo explica.
+**Los plazos son política de Meta y cambian**, así que viven en ese único lugar y se actualizan ahí. Los vigentes al escribir esto están en la tabla del Context. Lo que no cambia es el comportamiento: fuera de ventana el sistema **no intenta enviar y falla**, sino que lo impide antes y lo explica.
 
 ### 6. La unificación de personas se sugiere, nunca se ejecuta sola
 
 Cuando dos identidades de canales distintos parezcan la misma persona, el sistema lo señala y ofrece vincularlas. La decisión es de un humano.
 
 *Por qué:* el costo de los dos errores es asimétrico. No unificar deja dos fichas y algo de desorden. Unificar mal mezcla el historial de dos clientes —conversaciones, documentos, vehículos— y es un daño que puede no detectarse a tiempo, con datos personales de por medio.
+
+### 7. Una conexión por canal por cuenta
+
+Un negocio conecta una cuenta de Instagram y una página de Facebook, no varias. La identidad del lado del negocio no se modela.
+
+*Por qué:* es la regla que el producto ya tomó para WhatsApp y de forma deliberada — la migración 017 cambió `UNIQUE(user_id)` por `UNIQUE(account_id)` con el comentario *"one WhatsApp number per account"*. `ai_configs` la sigue, e `instagram_config` (migración 512) también.
+
+*Lo que evita:* con varias cuentas por canal, la salida deja de resolverse con una pregunta y pasa a resolverse con dos —por qué canal, y por cuál de nuestras cuentas en ese canal—. Eso duplica la lógica justo donde vive el peor error del change, que es contestarle a alguien por donde no era.
+
+*La salida cuando haga falta:* el producto es multi-cuenta desde la 017. Un negocio con dos Instagram suele ser dos sedes, y eso ya se modela como dos cuentas del CRM.
+
+### 8. La ventana depende del canal Y de quién responde
+
+No es una sola regla por canal, son dos dimensiones:
+
+```
+                DENTRO DE 24 h      24 h – 7 días        > 7 días
+WhatsApp        cualquiera          plantilla aprobada   plantilla aprobada
+Instagram       cualquiera          human_agent          nada
+Messenger       cualquiera          human_agent          nada
+```
+
+Un asesor en Instagram tiene siete días para contestar a mano. El asistente con IA tiene veinticuatro horas en los tres canales, siempre.
+
+*Por qué la IA no puede usar `human_agent`:* Meta la define para *"provide human agent support"* — casos donde el negocio estaba cerrado o el asunto necesita más de un día. Usarla para que un bot responda al quinto día es exactamente lo que la etiqueta no autoriza, y el permiso que la habilita pasa por revisión.
+
+*Consecuencia para el código:* `ai/reply-window.ts` hoy no distingue ni canal ni autor. La comprobación pasa a recibir ambos, y la respuesta "se puede enviar" deja de ser una propiedad de la conversación para ser una de la conversación **más** quién la está por enviar.
+
+### 9. Los mensajes se cuentan por canal
+
+Cada mensaje queda contabilizable por canal para los topes de plan que definirá `package-commercial-offering`.
+
+*Lo que cuesta:* nada. `messages` no tiene `account_id` — llega a la cuenta únicamente por `conversations`, así que toda medición ya está obligada a ese join para acotar por cuenta. El canal viaja en esa misma fila y se agrupa sin trabajo extra ni columna nueva.
+
+*Por qué separado y no un total:* el costo real difiere. WhatsApp tiene precio por conversación del lado de Meta; la mensajería de Instagram y Messenger no. Un único contador escondería esa diferencia justo cuando importe.
+
+**Este change no define topes ni precios.** Solo garantiza que el canal quede registrado en cada mensaje para que el otro pueda contarlos como decida.
+
+### 10. La atribución de la vitrina no llega a Instagram en este change
+
+El código de referencia del vehículo sigue viajando solo por WhatsApp.
+
+*Existe el mecanismo y es mejor que el actual:* `ig.me/m/<usuario>?ref=<param>` entrega el valor en el evento `messaging_referral`, como campo propio. Hoy el código va **dentro del texto** del mensaje prellenado y el propio `whatsappHref` lo reconoce — *"si no borra la etiqueta, el webhook puede atribuir la conversación"*. En Instagram el cliente no podría borrarlo.
+
+*Por qué se difiere igual:* construirlo exige la cuenta publicada, suscribir un evento más y tocar la vitrina, y nada de eso ayuda a que los mensajes de Instagram lleguen y se respondan, que es lo que este change tiene que probar primero.
+
+*La consecuencia, para tenerla a la vista:* mientras no se haga, una consulta que entre por Instagram no se asocia a ningún vehículo, y la conversión del tablero comercial —que cruza `vehicle_inquiries` con vehículos vendidos— se vuelve parcialmente ciega a medida que Instagram tome volumen. Conviene revisarlo apenas el canal esté operando.
 
 ## Risks / Trade-offs
 
@@ -83,6 +144,7 @@ Cuando dos identidades de canales distintos parezcan la misma persona, el sistem
 - **La migración de identidades deja contactos sin identidad** → El backfill se verifica contando: tantas identidades de WhatsApp como contactos con teléfono. Si no cuadra, no se sigue.
 - **Instagram y Messenger requieren permisos y revisión de la app en Meta** → No es trabajo de código y puede tomar semanas de calendario. Debe empezarse antes que el desarrollo, no después.
 - **El asistente con IA responde por un canal con reglas distintas** → La ventana se consulta por canal antes de que la IA responda; hoy `ai/reply-window.ts` asume las de WhatsApp.
+- **Usar `human_agent` para un envío automático** → Es el riesgo con peor desenlace de los que dependen de Meta: no produce un error, produce un uso de la etiqueta fuera de lo que autoriza, y lo que está en juego es el permiso de la app, no un mensaje. La etiqueta se decide en la puerta de salida a partir de quién envía, y nunca la elige quien construye el mensaje.
 
 ## Migration Plan
 
@@ -98,7 +160,9 @@ Cuando dos identidades de canales distintos parezcan la misma persona, el sistem
 
 ## Open Questions
 
-- **¿Un mismo negocio puede tener varias cuentas de Instagram o páginas de Facebook?** Si es así, la identidad del lado del negocio también necesita modelarse, no solo la del cliente.
-- **¿Qué se hace con una respuesta fuera de ventana en Instagram o Messenger?** En WhatsApp existen las plantillas aprobadas; en los otros canales el equivalente es distinto y hay que decidir si se ofrece algo o simplemente se impide.
-- **¿La atribución de la vitrina aplica a Instagram?** El código de referencia viaja hoy en el texto prellenado de WhatsApp. Desde Instagram no hay un mecanismo equivalente evidente.
-- **¿Se factura por canal?** Si `package-commercial-offering` avanza con topes por plan, habría que decidir si un mensaje de Instagram cuenta igual que uno de WhatsApp.
+Las cuatro se resolvieron el 2026-08-12 y viven arriba como decisiones: una conexión por canal por cuenta (7), la ventana por canal y por autor (8), conteo de mensajes por canal (9) y la atribución de la vitrina diferida (10).
+
+Queda sin decidir, y no bloquea:
+
+- **Cuándo revisar la atribución por Instagram.** La decisión 10 la difiere, no la descarta, y anota qué se pierde mientras tanto.
+- **Si el `human_agent` se ofrece en la bandeja como una acción explícita** ("responder fuera de ventana") o se aplica solo por estar respondiendo un humano. Lo segundo es más simple; lo primero deja constancia de que alguien lo eligió. Se define al construir la bandeja.

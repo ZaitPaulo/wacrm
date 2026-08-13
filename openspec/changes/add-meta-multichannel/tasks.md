@@ -1,21 +1,24 @@
 ## 1. Antes de escribir código
 
-- [ ] 1.1 Iniciar en Meta la solicitud de permisos y revisión de la aplicación para mensajería de Instagram y Messenger — **es calendario, no desarrollo**, puede tomar semanas y bloquea las pruebas reales
-- [ ] 1.2 Confirmar con el cliente por cuál de los dos canales llegan consultas de venta reales; puede que uno no justifique el trabajo
-- [ ] 1.3 Leer de la documentación vigente de Meta las ventanas de respuesta y las condiciones fuera de ventana de cada canal, y dejarlas escritas en el design
-- [ ] 1.4 Decidir si un negocio puede tener varias cuentas de Instagram o páginas de Facebook, porque eso cambia el modelo del lado del negocio
+Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12 y viven en `design.md` como decisiones 7 a 10. Lo que queda acá no depende de nosotros.
+
+- [ ] 1.1 Iniciar en Meta la solicitud de permisos y revisión de la aplicación para mensajería de Instagram y Messenger, incluida la etiqueta `human_agent` — **es calendario, no desarrollo**, puede tomar semanas y bloquea las pruebas reales
+- [x] 1.2 Confirmar con el cliente por cuál de los dos canales llegan consultas de venta reales — respondido: llegan por WhatsApp, Instagram y Messenger, así que los tres se justifican
+- [x] 1.3 Leer de la documentación vigente de Meta las ventanas de respuesta y las condiciones fuera de ventana de cada canal, y dejarlas escritas en el design — hecho: tabla en `design.md`, sección Context
+- [x] 1.4 Decidir si un negocio puede tener varias cuentas de Instagram o páginas de Facebook — decidido: una por canal por cuenta (decisión 7)
 - [ ] 1.5 Definir una cuenta de pruebas por canal, separada de la del cliente
 
 ## 2. Migración de base de datos
 
-- [ ] 2.1 Crear la migración en el rango 510+, idempotente y en el estilo del repo
+- [ ] 2.1 Crear la migración **513**, idempotente y en el estilo del repo (la 512 es la de publicación en Instagram)
 - [ ] 2.2 Catálogo de canales soportados
 - [ ] 2.3 Tabla de identidades por canal: contacto, canal, identificador externo, con unicidad por cuenta y canal
 - [ ] 2.4 Columna de canal en `conversations`, con `whatsapp` por defecto
 - [ ] 2.5 RLS de las tablas nuevas siguiendo el patrón del repo (lectura de miembro, escritura de `agent`)
 - [ ] 2.6 Backfill: una identidad de WhatsApp por cada contacto con teléfono, y toda conversación existente marcada como WhatsApp
 - [ ] 2.7 **Verificar el backfill por conteo** antes de continuar: tantas identidades de WhatsApp como contactos con teléfono. Si no cuadra, detenerse
-- [ ] 2.8 Aplicar a la nube (lo corre el usuario) y verificar por introspección
+- [ ] 2.8 Verificar que el consumo se puede desglosar por canal sin columna nueva: `messages` llega a la cuenta solo por `conversations`, así que el join ya obligatorio arrastra el canal (decisión 9)
+- [ ] 2.9 Aplicar a la nube (lo corre el usuario) y verificar por introspección
 
 ## 3. Identidad sin teléfono
 
@@ -44,11 +47,13 @@
 
 ## 6. Reglas de ventana por canal
 
-- [ ] 6.1 Declarar las reglas de cada canal en un único lugar
-- [ ] 6.2 `src/lib/ai/reply-window.ts` pasa a evaluar según el canal de la conversación
+- [ ] 6.1 Declarar las reglas de cada canal en un único lugar: ventana ordinaria de 24 h y qué se permite fuera de ella por canal (decisión 8)
+- [ ] 6.2 `src/lib/ai/reply-window.ts` pasa a evaluar según el canal **y** según quién responde
 - [ ] 6.3 Impedir el envío fuera de ventana antes de intentarlo, con motivo explicado y alternativa si el canal la ofrece
-- [ ] 6.4 Las plantillas de WhatsApp solo se ofrecen en conversaciones de WhatsApp
-- [ ] 6.5 Tests de los bordes de cada ventana y del caso fuera de ventana en automatizaciones
+- [ ] 6.4 La etiqueta `human_agent` la decide la puerta de salida a partir de quién envía; **ningún camino puede pedirla como parámetro**
+- [ ] 6.5 Verificar que la IA nunca la usa: a los 5 días un asesor puede responder por Instagram y el asistente no
+- [ ] 6.6 Las plantillas de WhatsApp solo se ofrecen en conversaciones de WhatsApp
+- [ ] 6.7 Tests de los bordes de cada ventana (24 h y 7 días), por canal y por autor, y del caso fuera de ventana en automatizaciones
 
 ## 7. Canales nuevos
 
@@ -78,10 +83,11 @@
 ## 10. Verificación
 
 - [ ] 10.1 `pnpm typecheck` limpio
-- [ ] 10.2 `pnpm lint` sin errores nuevos (el repo arrastra 2 preexistentes en `join/[token]/page.tsx`)
+- [ ] 10.2 `pnpm lint` sin errores nuevos — la referencia actual son 31 errores en 26 archivos preexistentes, casi todos por `set-state-in-effect`; la nota anterior decía 2 en `join/[token]/page.tsx` y estaba vencida
 - [ ] 10.3 `pnpm test` sin fallos nuevos (5 preexistentes de locale)
 - [ ] 10.4 **Regresión de WhatsApp**: recibir, responder, automatizar y usar el asistente exactamente como antes
 - [ ] 10.5 Prueba real de punta a punta por Messenger: recibir, responder, ver el hilo en la bandeja
 - [ ] 10.6 Prueba real de punta a punta por Instagram
 - [ ] 10.7 Prueba de que una respuesta nunca sale por el canal equivocado, con un contacto que tiene hilos en dos canales
 - [ ] 10.8 Prueba de evento desconocido: el webhook responde con éxito y no entra en reintentos
+- [ ] 10.9 Prueba de la ventana por autor: pasadas 24 h en Instagram, un asesor puede responder y el asistente con IA no

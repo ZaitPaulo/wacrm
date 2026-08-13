@@ -37,19 +37,36 @@ Cuando el canal ofrezca una alternativa permitida fuera de la ventana, el sistem
 - **WHEN** una automatización, un flujo o el asistente con IA intentan responder fuera de la ventana
 - **THEN** el envío no se realiza y queda registrado el motivo, sin acumular reintentos contra el proveedor
 
-### Requirement: La ventana se evalúa según el canal de la conversación
+### Requirement: La ventana se evalúa según el canal de la conversación y quién responde
 
-La verificación de la ventana SHALL usar las reglas del canal al que pertenece la conversación, no un criterio único.
+La verificación de la ventana SHALL usar las reglas del canal al que pertenece la conversación, y SHALL considerar además si quien responde es una persona o un envío automático. No es un criterio único ni depende solo del canal.
+
+En los canales donde el proveedor permite responder más allá de la ventana ordinaria únicamente mediante atención humana, esa extensión SHALL estar disponible para las respuestas de una persona y NUNCA para las de una automatización, un flujo o el asistente con IA.
 
 #### Scenario: Dos canales con ventanas distintas
 
 - **WHEN** un contacto tiene conversaciones abiertas en dos canales con reglas diferentes
 - **THEN** cada una se evalúa con las reglas de su propio canal
 
+#### Scenario: Un asesor responde pasada la ventana ordinaria
+
+- **WHEN** una persona responde en un canal que admite la extensión por atención humana, dentro de ese plazo mayor
+- **THEN** el mensaje se envía, marcado como atención humana ante el proveedor
+
+#### Scenario: El asistente con IA en ese mismo momento
+
+- **WHEN** el asistente con IA intenta responder esa misma conversación, pasada la ventana ordinaria
+- **THEN** el envío se impide, aunque un asesor sí podría responderla
+
 #### Scenario: El asistente con IA evalúa antes de responder
 
 - **WHEN** el asistente con IA va a responder una conversación
 - **THEN** consulta la ventana del canal de esa conversación antes de generar el envío
+
+#### Scenario: La extensión no la elige quien redacta el mensaje
+
+- **WHEN** cualquier camino de envío construye una respuesta
+- **THEN** la marca de atención humana la decide la puerta de salida a partir de quién envía, y no puede pedirse como parámetro
 
 ### Requirement: Lo que solo existe en un canal no se ofrece en los demás
 

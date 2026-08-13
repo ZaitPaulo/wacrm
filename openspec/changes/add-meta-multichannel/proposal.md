@@ -24,6 +24,8 @@ Lo que juega a favor es que los tres canales son de Meta y comparten registro de
 **Fuera de alcance**
 
 - Unificación automática de la misma persona entre canales. Se registra la sospecha y se ofrece vincular; fusionar sin intervención humana mezcla historiales de clientes distintos y es un daño difícil de revertir.
+- Atribución de la vitrina por Instagram. El mecanismo existe —enlaces `ig.me` con parámetro `ref`— y es más confiable que el actual, pero se difiere: ver la decisión 10 del design, que anota qué se pierde mientras tanto.
+- Topes y precios por canal. Este change deja el canal registrado en cada mensaje; cuánto se cobra por él lo define `package-commercial-offering`.
 - Canales fuera de Meta (Telegram, correo, chat web). El diseño no debe impedirlos, pero no se construyen aquí.
 - Difusiones por Instagram y Messenger. Las políticas de mensajería masiva son distintas por canal y merecen su propio análisis.
 - Publicación o gestión de contenido en redes. Esto es mensajería, no manejo de redes sociales.
@@ -41,7 +43,7 @@ Lo que juega a favor es que los tres canales son de Meta y comparten registro de
 ## Impact
 
 **Base de datos**
-- Migración en el rango 510+ (la última es `509` si se implementa antes `package-commercial-offering`; si no, `509`).
+- Migración **513**. La última aplicada es la `512` (publicación en Instagram); si `package-commercial-offering` avanza antes, se corre el número.
 - Tabla de identidades por canal; columna de canal en `conversations`. `contacts.phone` deja de ser la llave pero **no se elimina**: sigue siendo válido y poblado para WhatsApp.
 
 **Código afectado**
