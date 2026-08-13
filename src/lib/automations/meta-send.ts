@@ -6,8 +6,6 @@ import {
 } from '@/lib/flows/meta-send'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import {
-  sanitizePhoneForMeta,
-  isValidE164,
   phoneVariants,
   isRecipientNotAllowedError,
 } from '@/lib/whatsapp/phone-utils'
@@ -15,6 +13,7 @@ import {
   resolveTemplateRow,
   templateContentText,
 } from '@/lib/whatsapp/template-body'
+import { resolveOutboundTarget } from '@/lib/outbound/gate'
 import { supabaseAdmin } from './admin-client'
 
 // ------------------------------------------------------------
@@ -112,28 +111,29 @@ type SendInput =
 async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: string }> {
   const db = supabaseAdmin()
 
-  // Scope the contact + config lookups by account_id, not user_id.
-  // The engine uses the service-role client (bypassing RLS); without
-  // this filter, an authenticated user could fire their own
-  // automations against another tenant's contact UUID and send via
-  // their own WhatsApp config to that contact's phone. The 017
-  // migration moved both tables to account-scoped tenancy, so the
-  // check is the same defense-in-depth as before, just keyed on the
-  // new tenancy column.
-  const { data: contact, error: contactErr } = await db
-    .from('contacts')
-    .select('id, phone')
-    .eq('id', input.contactId)
-    .eq('account_id', input.accountId)
-    .maybeSingle()
-  if (contactErr || !contact?.phone) {
+  // El destino sale de la CONVERSACIÓN, no del contacto: la puerta lee
+  // su canal y devuelve a quién hay que hablarle en los términos de ese
+  // canal. Una automatización no elige por dónde sale su mensaje.
+  //
+  // La consulta sigue acotada por account_id, que es la misma defensa
+  // de antes: el motor usa el cliente service-role y sin ese filtro un
+  // usuario podría disparar sus automatizaciones contra el contacto de
+  // otro inquilino.
+  const resolution = await resolveOutboundTarget(
+    db,
+    input.accountId,
+    input.conversationId,
+  )
+  if (!resolution.ok) {
+    if (resolution.reason === 'channel_unsupported') {
+      throw new Error(resolution.detail ?? 'canal no soportado')
+    }
+    if (resolution.reason === 'invalid_recipient') {
+      throw new Error('contact phone invalid')
+    }
     throw new Error('contact not found for this account')
   }
-
-  const sanitized = sanitizePhoneForMeta(contact.phone)
-  if (!isValidE164(sanitized)) {
-    throw new Error(`contact phone invalid: ${contact.phone}`)
-  }
+  const sanitized = resolution.target.recipientId
 
   const { data: config, error: configErr } = await db
     .from('whatsapp_config')
@@ -204,8 +204,14 @@ async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: str
   }
   if (lastError) throw lastError
 
+  // Autocorrección del número: si funcionó una variante con o sin
+  // prefijo troncal, se guarda la que Meta aceptó. Es propio de
+  // WhatsApp — los otros canales no tienen variantes de identificador.
   if (workingPhone !== sanitized) {
-    await db.from('contacts').update({ phone: workingPhone }).eq('id', contact.id)
+    await db
+      .from('contacts')
+      .update({ phone: workingPhone })
+      .eq('id', resolution.target.contactId)
   }
 
   // Persist the sent message so it appears in the inbox with a real

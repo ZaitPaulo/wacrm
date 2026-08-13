@@ -10,11 +10,10 @@ import {
 import type { InteractiveMessagePayload } from '@/lib/whatsapp/interactive'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import {
-  sanitizePhoneForMeta,
-  isValidE164,
   phoneVariants,
   isRecipientNotAllowedError,
 } from '@/lib/whatsapp/phone-utils'
+import { resolveOutboundTarget } from '@/lib/outbound/gate'
 import { supabaseAdmin } from './admin-client'
 
 // ------------------------------------------------------------
@@ -67,20 +66,25 @@ export async function engineSendText(
 ): Promise<{ whatsapp_message_id: string }> {
   const db = supabaseAdmin()
 
-  const { data: contact, error: contactErr } = await db
-    .from('contacts')
-    .select('id, phone')
-    .eq('id', args.contactId)
-    .eq('account_id', args.accountId)
-    .maybeSingle()
-  if (contactErr || !contact?.phone) {
+  // El destino sale de la CONVERSACIÓN: la puerta lee su canal y
+  // devuelve a quién hablarle en los términos de ese canal. Un flujo no
+  // elige por dónde sale su mensaje. Sigue acotado por account_id, la
+  // misma defensa en profundidad de antes (migración 017).
+  const resolution = await resolveOutboundTarget(
+    db,
+    args.accountId,
+    args.conversationId,
+  )
+  if (!resolution.ok) {
+    if (resolution.reason === 'channel_unsupported') {
+      throw new Error(resolution.detail ?? 'canal no soportado')
+    }
+    if (resolution.reason === 'invalid_recipient') {
+      throw new Error('contact phone invalid')
+    }
     throw new Error('contact not found for this account')
   }
-
-  const sanitized = sanitizePhoneForMeta(contact.phone)
-  if (!isValidE164(sanitized)) {
-    throw new Error(`contact phone invalid: ${contact.phone}`)
-  }
+  const sanitized = resolution.target.recipientId
 
   const { data: config, error: configErr } = await db
     .from('whatsapp_config')
@@ -122,7 +126,10 @@ export async function engineSendText(
   if (lastError) throw lastError
 
   if (workingPhone !== sanitized) {
-    await db.from('contacts').update({ phone: workingPhone }).eq('id', contact.id)
+    await db
+      .from('contacts')
+      .update({ phone: workingPhone })
+      .eq('id', resolution.target.contactId)
   }
 
   const { error: msgErr } = await db.from('messages').insert({
@@ -177,20 +184,25 @@ export async function engineSendMedia(
 ): Promise<{ whatsapp_message_id: string }> {
   const db = supabaseAdmin()
 
-  const { data: contact, error: contactErr } = await db
-    .from('contacts')
-    .select('id, phone')
-    .eq('id', args.contactId)
-    .eq('account_id', args.accountId)
-    .maybeSingle()
-  if (contactErr || !contact?.phone) {
+  // El destino sale de la CONVERSACIÓN: la puerta lee su canal y
+  // devuelve a quién hablarle en los términos de ese canal. Un flujo no
+  // elige por dónde sale su mensaje. Sigue acotado por account_id, la
+  // misma defensa en profundidad de antes (migración 017).
+  const resolution = await resolveOutboundTarget(
+    db,
+    args.accountId,
+    args.conversationId,
+  )
+  if (!resolution.ok) {
+    if (resolution.reason === 'channel_unsupported') {
+      throw new Error(resolution.detail ?? 'canal no soportado')
+    }
+    if (resolution.reason === 'invalid_recipient') {
+      throw new Error('contact phone invalid')
+    }
     throw new Error('contact not found for this account')
   }
-
-  const sanitized = sanitizePhoneForMeta(contact.phone)
-  if (!isValidE164(sanitized)) {
-    throw new Error(`contact phone invalid: ${contact.phone}`)
-  }
+  const sanitized = resolution.target.recipientId
 
   const { data: config, error: configErr } = await db
     .from('whatsapp_config')
@@ -235,7 +247,10 @@ export async function engineSendMedia(
   if (lastError) throw lastError
 
   if (workingPhone !== sanitized) {
-    await db.from('contacts').update({ phone: workingPhone }).eq('id', contact.id)
+    await db
+      .from('contacts')
+      .update({ phone: workingPhone })
+      .eq('id', resolution.target.contactId)
   }
 
   // content_type='image'|'video'|'document' — these are already in the
@@ -326,23 +341,25 @@ async function sendInteractiveViaMeta(
 ): Promise<{ whatsapp_message_id: string }> {
   const db = supabaseAdmin()
 
-  // Scope the contact + whatsapp_config lookups by account_id —
-  // same defense-in-depth rationale as automations/meta-send.ts.
-  // Migration 017 moved both tables to account-scoped tenancy.
-  const { data: contact, error: contactErr } = await db
-    .from('contacts')
-    .select('id, phone')
-    .eq('id', input.contactId)
-    .eq('account_id', input.accountId)
-    .maybeSingle()
-  if (contactErr || !contact?.phone) {
+  // El destino sale de la CONVERSACIÓN: la puerta lee su canal y
+  // devuelve a quién hablarle en los términos de ese canal. Un flujo no
+  // elige por dónde sale su mensaje. Sigue acotado por account_id, la
+  // misma defensa en profundidad de antes (migración 017).
+  const resolution = await resolveOutboundTarget(
+    db,
+    input.accountId,
+    input.conversationId,
+  )
+  if (!resolution.ok) {
+    if (resolution.reason === 'channel_unsupported') {
+      throw new Error(resolution.detail ?? 'canal no soportado')
+    }
+    if (resolution.reason === 'invalid_recipient') {
+      throw new Error('contact phone invalid')
+    }
     throw new Error('contact not found for this account')
   }
-
-  const sanitized = sanitizePhoneForMeta(contact.phone)
-  if (!isValidE164(sanitized)) {
-    throw new Error(`contact phone invalid: ${contact.phone}`)
-  }
+  const sanitized = resolution.target.recipientId
 
   const { data: config, error: configErr } = await db
     .from('whatsapp_config')
@@ -403,7 +420,10 @@ async function sendInteractiveViaMeta(
   if (lastError) throw lastError
 
   if (workingPhone !== sanitized) {
-    await db.from('contacts').update({ phone: workingPhone }).eq('id', contact.id)
+    await db
+      .from('contacts')
+      .update({ phone: workingPhone })
+      .eq('id', resolution.target.contactId)
   }
 
   // Persist the bot's prompt to the messages table so it appears in

@@ -210,6 +210,9 @@ function sendPathDb(
 ): SupabaseClient {
   const conversation = {
     id: 'cv-1',
+    contact_id: 'ct-1',
+    // Toda conversación declara su canal desde la migración 513.
+    channel: 'whatsapp',
     contact: { id: 'ct-1', phone: '+15551234567' },
   };
   const config = {
@@ -231,7 +234,18 @@ function sendPathDb(
           if (table === 'conversations') captured.conversation = row;
           return builder;
         },
-        maybeSingle: async () => ({ data: null, error: null }),
+        // La puerta de salida (src/lib/outbound/gate.ts) resuelve el
+        // destino con `.maybeSingle()`: primero la conversación —para
+        // saber su canal— y después el contacto de ese canal.
+        maybeSingle: async () => {
+          if (table === 'conversations') {
+            return { data: conversation, error: null };
+          }
+          if (table === 'contacts') {
+            return { data: conversation.contact, error: null };
+          }
+          return { data: null, error: null };
+        },
         single: async () => {
           if (table === 'conversations') {
             return { data: conversation, error: null };

@@ -36,9 +36,8 @@ import {
 } from '@/lib/whatsapp/interactive';
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
 import { supabaseAdmin } from '@/lib/flows/admin-client';
+import { resolveOutboundTarget } from '@/lib/outbound/gate';
 import {
-  sanitizePhoneForMeta,
-  isValidE164,
   phoneVariants,
   isRecipientNotAllowedError,
 } from '@/lib/whatsapp/phone-utils';
@@ -234,22 +233,39 @@ export async function sendMessageToConversation(
   }
 
   const contact = conversation.contact;
-  if (!contact?.phone) {
+
+  // El destino lo resuelve la PUERTA a partir de la conversación, que
+  // es la que sabe por qué canal existe este hilo. Acá no se decide ni
+  // se infiere el canal: contestarle a alguien por donde no escribió es
+  // el peor fallo del multicanal, y la defensa es que no haya forma de
+  // pedirlo desde afuera.
+  //
+  // La conversación ya se cargó arriba; la puerta la relee para
+  // resolver el destinatario con la misma regla que usan las
+  // automatizaciones y los flujos, en vez de tener tres criterios.
+  const resolution = await resolveOutboundTarget(db, accountId, conversationId);
+  if (!resolution.ok) {
+    if (resolution.reason === 'channel_unsupported') {
+      throw new SendMessageError(
+        'bad_request',
+        resolution.detail ?? 'Channel not supported yet',
+        400
+      );
+    }
+    if (resolution.reason === 'invalid_recipient') {
+      throw new SendMessageError(
+        'bad_request',
+        'Invalid phone number format',
+        400
+      );
+    }
     throw new SendMessageError(
       'bad_request',
       'Contact phone number not found',
       400
     );
   }
-
-  const sanitizedPhone = sanitizePhoneForMeta(contact.phone);
-  if (!isValidE164(sanitizedPhone)) {
-    throw new SendMessageError(
-      'bad_request',
-      'Invalid phone number format',
-      400
-    );
-  }
+  const sanitizedPhone = resolution.target.recipientId;
 
   // WhatsApp config, account-scoped.
   const { data: config, error: configError } = await db

@@ -40,12 +40,12 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 
 ## 5. Puerta de salida única
 
-- [ ] 5.1 Función única de envío que recibe la conversación y resuelve el canal internamente
-- [ ] 5.2 Migrar `src/lib/whatsapp/send-message.ts` a la puerta común
-- [ ] 5.3 Migrar `src/lib/automations/meta-send.ts` a la puerta común
-- [ ] 5.4 Migrar `src/lib/flows/meta-send.ts` a la puerta común
-- [ ] 5.5 Verificar que ningún camino de envío acepta el canal como parámetro suelto: siempre se lee de la conversación
-- [ ] 5.6 Tests de que la respuesta sale por el canal de la conversación, incluida la de automatizaciones, flujos e IA
+- [x] 5.1 Función única de envío que recibe la conversación y resuelve el canal internamente
+- [x] 5.2 Migrar `src/lib/whatsapp/send-message.ts` a la puerta común
+- [x] 5.3 Migrar `src/lib/automations/meta-send.ts` a la puerta común
+- [x] 5.4 Migrar `src/lib/flows/meta-send.ts` a la puerta común
+- [x] 5.5 Verificar que ningún camino de envío acepta el canal como parámetro suelto: siempre se lee de la conversación — verificado por grep: las únicas menciones de `channel` en los tres son el manejo del resultado de la puerta
+- [x] 5.6 Tests de que la respuesta sale por el canal de la conversación, incluida la de automatizaciones, flujos e IA
 
 ## 6. Reglas de ventana por canal
 
