@@ -169,12 +169,19 @@ async function findOrCreateConversationRow(
     .select('id')
     .eq('account_id', accountId)
     .eq('contact_id', contactId)
+    // Resolver POR TELÉFONO es, por definición, resolver WhatsApp: el
+    // hilo de otro canal del mismo contacto no es el que se busca.
+    .eq('channel', 'whatsapp')
     .order('created_at', { ascending: true })
     .limit(1);
 
   if (findErr) {
     console.error('[resolve-conversation] conversation lookup error:', findErr);
-    throw new SendMessageError('db_error', 'Failed to resolve conversation', 500);
+    throw new SendMessageError(
+      'db_error',
+      'Failed to resolve conversation',
+      500
+    );
   }
 
   if (existing && existing.length > 0) {
@@ -187,6 +194,7 @@ async function findOrCreateConversationRow(
       account_id: accountId,
       user_id: ownerUserId,
       contact_id: contactId,
+      channel: 'whatsapp',
     })
     .select('id')
     .single();
@@ -198,6 +206,7 @@ async function findOrCreateConversationRow(
         .select('id')
         .eq('account_id', accountId)
         .eq('contact_id', contactId)
+        .eq('channel', 'whatsapp')
         .order('created_at', { ascending: true })
         .limit(1);
       if (raced && raced.length > 0) {
@@ -205,7 +214,11 @@ async function findOrCreateConversationRow(
       }
     }
     console.error('[resolve-conversation] conversation create error:', convErr);
-    throw new SendMessageError('db_error', 'Failed to create conversation', 500);
+    throw new SendMessageError(
+      'db_error',
+      'Failed to create conversation',
+      500
+    );
   }
 
   return newConv.id;

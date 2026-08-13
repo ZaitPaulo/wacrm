@@ -30,13 +30,13 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 
 ## 4. Núcleo del webhook (sin cambiar comportamiento)
 
-- [ ] 4.1 Extraer el procesamiento común —resolver contacto, resolver conversación, guardar mensaje, disparar automatizaciones, flujos e IA— a un módulo independiente del canal
-- [ ] 4.2 Enrutador que determina el canal del evento antes de procesarlo
-- [ ] 4.3 Un evento desconocido se registra y se descarta respondiendo con éxito, sin generar error ni reintentos
-- [ ] 4.4 Un lote con eventos mezclados procesa cada uno por separado; el fallo de uno no detiene los demás
-- [ ] 4.5 Conservar la dirección de webhook actual para no obligar a reconfigurar instalaciones
-- [ ] 4.6 **Acotar por canal toda búsqueda de conversación por contacto** antes de que exista un solo hilo que no sea de WhatsApp. Hoy usan `.maybeSingle()` sobre `(account_id, contact_id)`; con dos hilos del mismo contacto eso vuelve a fallar en cada mensaje, que es exactamente el bug #363 que motivó la 036
-- [ ] 4.7 **Verificar que WhatsApp se comporta exactamente igual que antes** — este grupo no debe cambiar nada visible
+- [ ] 4.1 Extraer el procesamiento común —resolver contacto, resolver conversación, guardar mensaje, disparar automatizaciones, flujos e IA— a un módulo independiente del canal. **Pendiente**: es el refactor grande de `processMessage` (~330 líneas muy acopladas a WhatsApp) y se dejó para su propio paso, después del enrutado
+- [x] 4.2 Enrutador que determina el canal del evento antes de procesarlo
+- [x] 4.3 Un evento desconocido se registra y se descarta respondiendo con éxito, sin generar error ni reintentos
+- [x] 4.4 Un lote con eventos mezclados procesa cada uno por separado; el fallo de uno no detiene los demás
+- [x] 4.5 Conservar la dirección de webhook actual para no obligar a reconfigurar instalaciones
+- [x] 4.6 **Acotar por canal toda búsqueda de conversación por contacto** antes de que exista un solo hilo que no sea de WhatsApp. Hoy usan `.maybeSingle()` sobre `(account_id, contact_id)`; con dos hilos del mismo contacto eso vuelve a fallar en cada mensaje, que es exactamente el bug #363 que motivó la 036
+- [x] 4.7 **Verificar que WhatsApp se comporta exactamente igual que antes** — los 7 tests que ya existían siguen pasando; el único ajuste fue el mock, que ahora refleja el filtro por canal
 
 ## 5. Puerta de salida única
 
