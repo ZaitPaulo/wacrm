@@ -51,6 +51,25 @@ vi.mock('@supabase/supabase-js', () => ({
                 }),
             }),
           };
+        case 'contact_channels':
+          // La resolución por identidad de canal (migración 513).
+          // Devuelve "sin identidad registrada" para que el camino de
+          // WhatsApp caiga al respaldo por teléfono, que es lo que
+          // `findExistingContact` simula más abajo — el mismo
+          // comportamiento que estos tests verificaban antes.
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    maybeSingle: () =>
+                      Promise.resolve({ data: null, error: null }),
+                  }),
+                }),
+              }),
+            }),
+            upsert: () => Promise.resolve({ error: null }),
+          };
         case 'conversations':
           // findOrCreateConversation:
           //   select().eq(account).eq(contact).eq(channel).order().limit()

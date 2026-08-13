@@ -30,7 +30,7 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 
 ## 4. Núcleo del webhook (sin cambiar comportamiento)
 
-- [ ] 4.1 Extraer el procesamiento común —resolver contacto, resolver conversación, guardar mensaje, disparar automatizaciones, flujos e IA— a un módulo independiente del canal. **Pendiente**: es el refactor grande de `processMessage` (~330 líneas muy acopladas a WhatsApp) y se dejó para su propio paso, después del enrutado
+- [x] 4.1 Extraer el procesamiento común —resolver contacto, resolver conversación, guardar mensaje, disparar automatizaciones, flujos e IA— a un módulo independiente del canal — `src/lib/inbound/core.ts`. El webhook quedó de 1209 a 800 líneas y `processMessage` es ahora solo el traductor de WhatsApp
 - [x] 4.2 Enrutador que determina el canal del evento antes de procesarlo
 - [x] 4.3 Un evento desconocido se registra y se descarta respondiendo con éxito, sin generar error ni reintentos
 - [x] 4.4 Un lote con eventos mezclados procesa cada uno por separado; el fallo de uno no detiene los demás
