@@ -54,7 +54,7 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 - [x] 6.3 Impedir el envío fuera de ventana antes de intentarlo, con motivo explicado y alternativa si el canal la ofrece — **comportamiento NUEVO**, decidido con el usuario: se bloquea y se ofrece la plantilla como salida
 - [x] 6.4 La etiqueta `human_agent` la decide la puerta de salida a partir de quién envía; **ningún camino puede pedirla como parámetro**
 - [x] 6.5 Verificar que la IA nunca la usa: a los 5 días un asesor puede responder por Instagram y el asistente no — test en `window.test.ts`; además `senderKind` es obligatorio, así que un camino automático no puede heredar los permisos de una persona por omisión
-- [ ] 6.6 Las plantillas de WhatsApp solo se ofrecen en conversaciones de WhatsApp
+- [x] 6.6 Las plantillas de WhatsApp solo se ofrecen en conversaciones de WhatsApp — el compositor recibe si el canal las admite; en los otros hilos los dos botones no se muestran
 - [x] 6.7 Tests de los bordes de cada ventana (24 h y 7 días), por canal y por autor, y del caso fuera de ventana en automatizaciones
 
 ## 7. Canales nuevos
