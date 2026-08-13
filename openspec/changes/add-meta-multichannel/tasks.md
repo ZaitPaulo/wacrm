@@ -19,7 +19,7 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 - [x] 2.6 Backfill: una identidad de WhatsApp por cada contacto con teléfono, y toda conversación existente marcada como WhatsApp
 - [x] 2.7 **Verificar el backfill por conteo** antes de continuar: tantas identidades de WhatsApp como contactos con teléfono. Si no cuadra, detenerse — la comprobación va dentro de la migración y aborta la transacción
 - [x] 2.8 Verificar que el consumo se puede desglosar por canal sin columna nueva: `messages` llega a la cuenta solo por `conversations`, así que el join ya obligatorio arrastra el canal (decisión 9)
-- [ ] 2.9 Aplicar a la nube (lo corre el usuario) y verificar por introspección — **la 514 también está sin aplicar**
+- [x] 2.9 Aplicar a la nube (lo corre el usuario) y verificar por introspección — 513 y 514 aplicadas y verificadas contra la nube, incluido el ciclo vincular → deshacer → volver a vincular
 
 ## 3. Identidad sin teléfono
 
