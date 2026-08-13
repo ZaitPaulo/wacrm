@@ -2,6 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { MessageChannel } from '@/lib/contacts/channel-identity';
 import { sanitizePhoneForMeta, isValidE164 } from '@/lib/whatsapp/phone-utils';
+import {
+  evaluateWindow,
+  type OutsideWindowOption,
+  type SenderKind,
+} from './window';
 
 // ============================================================
 // La puerta de salida: por dónde y a quién sale una respuesta.
@@ -29,6 +34,15 @@ export interface OutboundTarget {
   recipientId: string;
   conversationId: string;
   contactId: string;
+  /**
+   * True cuando el envío sale pasada la ventana ordinaria y hay que
+   * marcarlo como atención humana ante Meta.
+   *
+   * LO DECIDE LA PUERTA. Ningún camino de envío puede pedirlo: usar esa
+   * etiqueta para un mensaje automático no da error, da un uso fuera de
+   * lo que Meta autoriza, y lo que se arriesga es el permiso de la app.
+   */
+  humanAgentTag: boolean;
 }
 
 export type OutboundFailure =
@@ -39,11 +53,31 @@ export type OutboundFailure =
   /** La tiene, pero no sirve para enviar (un teléfono mal formado). */
   | 'invalid_recipient'
   /** El canal existe en la base pero todavía no tiene cómo enviar. */
-  | 'channel_unsupported';
+  | 'channel_unsupported'
+  /** La ventana de respuesta del canal se cerró. */
+  | 'outside_window';
 
 export type OutboundResolution =
   | { ok: true; target: OutboundTarget }
-  | { ok: false; reason: OutboundFailure; detail?: string };
+  | {
+      ok: false;
+      reason: OutboundFailure;
+      detail?: string;
+      /** Qué sí se podría mandar. Solo con `outside_window`. */
+      alternative?: OutsideWindowOption;
+    };
+
+export interface OutboundOptions {
+  /**
+   * Quién manda. Obligatorio a propósito: de esto depende si aplica la
+   * extensión por atención humana, y dejarlo con valor por defecto
+   * haría que un camino automático heredara sin querer los permisos de
+   * una persona.
+   */
+  senderKind: SenderKind;
+  /** Si el envío es una plantilla aprobada (solo aplica a WhatsApp). */
+  isTemplate?: boolean;
+}
 
 /** Canales que hoy saben enviar. Instagram y Messenger se suman luego. */
 const SENDABLE_CHANNELS: readonly MessageChannel[] = ['whatsapp'];
@@ -65,7 +99,8 @@ interface ConversationRow {
 export async function resolveOutboundTarget(
   db: SupabaseClient,
   accountId: string,
-  conversationId: string
+  conversationId: string,
+  options: OutboundOptions
 ): Promise<OutboundResolution> {
   const { data: conversation, error } = await db
     .from('conversations')
@@ -102,6 +137,23 @@ export async function resolveOutboundTarget(
   );
   if (!recipient.ok) return recipient;
 
+  // La ventana se comprueba ACÁ, en la misma llamada que resuelve el
+  // destino, para que ningún camino de envío pueda olvidarse de mirarla.
+  const verdict = evaluateWindow({
+    channel,
+    senderKind: options.senderKind,
+    lastInboundAt: await lastInboundAt(db, conversation.id),
+    isTemplate: options.isTemplate,
+  });
+
+  if (!verdict.allowed) {
+    return {
+      ok: false,
+      reason: 'outside_window',
+      alternative: verdict.alternative,
+    };
+  }
+
   return {
     ok: true,
     target: {
@@ -109,8 +161,35 @@ export async function resolveOutboundTarget(
       recipientId: recipient.recipientId,
       conversationId: conversation.id,
       contactId: conversation.contact_id,
+      humanAgentTag: verdict.humanAgentTag,
     },
   };
+}
+
+/**
+ * Cuándo escribió el cliente por última vez en ese hilo.
+ *
+ * `null` cuando nunca escribió, que es lo que cierra la ventana para un
+ * negocio que quiere iniciar la conversación.
+ */
+async function lastInboundAt(
+  db: SupabaseClient,
+  conversationId: string
+): Promise<Date | null> {
+  const { data, error } = await db
+    .from('messages')
+    .select('created_at')
+    .eq('conversation_id', conversationId)
+    .eq('sender_type', 'customer')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('[outbound] last inbound lookup error:', error.message);
+    return null;
+  }
+  const row = data?.[0] as { created_at: string } | undefined;
+  return row ? new Date(row.created_at) : null;
 }
 
 /**

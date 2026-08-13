@@ -11,6 +11,8 @@ interface FakeRows {
   } | null;
   contact?: { id: string; phone: string | null } | null;
   identity?: { external_id: string } | null;
+  /** Último mensaje del cliente. Por defecto, recién llegado. */
+  lastInbound?: { created_at: string } | null;
 }
 
 /**
@@ -28,6 +30,16 @@ function fakeDb(rows: FakeRows) {
       const b: Record<string, unknown> = {
         select: () => b,
         eq: () => b,
+        order: () => b,
+        // La puerta lee el último mensaje entrante para evaluar la
+        // ventana: select().eq().eq().order().limit()
+        limit: async () => ({
+          data:
+            rows.lastInbound === null
+              ? []
+              : [rows.lastInbound ?? { created_at: new Date().toISOString() }],
+          error: null,
+        }),
         maybeSingle: async () => {
           if (table === 'conversations') {
             return { data: rows.conversation ?? null, error: null };
@@ -65,7 +77,9 @@ describe('resolveOutboundTarget — el canal sale de la conversación', () => {
       contact: { id: 'ct-1', phone: '+1 555 123 4567' },
     });
 
-    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1');
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
 
     expect(out.ok).toBe(true);
     if (!out.ok) return;
@@ -85,7 +99,7 @@ describe('resolveOutboundTarget — el canal sale de la conversación', () => {
       contact: { id: 'ct-1', phone: '+15551234567' },
     });
 
-    await resolveOutboundTarget(db, 'acct-1', 'cv-1');
+    await resolveOutboundTarget(db, 'acct-1', 'cv-1', { senderKind: 'human' });
 
     expect(touched).toContain('contacts');
     expect(touched).not.toContain('contact_channels');
@@ -97,7 +111,9 @@ describe('resolveOutboundTarget — el canal sale de la conversación', () => {
       identity: { external_id: 'ig-abc' },
     });
 
-    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-2');
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-2', {
+      senderKind: 'human',
+    });
 
     expect(out.ok).toBe(false);
     if (out.ok) return;
@@ -112,7 +128,9 @@ describe('resolveOutboundTarget — lo que impide enviar', () => {
   it('informa cuando la conversación no existe en la cuenta', async () => {
     const { db } = fakeDb({ conversation: null });
 
-    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-ajena');
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-ajena', {
+      senderKind: 'human',
+    });
 
     expect(out).toEqual({ ok: false, reason: 'conversation_not_found' });
   });
@@ -124,7 +142,9 @@ describe('resolveOutboundTarget — lo que impide enviar', () => {
       contact: { id: 'ct-1', phone: null },
     });
 
-    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1');
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
 
     expect(out).toEqual({ ok: false, reason: 'no_recipient' });
   });
@@ -135,7 +155,9 @@ describe('resolveOutboundTarget — lo que impide enviar', () => {
       contact: { id: 'ct-1', phone: '123' },
     });
 
-    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1');
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
 
     expect(out).toEqual({ ok: false, reason: 'invalid_recipient' });
   });
@@ -149,5 +171,72 @@ describe('isSendableChannel', () => {
   it('Instagram y Messenger todavía no', () => {
     expect(isSendableChannel('instagram')).toBe(false);
     expect(isSendableChannel('messenger')).toBe(false);
+  });
+});
+
+describe('la puerta también decide la ventana', () => {
+  const hace = (horas: number) =>
+    new Date(Date.now() - horas * 60 * 60 * 1000).toISOString();
+
+  it('bloquea un envío tardío de WhatsApp y ofrece la plantilla', async () => {
+    const { db } = fakeDb({
+      conversation: CONV_WHATSAPP,
+      contact: { id: 'ct-1', phone: '+15551234567' },
+      lastInbound: { created_at: hace(30) },
+    });
+
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
+
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.reason).toBe('outside_window');
+    expect(out.alternative).toBe('template');
+  });
+
+  it('deja pasar esa misma plantilla', async () => {
+    const { db } = fakeDb({
+      conversation: CONV_WHATSAPP,
+      contact: { id: 'ct-1', phone: '+15551234567' },
+      lastInbound: { created_at: hace(30) },
+    });
+
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+      isTemplate: true,
+    });
+
+    expect(out.ok).toBe(true);
+  });
+
+  it('un hilo sin mensajes del cliente tiene la ventana cerrada', async () => {
+    const { db } = fakeDb({
+      conversation: CONV_WHATSAPP,
+      contact: { id: 'ct-1', phone: '+15551234567' },
+      lastInbound: null,
+    });
+
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
+
+    expect(out.ok).toBe(false);
+  });
+
+  it('un envío dentro de ventana no lleva la etiqueta de atención humana', async () => {
+    const { db } = fakeDb({
+      conversation: CONV_WHATSAPP,
+      contact: { id: 'ct-1', phone: '+15551234567' },
+      lastInbound: { created_at: hace(2) },
+    });
+
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.target.humanAgentTag).toBe(false);
   });
 });

@@ -74,10 +74,18 @@ export async function engineSendText(
     db,
     args.accountId,
     args.conversationId,
+    { senderKind: 'automated' },
   )
   if (!resolution.ok) {
     if (resolution.reason === 'channel_unsupported') {
       throw new Error(resolution.detail ?? 'canal no soportado')
+    }
+    if (resolution.reason === 'outside_window') {
+      // La extensión por atención humana NO aplica acá: este envío es
+      // automático. Un asesor sí podría contestar el mismo hilo.
+      throw new Error(
+        `messaging window closed (alternative: ${resolution.alternative ?? 'none'})`,
+      )
     }
     if (resolution.reason === 'invalid_recipient') {
       throw new Error('contact phone invalid')
@@ -192,10 +200,18 @@ export async function engineSendMedia(
     db,
     args.accountId,
     args.conversationId,
+    { senderKind: 'automated' },
   )
   if (!resolution.ok) {
     if (resolution.reason === 'channel_unsupported') {
       throw new Error(resolution.detail ?? 'canal no soportado')
+    }
+    if (resolution.reason === 'outside_window') {
+      // La extensión por atención humana NO aplica acá: este envío es
+      // automático. Un asesor sí podría contestar el mismo hilo.
+      throw new Error(
+        `messaging window closed (alternative: ${resolution.alternative ?? 'none'})`,
+      )
     }
     if (resolution.reason === 'invalid_recipient') {
       throw new Error('contact phone invalid')
@@ -349,10 +365,18 @@ async function sendInteractiveViaMeta(
     db,
     input.accountId,
     input.conversationId,
+    { senderKind: 'automated' },
   )
   if (!resolution.ok) {
     if (resolution.reason === 'channel_unsupported') {
       throw new Error(resolution.detail ?? 'canal no soportado')
+    }
+    if (resolution.reason === 'outside_window') {
+      // La extensión por atención humana NO aplica acá: este envío es
+      // automático. Un asesor sí podría contestar el mismo hilo.
+      throw new Error(
+        `messaging window closed (alternative: ${resolution.alternative ?? 'none'})`,
+      )
     }
     if (resolution.reason === 'invalid_recipient') {
       throw new Error('contact phone invalid')

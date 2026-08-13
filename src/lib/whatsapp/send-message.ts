@@ -243,12 +243,31 @@ export async function sendMessageToConversation(
   // La conversación ya se cargó arriba; la puerta la relee para
   // resolver el destinatario con la misma regla que usan las
   // automatizaciones y los flujos, en vez de tener tres criterios.
-  const resolution = await resolveOutboundTarget(db, accountId, conversationId);
+  // `human`: este camino lo dispara una persona desde la bandeja o una
+  // integración que actúa en su nombre. De eso depende que aplique la
+  // extensión por atención humana en los canales que la ofrecen.
+  //
+  // La plantilla se declara porque es la salida que WhatsApp da para
+  // hablar fuera de ventana: sin esto, el único envío que sí procede
+  // quedaría bloqueado.
+  const resolution = await resolveOutboundTarget(db, accountId, conversationId, {
+    senderKind: 'human',
+    isTemplate: messageType === 'template',
+  });
   if (!resolution.ok) {
     if (resolution.reason === 'channel_unsupported') {
       throw new SendMessageError(
         'bad_request',
         resolution.detail ?? 'Channel not supported yet',
+        400
+      );
+    }
+    if (resolution.reason === 'outside_window') {
+      throw new SendMessageError(
+        'bad_request',
+        resolution.alternative === 'template'
+          ? 'The 24-hour messaging window has closed. Send an approved template to reach this contact.'
+          : 'The messaging window for this conversation has closed.',
         400
       );
     }

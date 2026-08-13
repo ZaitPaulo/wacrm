@@ -226,6 +226,17 @@ function sendPathDb(
       const builder: Record<string, unknown> = {
         select: () => builder,
         eq: () => builder,
+        order: () => builder,
+        // La puerta lee el último mensaje del cliente para evaluar la
+        // ventana de respuesta. Se devuelve uno reciente: estos tests
+        // verifican persistencia de plantillas, no la ventana.
+        limit: async () => ({
+          data:
+            table === 'messages'
+              ? [{ created_at: new Date().toISOString() }]
+              : [],
+          error: null,
+        }),
         insert: (row: Record<string, unknown>) => {
           if (table === 'messages') captured.message = row;
           return builder;
