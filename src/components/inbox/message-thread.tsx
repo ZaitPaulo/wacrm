@@ -51,6 +51,7 @@ import {
 import { deleteAccountMedia } from "@/lib/storage/upload-media";
 import { TemplatePicker } from "./template-picker";
 import { AiThreadBanner } from "./ai-thread-banner";
+import { ChannelBadge } from "./channel-badge";
 import { buildReplyPreview } from "./reply-quote";
 import { renderTemplateBody } from "@/lib/whatsapp/template-body";
 import { toast } from "sonner";
@@ -923,7 +924,17 @@ export function MessageThread({
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold text-foreground">{displayName}</h2>
-            <p className="truncate text-xs text-muted-foreground">{contact.phone}</p>
+            {/* El canal va junto al identificador porque es lo que
+                decide por dónde sale la respuesta que se escriba abajo.
+                Con dos hilos de la misma persona, es lo único que los
+                distingue. */}
+            <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+              <ChannelBadge
+                channel={conversation.channel ?? 'whatsapp'}
+                withLabel
+              />
+              {contact.phone && <span className="truncate">{contact.phone}</span>}
+            </p>
           </div>
           {/* Session timer badge — hidden on the narrowest phones so
               the name + back arrow keep their room. */}

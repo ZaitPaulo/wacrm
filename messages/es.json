@@ -361,6 +361,12 @@
       "failed": "Este archivo ya no está disponible",
       "imageAlt": "Imagen compartida",
       "you": "Tú"
+    },
+    "channel": "Canal",
+    "channels": {
+      "whatsapp": "WhatsApp",
+      "instagram": "Instagram",
+      "messenger": "Messenger"
     }
   },
   "Contacts": {

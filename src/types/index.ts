@@ -1,4 +1,5 @@
 import type { AccountRole } from "@/lib/auth/roles";
+import type { MessageChannel } from "@/lib/contacts/channel-identity";
 import type { InteractiveMessagePayload } from "@/lib/whatsapp/interactive";
 
 export type {
@@ -168,6 +169,15 @@ export interface Conversation {
   id: string;
   user_id: string;
   contact_id: string;
+  /**
+   * Canal por el que existe este hilo (migración 513). Un contacto
+   * tiene un hilo por canal y NUNCA se mezclan: de esto depende por
+   * dónde sale la respuesta.
+   *
+   * Opcional en el tipo por las filas que ya estaban en memoria antes
+   * del cambio; en la base es NOT NULL con `whatsapp` por defecto.
+   */
+  channel?: MessageChannel;
   status: ConversationStatus;
   assigned_agent_id?: string;
   last_message_text?: string;

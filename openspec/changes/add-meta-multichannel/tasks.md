@@ -68,11 +68,11 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 
 ## 8. Bandeja
 
-- [ ] 8.1 Indicador de canal en la lista de conversaciones
-- [ ] 8.2 Filtro por canal, que no estorbe cuando la cuenta solo usa uno
-- [ ] 8.3 Indicador de canal dentro de la conversación abierta
-- [ ] 8.4 Ver los hilos de un contacto en varios canales desde su ficha
-- [ ] 8.5 Traducciones en `messages/{es,en,ko}.json`
+- [x] 8.1 Indicador de canal en la lista de conversaciones
+- [x] 8.2 Filtro por canal, que no estorbe cuando la cuenta solo usa uno — se muestra solo si hay más de un canal en la bandeja
+- [x] 8.3 Indicador de canal dentro de la conversación abierta
+- [ ] 8.4 Ver los hilos de un contacto en varios canales desde su ficha — **pendiente**: la ficha hoy no lista conversaciones (tiene Negocios y Notas), así que es una sección nueva, no un ajuste
+- [x] 8.5 Traducciones en `messages/{es,en,ko}.json`
 
 ## 9. Vinculación de identidades
 
