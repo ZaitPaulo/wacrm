@@ -7,6 +7,7 @@ import {
   syncVehicleKnowledge,
   deleteVehicleKnowledge,
 } from '@/lib/inventory/knowledge-sync'
+import { syncVehiclePost } from '@/lib/instagram/queue'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -72,6 +73,18 @@ export async function PATCH(request: Request, { params }: Params) {
       console.error('[inventory PATCH] KB sync error:', err)
       warning =
         'Cambios guardados, pero no se pudo sincronizar con el asistente de IA. Vuelve a guardar para reintentar.'
+    }
+
+    // La cola de Instagram, con el mismo trato best-effort: prepara el
+    // borrador al pasar a disponible y lo retira al salir de ahí. No
+    // publica nada — eso siempre lo dispara una persona. Un fallo acá
+    // no puede impedir guardar el vehículo, y ni siquiera pisa el
+    // warning del KB: ese pide volver a guardar, y este se arregla solo
+    // en el próximo guardado.
+    try {
+      await syncVehiclePost(accountId, id)
+    } catch (err) {
+      console.error('[inventory PATCH] Instagram queue error:', err)
     }
 
     return NextResponse.json({ success: true, ...(warning ? { warning } : {}) })

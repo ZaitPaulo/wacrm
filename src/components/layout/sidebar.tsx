@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
+import { usePendingPosts } from "@/hooks/use-pending-posts";
 import {
   Bell,
   Bot,
@@ -14,6 +15,7 @@ import {
   Crown,
   FileText,
   GitBranch,
+  Camera,
   LayoutDashboard,
   LogOut,
   MessageSquare,
@@ -28,7 +30,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import type { AccountRole } from "@/lib/auth/roles";
+import { hasMinRole, type AccountRole } from "@/lib/auth/roles";
 
 // Per-role chip metadata used in the sidebar's account strip + the
 // Members tab roster. Keeping this near both consumers in a single
@@ -89,6 +91,12 @@ interface NavItem {
    * Purely informational — doesn't affect routing or access.
    */
   beta?: boolean;
+  /**
+   * Oculta la entrada para quien no llegue a `admin`. La ruta y su API
+   * se protegen igual del lado del servidor — esto solo evita ofrecer
+   * una pantalla en la que no se podría hacer nada.
+   */
+  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -97,6 +105,7 @@ const navItems: NavItem[] = [
   { href: "/notifications", labelKey: "notifications", icon: Bell },
   { href: "/contacts", labelKey: "contacts", icon: Users },
   { href: "/inventory", labelKey: "inventory", icon: Car },
+  { href: "/instagram", labelKey: "instagram", icon: Camera, adminOnly: true },
   { href: "/documents", labelKey: "documents", icon: FileText },
   { href: "/pipelines", labelKey: "pipelines", icon: GitBranch },
   { href: "/broadcasts", labelKey: "broadcasts", icon: Radio },
@@ -123,6 +132,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const { profile, profileLoading, account, accountRole, signOut } = useAuth();
   const totalUnread = useTotalUnread();
   const unreadNotifications = useUnreadNotifications();
+  const pendingPosts = usePendingPosts();
   // Only surface the account-name strip when it actually carries
   // information. A solo user's personal account is named after them
   // (the 017 signup trigger seeds it from `full_name`), so showing it
@@ -212,7 +222,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         {/* Main navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="flex flex-col gap-1">
-            {navItems.map((item) => {
+            {navItems
+              .filter(
+                (item) =>
+                  !item.adminOnly ||
+                  (accountRole && hasMinRole(accountRole, "admin")),
+              )
+              .map((item) => {
               const isActive =
                 pathname === item.href ||
                 (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -226,6 +242,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               // viewing this section".
               const showNotificationBadge =
                 item.href === "/notifications" && unreadNotifications > 0;
+
+              // Igual que el de notificaciones, sigue visible mientras
+              // se está en la pantalla: refleja trabajo sin hacer, no
+              // "estás mirando esta sección".
+              const showPendingPosts =
+                item.href === "/instagram" && pendingPosts > 0;
 
               return (
                 <li key={item.href}>
@@ -256,6 +278,14 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                       >
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                         <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                      </span>
+                    )}
+                    {showPendingPosts && (
+                      <span
+                        aria-label={t("pendingPosts", { count: pendingPosts })}
+                        className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
+                      >
+                        {pendingPosts > 9 ? "9+" : pendingPosts}
                       </span>
                     )}
                     {showNotificationBadge && (

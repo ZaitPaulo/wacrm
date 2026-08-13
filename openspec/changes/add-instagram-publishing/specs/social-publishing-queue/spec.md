@@ -30,12 +30,17 @@ Preparar la publicación SHALL ser best-effort: si falla, se registra y el vehí
 
 Una publicación SHALL enviarse a Instagram únicamente tras la aprobación de una persona. NO SHALL existir ningún camino —automatización, tarea programada o regla— que publique sin esa aprobación.
 
-Quien revisa SHALL poder editar el texto antes de aprobar, y SHALL poder descartar la publicación.
+Aprobar, editar y descartar SHALL requerir rol `admin` o superior, el mismo que exige conectar la cuenta. Publicar interviene la marca del negocio, que es la razón de que la cola exista.
 
 #### Scenario: Se aprueba una publicación
 
-- **WHEN** una persona con permiso revisa una publicación pendiente y la aprueba
+- **WHEN** un miembro con rol `admin` o superior revisa una publicación pendiente y la aprueba
 - **THEN** se envía a Instagram y queda registrada como publicada, con el identificador que Instagram devolvió
+
+#### Scenario: Un asesor abre la cola
+
+- **WHEN** un miembro con rol `agent` o `viewer` accede a la cola de publicaciones
+- **THEN** no puede aprobar, editar ni descartar ninguna publicación
 
 #### Scenario: Se edita antes de aprobar
 
@@ -75,13 +80,20 @@ Una publicación de Instagram no puede retirarse limpiamente, así que ante cual
 
 ### Requirement: Se revalida el vehículo en el momento de publicar
 
-Antes de enviar a Instagram, el sistema SHALL comprobar que el vehículo sigue disponible y que sus imágenes siguen siendo accesibles. Si algo cambió, NO SHALL publicar y SHALL explicar por qué.
+Antes de enviar a Instagram, el sistema SHALL comprobar que el vehículo sigue **disponible** y que sus imágenes siguen siendo accesibles. Si algo cambió, NO SHALL publicar y SHALL explicar por qué.
+
+Disponible significa exactamente el estado disponible, no "cualquier cosa menos vendido". Un vehículo reservado u oculto ya no aparece en la vitrina, así que anunciarlo llevaría a una ficha que el interesado no puede consultar. Es la misma regla que el sistema ya aplica para sacarlo del knowledge base.
 
 Entre preparar y aprobar pueden pasar días, y el inventario cambia por caminos que la cola no observa.
 
 #### Scenario: El vehículo se vendió mientras esperaba
 
 - **WHEN** se aprueba una publicación de un vehículo que ya se vendió
+- **THEN** no se publica y se informa que el vehículo ya no está disponible
+
+#### Scenario: El vehículo quedó reservado u oculto
+
+- **WHEN** se aprueba una publicación de un vehículo que pasó a reservado u oculto
 - **THEN** no se publica y se informa que el vehículo ya no está disponible
 
 #### Scenario: Las imágenes ya no están
@@ -94,9 +106,11 @@ Entre preparar y aprobar pueden pasar días, y el inventario cambia por caminos 
 - **WHEN** se aprueba una publicación de un vehículo que ya no existe
 - **THEN** no se publica y la publicación se retira de las pendientes
 
-### Requirement: El tope de publicaciones se respeta antes de intentar
+### Requirement: El tope de publicaciones se consulta a Instagram, no se estima
 
-El sistema SHALL conocer cuántas publicaciones admite Instagram por periodo, SHALL mostrarlo en la cola y SHALL impedir aprobar cuando ya no quede margen, en lugar de descubrirlo por el rechazo.
+El sistema SHALL preguntarle a Instagram cuánto margen queda en el periodo vigente, SHALL mostrarlo en la cola y SHALL impedir aprobar cuando no quede, en lugar de descubrirlo por el rechazo.
+
+El tope NO SHALL guardarse como un valor fijo en el sistema: lo define Instagram y cambia, y un valor desactualizado falla creyéndose con margen que no tiene.
 
 #### Scenario: Queda margen
 
@@ -107,6 +121,11 @@ El sistema SHALL conocer cuántas publicaciones admite Instagram por periodo, SH
 
 - **WHEN** se intenta aprobar habiendo alcanzado el tope del periodo
 - **THEN** la acción se impide explicando cuándo vuelve a haber margen, y la publicación sigue pendiente
+
+#### Scenario: No se puede consultar el margen
+
+- **WHEN** no se logra averiguar el margen restante
+- **THEN** la aprobación se impide indicando que no pudo verificarse, en vez de publicar a ciegas
 
 ### Requirement: Vender un vehículo publicado se avisa, no se despublica
 
@@ -123,3 +142,31 @@ Retirar una publicación con interacción destruye el alcance ganado, y qué hac
 
 - **WHEN** se vende un vehículo cuya publicación seguía pendiente
 - **THEN** la pendiente se retira, porque ya no tiene sentido publicarla
+
+#### Scenario: Un vehículo pendiente se reserva o se oculta
+
+- **WHEN** un vehículo con publicación pendiente deja de estar disponible por cualquier motivo
+- **THEN** la pendiente se retira, igual que si se hubiera vendido
+
+### Requirement: Un vehículo que reingresa se ofrece de nuevo, mostrando que ya se publicó
+
+Cuando un vehículo vuelva a estar disponible después de haber salido del inventario, el sistema SHALL preparar una publicación nueva, y SHALL indicar en la cola que ese vehículo ya se publicó antes y cuándo.
+
+Un auto que reingresa es un hecho comercial nuevo y merece ofrecerse. Pero republicarlo puede ser lo correcto o puede ser un descuido, y desde la cola no se distingue: mostrar el antecedente convierte eso en una decisión informada.
+
+Esto no contradice la regla de no duplicar pendientes: salir del inventario ya retiró la pendiente que hubiera, así que al reingresar no hay ninguna con la cual duplicarse.
+
+#### Scenario: Vuelve a estar disponible un vehículo ya publicado
+
+- **WHEN** un vehículo que tuvo una publicación vuelve a quedar disponible
+- **THEN** se prepara una publicación nueva y la cola indica que ese vehículo ya se publicó, con la fecha
+
+#### Scenario: Vuelve a estar disponible un vehículo nunca publicado
+
+- **WHEN** un vehículo cuya publicación se descartó vuelve a quedar disponible
+- **THEN** se prepara una publicación nueva sin señalar ningún antecedente de publicación
+
+#### Scenario: Se decide no republicar
+
+- **WHEN** quien revisa descarta la publicación de un vehículo reingresado
+- **THEN** no se publica nada y la publicación anterior sigue intacta en Instagram

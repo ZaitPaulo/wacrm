@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { SETTINGS_SECTIONS } from '@/components/settings/settings-sections';
+
 // Locale dictionaries are hand-maintained. English is the source of
 // truth (src/i18n/request.ts falls back to en.json only when a whole
 // locale file is missing — there is no per-key fallback), so a key
@@ -49,5 +51,28 @@ describe('message catalogue parity', () => {
     const translated = loadKeys(locale);
     const orphaned = [...translated].filter((k) => !source.has(k)).sort();
     expect(orphaned, `${locale}.json has keys absent from en.json`).toEqual([]);
+  });
+});
+
+// Parity between locales says nothing about whether a key the CODE
+// asks for exists at all: a label missing from every catalogue is
+// perfectly "in parity" and renders as the raw keypath on screen.
+//
+// The settings rail is where that bit us. It labels each section with
+// `Settings.sections.<id>`, and two ids shipped without one — `showcase`
+// for a while, then `instagram`. Both showed up in the sidebar as
+// "Settings.sections.showcase" to real users.
+describe('settings rail labels', () => {
+  const ALL_LOCALES = [SOURCE_LOCALE, ...TRANSLATED_LOCALES];
+
+  it.each(ALL_LOCALES)('%s.json labels every settings section', (locale) => {
+    const keys = loadKeys(locale);
+    const missing = SETTINGS_SECTIONS.filter(
+      (id) => !keys.has(`Settings.sections.${id}`)
+    );
+    expect(
+      missing,
+      `${locale}.json has no Settings.sections label for these sections`
+    ).toEqual([]);
   });
 });

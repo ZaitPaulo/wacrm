@@ -40,7 +40,9 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Perfil",
     "menuSettings": "Ajustes",
-    "menuSignOut": "Cerrar sesión"
+    "menuSignOut": "Cerrar sesión",
+    "instagram": "Instagram",
+    "pendingPosts": "{count} publicaciones esperando revisión"
   },
   "Header": {
     "dashboard": "Panel",
@@ -1762,7 +1764,9 @@
       "fields": "Campos y etiquetas",
       "deals": "Negocios y moneda",
       "members": "Equipo",
-      "api": "Claves de API"
+      "api": "Claves de API",
+      "instagram": "Instagram",
+      "showcase": "Vitrina pública"
     },
     "groups": {
       "account": "Cuenta",
@@ -1993,6 +1997,46 @@
       "created": "Respuesta rápida creada.",
       "updated": "Respuesta rápida actualizada.",
       "deleteFailed": "No se pudo eliminar la respuesta rápida."
+    },
+    "instagram": {
+      "title": "Instagram",
+      "description": "Conecta la cuenta del negocio para que los vehículos disponibles se preparen para publicar.",
+      "loading": "Cargando la conexión…",
+      "connectedTo": "Conectado a",
+      "unknownUser": "Cuenta de Instagram",
+      "tokenLabel": "Token de acceso",
+      "tokenPlaceholder": "Pega el token de acceso de Instagram",
+      "requirement": "Tiene que ser una cuenta profesional de Instagram. Una cuenta personal no puede publicar por API.",
+      "connect": "Conectar",
+      "connected": "Cuenta de Instagram conectada",
+      "connectFailed": "No se pudo conectar la cuenta",
+      "disconnect": "Desconectar",
+      "disconnected": "Cuenta de Instagram desconectada",
+      "disconnectFailed": "No se pudo desconectar la cuenta",
+      "disconnectHint": "Desconectar no toca lo ya publicado en Instagram. Las pendientes esperan a que haya una cuenta conectada de nuevo.",
+      "adminOnly": "Solo un administrador o el dueño puede cambiar esta conexión.",
+      "setupTitle": "Cómo obtener el token",
+      "setupDesc": "Tres pasos en el panel de desarrolladores de Meta. Está en inglés aunque el CRM no lo esté.",
+      "step1": "Crear la app en Meta",
+      "step1Items": [
+        "Entra a developers.facebook.com y crea una app.",
+        "Elige el tipo Business. Si la app que ya tienes es de otro tipo, hace falta una nueva.",
+        "Ponle un nombre y termina de crearla."
+      ],
+      "step2": "Agregar Instagram y vincular la cuenta",
+      "step2Items": [
+        "En el menú izquierdo del panel, abre Instagram.",
+        "Entra a \"API setup with Instagram business login\".",
+        "Vincula la cuenta de Instagram del negocio. Una cuenta personal no sirve — conviértela en profesional desde la app de Instagram antes."
+      ],
+      "step3": "Generar el token y pegarlo acá",
+      "step3Items": [
+        "Junto a la cuenta vinculada, pulsa \"Generate token\".",
+        "Inicia sesión en Instagram y autoriza la app.",
+        "Copia el token que aparece y pégalo en el campo de la izquierda.",
+        "Pulsa Conectar. Verificamos la cuenta contra Instagram antes de guardarla."
+      ],
+      "expiryNote": "El token dura 60 días. Cuando caduque, publicar falla con un aviso de credenciales: genera uno nuevo y vuelve a conectar."
     }
   },
   "Inventory": {
@@ -2130,6 +2174,14 @@
       "noBuyer": "Sin especificar"
     },
     "confirmRevertSale": "Este vehículo figura como vendido. Si cambias el estado se borrarán el precio, la fecha y el comprador. ¿Continuar?"
+  },
+  "InstagramPost": {
+    "price": "Precio: {value}",
+    "mileage": "Kilometraje: {value} km",
+    "plateCity": "Matriculado en {value}",
+    "acceptsTradeIn": "Recibimos tu usado",
+    "contact": "Escríbenos: {channel}",
+    "contactGeneric": "Escríbenos para más información"
   },
   "Documents": {
     "title": "Documentos",
@@ -2381,5 +2433,43 @@
   },
   "Handoff": {
     "customerNotice": "Te asignamos un asesor comercial. Se comunicará contigo muy pronto. 🙌"
+  },
+  "InstagramQueue": {
+    "pageTitle": "Cola de Instagram",
+    "pageDesc": "Publicaciones preparadas con tus vehículos disponibles. Nada sale hasta que lo apruebes acá.",
+    "loading": "Cargando la cola…",
+    "notConnected": "No hay una cuenta de Instagram conectada. Conéctala en Ajustes antes de publicar.",
+    "quota": "Quedan {remaining} de {total} publicaciones en este periodo",
+    "quotaUnknown": "Instagram no informó cuántas publicaciones quedan, así que aprobar está en pausa.",
+    "pendingTitle": "Esperando revisión ({count})",
+    "noPending": "No hay nada para revisar por ahora.",
+    "historyTitle": "Historial",
+    "vehicleGone": "El vehículo ya no existe",
+    "vehicleNotAvailable": "Este vehículo ya no está disponible, así que no se va a publicar. Descártalo o vuelve a ponerlo como disponible.",
+    "alreadyPublished": "Ya se publicó el {date}",
+    "firstImage": "Portada",
+    "charsLeft": "Quedan {count} caracteres",
+    "saveText": "Guardar texto",
+    "saved": "Texto guardado",
+    "saveFailed": "No se pudo guardar el texto",
+    "saveBeforePublishing": "Guarda los cambios antes de publicar",
+    "publish": "Publicar",
+    "published": "Publicado en Instagram",
+    "publishFailed": "No se pudo publicar",
+    "discard": "Descartar",
+    "discarded": "Publicación descartada",
+    "discardFailed": "No se pudo descartar",
+    "failureCredentials": "Instagram rechazó las credenciales. Vuelve a conectar la cuenta en Ajustes.",
+    "soldWithLivePost": "Vendido — la publicación sigue viva en Instagram",
+    "status": {
+      "published": "Publicada",
+      "discarded": "Descartada",
+      "failed": "Falló",
+      "needs_review": "Necesita revisión manual",
+      "pending": "Pendiente"
+    },
+    "rewrite": "Reescribir con IA",
+    "rewritten": "Reescrito — revísalo antes de publicar",
+    "rewriteFailed": "No se pudo reescribir el texto"
   }
 }

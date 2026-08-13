@@ -6,7 +6,12 @@ export interface LogAiUsageArgs {
   /** Null for a draft not tied to one thread, or when the row was
    *  deleted between generation and logging. */
   conversationId: string | null
-  mode: 'auto_reply' | 'draft'
+  // `social_caption` = reescritura del texto de una publicación de
+  // Instagram. Valor propio y no reusar 'draft' porque ese significa
+  // "borrador de respuesta de WhatsApp": mezclarlos volvería inútil el
+  // reporte de consumo para quien quiera saber cuánto le cuesta
+  // publicar. El CHECK de la columna se amplió en la migración 512.
+  mode: 'auto_reply' | 'draft' | 'social_caption'
   provider: AiProvider
   model: string
   /** Provider usage; a no-op when null (nothing worth recording). */

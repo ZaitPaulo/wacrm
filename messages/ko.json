@@ -40,7 +40,9 @@
     "defaultAvatar": "아바타",
     "menuProfile": "프로필",
     "menuSettings": "설정",
-    "menuSignOut": "로그아웃"
+    "menuSignOut": "로그아웃",
+    "instagram": "Instagram",
+    "pendingPosts": "검토 대기 게시물 {count}개"
   },
   "Header": {
     "dashboard": "대시보드",
@@ -1769,7 +1771,9 @@
       "fields": "필드 & 태그",
       "deals": "딜 & 통화",
       "members": "팀원",
-      "api": "API 키"
+      "api": "API 키",
+      "instagram": "Instagram",
+      "showcase": "공개 쇼케이스"
     },
     "groups": {
       "account": "계정",
@@ -2000,6 +2004,46 @@
       "created": "빠른 답장을 만들었습니다.",
       "updated": "빠른 답장을 수정했습니다.",
       "deleteFailed": "빠른 답장을 삭제하지 못했습니다."
+    },
+    "instagram": {
+      "title": "Instagram",
+      "description": "판매 가능한 차량의 게시물을 준비할 수 있도록 비즈니스 계정을 연결하세요.",
+      "loading": "연결 정보를 불러오는 중…",
+      "connectedTo": "연결된 계정",
+      "unknownUser": "Instagram 계정",
+      "tokenLabel": "액세스 토큰",
+      "tokenPlaceholder": "Instagram 액세스 토큰을 붙여넣으세요",
+      "requirement": "Instagram 프로페셔널 계정이어야 합니다. 개인 계정은 API로 게시할 수 없습니다.",
+      "connect": "연결",
+      "connected": "Instagram 계정이 연결되었습니다",
+      "connectFailed": "계정을 연결하지 못했습니다",
+      "disconnect": "연결 해제",
+      "disconnected": "Instagram 계정 연결이 해제되었습니다",
+      "disconnectFailed": "계정 연결을 해제하지 못했습니다",
+      "disconnectHint": "연결을 해제해도 이미 게시된 내용은 Instagram에 그대로 남습니다. 대기 중인 게시물은 계정이 다시 연결될 때까지 기다립니다.",
+      "adminOnly": "관리자 또는 소유자만 이 연결을 변경할 수 있습니다.",
+      "setupTitle": "토큰을 받는 방법",
+      "setupDesc": "Meta 개발자 패널에서 세 단계로 진행합니다. 이 앱과 달리 해당 패널은 영어로 표시됩니다.",
+      "step1": "Meta에서 앱 만들기",
+      "step1Items": [
+        "developers.facebook.com에 접속해 앱을 만듭니다.",
+        "Business 앱 유형을 선택합니다. 기존 앱이 다른 유형이면 새로 만들어야 합니다.",
+        "이름을 지정하고 생성을 완료합니다."
+      ],
+      "step2": "Instagram 추가 및 계정 연결",
+      "step2Items": [
+        "패널 왼쪽 메뉴에서 Instagram을 엽니다.",
+        "\"API setup with Instagram business login\"으로 이동합니다.",
+        "비즈니스 Instagram 계정을 연결합니다. 개인 계정은 사용할 수 없으므로 먼저 Instagram 앱에서 프로페셔널 계정으로 전환하세요."
+      ],
+      "step3": "토큰 생성 후 여기에 붙여넣기",
+      "step3Items": [
+        "연결된 계정 옆의 \"Generate token\"을 누릅니다.",
+        "Instagram에 로그인하고 앱을 승인합니다.",
+        "표시된 토큰을 복사해 왼쪽 입력란에 붙여넣습니다.",
+        "연결을 누릅니다. 저장하기 전에 Instagram에서 계정을 확인합니다."
+      ],
+      "expiryNote": "토큰은 60일간 유효합니다. 만료되면 게시가 인증 오류로 실패하므로, 새 토큰을 생성해 다시 연결하세요."
     }
   },
   "Inventory": {
@@ -2137,6 +2181,14 @@
       "noBuyer": "지정 안 함"
     },
     "confirmRevertSale": "판매 완료로 등록된 차량입니다. 상태를 변경하면 판매가, 판매일, 구매자 정보가 삭제됩니다. 계속하시겠습니까?"
+  },
+  "InstagramPost": {
+    "price": "가격: {value}",
+    "mileage": "주행거리: {value} km",
+    "plateCity": "등록지: {value}",
+    "acceptsTradeIn": "중고차 매입 가능",
+    "contact": "문의: {channel}",
+    "contactGeneric": "자세한 내용은 문의해 주세요"
   },
   "Documents": {
     "title": "문서",
@@ -2381,5 +2433,43 @@
   },
   "Handoff": {
     "customerNotice": "담당 상담원을 배정했습니다. 곧 연락드리겠습니다. 🙌"
+  },
+  "InstagramQueue": {
+    "pageTitle": "Instagram 대기열",
+    "pageDesc": "판매 가능한 차량으로 준비된 게시물입니다. 여기서 승인하기 전까지는 게시되지 않습니다.",
+    "loading": "대기열을 불러오는 중…",
+    "notConnected": "연결된 Instagram 계정이 없습니다. 게시하기 전에 설정에서 연결하세요.",
+    "quota": "이번 기간에 {total}개 중 {remaining}개 남음",
+    "quotaUnknown": "Instagram이 남은 게시 가능 수를 알려주지 않아 승인이 보류되었습니다.",
+    "pendingTitle": "검토 대기 ({count})",
+    "noPending": "지금은 검토할 항목이 없습니다.",
+    "historyTitle": "기록",
+    "vehicleGone": "차량이 더 이상 존재하지 않습니다",
+    "vehicleNotAvailable": "이 차량은 더 이상 판매 가능 상태가 아니므로 게시되지 않습니다. 폐기하거나 차량을 다시 판매 가능으로 설정하세요.",
+    "alreadyPublished": "{date}에 이미 게시됨",
+    "firstImage": "대표",
+    "charsLeft": "{count}자 남음",
+    "saveText": "문구 저장",
+    "saved": "문구가 저장되었습니다",
+    "saveFailed": "문구를 저장하지 못했습니다",
+    "saveBeforePublishing": "게시하기 전에 변경 사항을 저장하세요",
+    "publish": "게시",
+    "published": "Instagram에 게시되었습니다",
+    "publishFailed": "게시하지 못했습니다",
+    "discard": "폐기",
+    "discarded": "게시물을 폐기했습니다",
+    "discardFailed": "폐기하지 못했습니다",
+    "failureCredentials": "Instagram이 인증 정보를 거부했습니다. 설정에서 계정을 다시 연결하세요.",
+    "soldWithLivePost": "판매됨 — 게시물은 Instagram에 남아 있습니다",
+    "status": {
+      "published": "게시됨",
+      "discarded": "폐기됨",
+      "failed": "실패",
+      "needs_review": "수동 확인 필요",
+      "pending": "대기 중"
+    },
+    "rewrite": "AI로 다시 쓰기",
+    "rewritten": "다시 작성됨 — 게시 전에 확인하세요",
+    "rewriteFailed": "문구를 다시 작성하지 못했습니다"
   }
 }

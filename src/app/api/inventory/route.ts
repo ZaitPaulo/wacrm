@@ -8,6 +8,7 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit
 import { buildVehiclePayload } from '@/lib/inventory/payload'
 import { persistAcquisition } from '@/lib/inventory/acquisitions'
 import { syncVehicleKnowledge } from '@/lib/inventory/knowledge-sync'
+import { syncVehiclePost } from '@/lib/instagram/queue'
 
 // Lista nominal a propósito (nunca `*`): mantiene bajo control qué sale
 // hacia el cliente cuando se agregan columnas.
@@ -122,6 +123,15 @@ export async function POST(request: Request) {
       console.error('[inventory POST] KB sync error:', err)
       warning =
         'Vehículo guardado, pero no se pudo sincronizar con el asistente de IA. Vuelve a guardar para reintentar.'
+    }
+
+    // Borrador de Instagram, best-effort. Un vehículo nuevo y
+    // disponible deja una publicación PENDIENTE de revisión; nada sale
+    // a Instagram sin que una persona lo apruebe.
+    try {
+      await syncVehiclePost(accountId, created.id)
+    } catch (err) {
+      console.error('[inventory POST] Instagram queue error:', err)
     }
 
     return NextResponse.json({

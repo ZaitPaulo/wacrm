@@ -40,7 +40,9 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profile",
     "menuSettings": "Settings",
-    "menuSignOut": "Sign out"
+    "menuSignOut": "Sign out",
+    "instagram": "Instagram",
+    "pendingPosts": "{count} posts waiting for review"
   },
   "Header": {
     "dashboard": "Dashboard",
@@ -1769,7 +1771,9 @@
       "fields": "Fields & tags",
       "deals": "Deals & currency",
       "members": "Team members",
-      "api": "API keys"
+      "api": "API keys",
+      "instagram": "Instagram",
+      "showcase": "Public showcase"
     },
     "groups": {
       "account": "Account",
@@ -2000,6 +2004,46 @@
       "created": "Quick reply created.",
       "updated": "Quick reply updated.",
       "deleteFailed": "Couldn't delete the quick reply."
+    },
+    "instagram": {
+      "title": "Instagram",
+      "description": "Connect the business account so available vehicles can be prepared for publishing.",
+      "loading": "Loading the connection…",
+      "connectedTo": "Connected to",
+      "unknownUser": "Instagram account",
+      "tokenLabel": "Access token",
+      "tokenPlaceholder": "Paste the Instagram access token",
+      "requirement": "It must be an Instagram professional account. A personal account cannot publish through the API.",
+      "connect": "Connect",
+      "connected": "Instagram account connected",
+      "connectFailed": "The account could not be connected",
+      "disconnect": "Disconnect",
+      "disconnected": "Instagram account disconnected",
+      "disconnectFailed": "The account could not be disconnected",
+      "disconnectHint": "Disconnecting leaves published posts untouched on Instagram. Pending ones wait until an account is connected again.",
+      "adminOnly": "Only an admin or owner can change this connection.",
+      "setupTitle": "How to get the token",
+      "setupDesc": "Three steps in the Meta developers panel. It stays in English even though this app does not.",
+      "step1": "Create the app on Meta",
+      "step1Items": [
+        "Go to developers.facebook.com and create an app.",
+        "Choose the Business app type. If your existing app is another type, you need a new one.",
+        "Give it a name and finish creating it."
+      ],
+      "step2": "Add Instagram and link the account",
+      "step2Items": [
+        "In the panel left menu, open Instagram.",
+        "Go to \"API setup with Instagram business login\".",
+        "Link the business Instagram account. A personal account will not work — convert it to professional from the Instagram app first."
+      ],
+      "step3": "Generate the token and paste it here",
+      "step3Items": [
+        "Next to the linked account, press \"Generate token\".",
+        "Sign in to Instagram and authorise the app.",
+        "Copy the token it shows and paste it into the field on the left.",
+        "Press Connect. We check the account with Instagram before saving it."
+      ],
+      "expiryNote": "The token lasts 60 days. When it expires, publishing fails with a credentials notice: generate a new one and connect again."
     }
   },
   "Inventory": {
@@ -2137,6 +2181,14 @@
       "noBuyer": "Not specified"
     },
     "confirmRevertSale": "This vehicle is marked as sold. Changing its status will clear the price, date and buyer. Continue?"
+  },
+  "InstagramPost": {
+    "price": "Price: {value}",
+    "mileage": "Mileage: {value} km",
+    "plateCity": "Registered in {value}",
+    "acceptsTradeIn": "We take trade-ins",
+    "contact": "Write to us: {channel}",
+    "contactGeneric": "Message us for more information"
   },
   "Documents": {
     "title": "Documents",
@@ -2381,5 +2433,43 @@
   },
   "Handoff": {
     "customerNotice": "We have assigned a sales agent to you. They will be in touch very soon. 🙌"
+  },
+  "InstagramQueue": {
+    "pageTitle": "Instagram queue",
+    "pageDesc": "Posts prepared from your available vehicles. Nothing is published until you approve it here.",
+    "loading": "Loading the queue…",
+    "notConnected": "No Instagram account is connected. Connect one in Settings before publishing.",
+    "quota": "{remaining} of {total} posts left in this period",
+    "quotaUnknown": "Instagram did not report how many posts are left, so approving is on hold.",
+    "pendingTitle": "Waiting for review ({count})",
+    "noPending": "Nothing to review right now.",
+    "historyTitle": "History",
+    "vehicleGone": "Vehicle no longer exists",
+    "vehicleNotAvailable": "This vehicle is no longer available, so it will not publish. Discard it or set the vehicle back to available.",
+    "alreadyPublished": "Already published on {date}",
+    "firstImage": "Cover",
+    "charsLeft": "{count} characters left",
+    "saveText": "Save text",
+    "saved": "Text saved",
+    "saveFailed": "The text could not be saved",
+    "saveBeforePublishing": "Save your changes before publishing",
+    "publish": "Publish",
+    "published": "Published to Instagram",
+    "publishFailed": "It could not be published",
+    "discard": "Discard",
+    "discarded": "Post discarded",
+    "discardFailed": "It could not be discarded",
+    "failureCredentials": "Instagram rejected the credentials. Reconnect the account in Settings.",
+    "soldWithLivePost": "Sold — the post is still live on Instagram",
+    "status": {
+      "published": "Published",
+      "discarded": "Discarded",
+      "failed": "Failed",
+      "needs_review": "Needs manual review",
+      "pending": "Pending"
+    },
+    "rewrite": "Rewrite with AI",
+    "rewritten": "Rewritten — review it before publishing",
+    "rewriteFailed": "The text could not be rewritten"
   }
 }
