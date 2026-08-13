@@ -92,8 +92,10 @@ type VehicleOption = Pick<InventoryVehicle, 'id' | 'brand' | 'model' | 'year'>;
 function vehicleLabel(v: { brand: string; model: string; year: number }): string {
   return `${v.brand} ${v.model} ${v.year}`;
 }
-function contactLabel(c: { name?: string | null; phone: string }): string {
-  return c.name?.trim() || c.phone;
+function contactLabel(c: { name?: string | null; phone?: string | null }): string {
+  // Un contacto que llegó por Instagram puede no tener teléfono
+  // (migración 513), así que el rótulo no puede depender de él.
+  return c.name?.trim() || c.phone || '—';
 }
 
 // ============================================================

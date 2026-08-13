@@ -192,7 +192,9 @@ export function ContactDetailView({
   }, [open, contactId, fetchContact, fetchTags, fetchNotes, fetchCustomFields, fetchDeals]);
 
   async function copyPhone() {
-    if (!contact) return;
+    // Sin teléfono no hay nada que copiar: desde la 513 un contacto de
+    // Instagram o Messenger puede no tenerlo.
+    if (!contact?.phone) return;
     await navigator.clipboard.writeText(contact.phone);
     setCopiedPhone(true);
     setTimeout(() => setCopiedPhone(false), 2000);

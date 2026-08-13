@@ -10,22 +10,23 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 
 ## 2. Migración de base de datos
 
-- [ ] 2.1 Crear la migración **513**, idempotente y en el estilo del repo (la 512 es la de publicación en Instagram)
-- [ ] 2.2 Catálogo de canales soportados
-- [ ] 2.3 Tabla de identidades por canal: contacto, canal, identificador externo, con unicidad por cuenta y canal
-- [ ] 2.4 Columna de canal en `conversations`, con `whatsapp` por defecto
-- [ ] 2.5 RLS de las tablas nuevas siguiendo el patrón del repo (lectura de miembro, escritura de `agent`)
-- [ ] 2.6 Backfill: una identidad de WhatsApp por cada contacto con teléfono, y toda conversación existente marcada como WhatsApp
-- [ ] 2.7 **Verificar el backfill por conteo** antes de continuar: tantas identidades de WhatsApp como contactos con teléfono. Si no cuadra, detenerse
-- [ ] 2.8 Verificar que el consumo se puede desglosar por canal sin columna nueva: `messages` llega a la cuenta solo por `conversations`, así que el join ya obligatorio arrastra el canal (decisión 9)
+- [x] 2.1 Crear la migración **513**, idempotente y en el estilo del repo (la 512 es la de publicación en Instagram)
+- [x] 2.2 Catálogo de canales soportados
+- [x] 2.3 Tabla de identidades por canal: contacto, canal, identificador externo, con unicidad por cuenta y canal
+- [x] 2.4 Columna de canal en `conversations`, con `whatsapp` por defecto
+- [x] 2.4b Reemplazar el índice único de la 036 por uno que incluya el canal — el actual `(account_id, contact_id)` **prohíbe** el modelo multicanal
+- [x] 2.5 RLS de las tablas nuevas siguiendo el patrón del repo (lectura de miembro, escritura de `agent`)
+- [x] 2.6 Backfill: una identidad de WhatsApp por cada contacto con teléfono, y toda conversación existente marcada como WhatsApp
+- [x] 2.7 **Verificar el backfill por conteo** antes de continuar: tantas identidades de WhatsApp como contactos con teléfono. Si no cuadra, detenerse — la comprobación va dentro de la migración y aborta la transacción
+- [x] 2.8 Verificar que el consumo se puede desglosar por canal sin columna nueva: `messages` llega a la cuenta solo por `conversations`, así que el join ya obligatorio arrastra el canal (decisión 9)
 - [ ] 2.9 Aplicar a la nube (lo corre el usuario) y verificar por introspección
 
 ## 3. Identidad sin teléfono
 
-- [ ] 3.1 Reescribir la resolución de contactos para buscar por canal e identificador en vez de por teléfono
-- [ ] 3.2 Permitir crear contactos sin teléfono, conservando el teléfono para WhatsApp
-- [ ] 3.3 Revisar cada punto del código que hoy asume `contact.phone` presente
-- [ ] 3.4 Tests: contacto nuevo sin teléfono, contacto recurrente por identidad, mismo identificador en dos cuentas, contacto con identidades en varios canales
+- [x] 3.1 Reescribir la resolución de contactos para buscar por canal e identificador en vez de por teléfono — `src/lib/contacts/channel-identity.ts`. **El webhook todavía no la usa**: eso lo hace la tarea 4.1 al extraer el núcleo
+- [x] 3.2 Permitir crear contactos sin teléfono, conservando el teléfono para WhatsApp
+- [x] 3.3 Revisar cada punto del código que hoy asume `contact.phone` presente — hecho con el compilador: `Contact.phone` pasó a `string | null` y `tsc` señaló los 10 sitios, todos corregidos
+- [x] 3.4 Tests: contacto nuevo sin teléfono, contacto recurrente por identidad, mismo identificador en dos cuentas, contacto con identidades en varios canales — más el de tolerancia troncal, que es el que fija que WhatsApp no cambió
 
 ## 4. Núcleo del webhook (sin cambiar comportamiento)
 
@@ -34,7 +35,8 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 - [ ] 4.3 Un evento desconocido se registra y se descarta respondiendo con éxito, sin generar error ni reintentos
 - [ ] 4.4 Un lote con eventos mezclados procesa cada uno por separado; el fallo de uno no detiene los demás
 - [ ] 4.5 Conservar la dirección de webhook actual para no obligar a reconfigurar instalaciones
-- [ ] 4.6 **Verificar que WhatsApp se comporta exactamente igual que antes** — este grupo no debe cambiar nada visible
+- [ ] 4.6 **Acotar por canal toda búsqueda de conversación por contacto** antes de que exista un solo hilo que no sea de WhatsApp. Hoy usan `.maybeSingle()` sobre `(account_id, contact_id)`; con dos hilos del mismo contacto eso vuelve a fallar en cada mensaje, que es exactamente el bug #363 que motivó la 036
+- [ ] 4.7 **Verificar que WhatsApp se comporta exactamente igual que antes** — este grupo no debe cambiar nada visible
 
 ## 5. Puerta de salida única
 

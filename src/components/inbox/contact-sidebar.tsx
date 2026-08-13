@@ -127,7 +127,9 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     );
   }
 
-  const displayName = contact.name || contact.phone;
+  // Ni nombre ni teléfono es posible desde la 513; el rótulo
+  // igual tiene que existir para la inicial del avatar.
+  const displayName = contact.name || contact.phone || "—";
   const initials = displayName.charAt(0).toUpperCase();
 
   return (

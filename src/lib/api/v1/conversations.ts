@@ -22,7 +22,8 @@ export interface ApiConversation {
   updated_at: string;
   contact: {
     id: string;
-    phone: string;
+    /** NULL para contactos sin teléfono (Instagram, Messenger). */
+    phone: string | null;
     name: string | null;
     email: string | null;
     company: string | null;

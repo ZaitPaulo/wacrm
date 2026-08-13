@@ -879,7 +879,9 @@ export function MessageThread({
     );
   }
 
-  const displayName = contact.name || contact.phone;
+  // Un contacto de Instagram o Messenger puede no tener teléfono
+  // (migración 513), así que el rótulo necesita su propio respaldo.
+  const displayName = contact.name || contact.phone || '—';
   const messageGroups = groupMessagesByDate(messages);
   const currentStatus = STATUS_OPTIONS.find(
     (s) => s.value === conversation.status
