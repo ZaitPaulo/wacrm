@@ -587,6 +587,13 @@
       "windowOpenUntil": "You can reply until {when}",
       "windowTemplateOnly": "Closed — template only",
       "windowClosed": "Closed"
+    },
+    "suggestions": {
+      "maybeSame": "{name} may be the same person on two channels",
+      "link": "Link",
+      "dismiss": "Dismiss",
+      "linked": "Contacts linked",
+      "linkFailed": "They could not be linked"
     }
   },
   "Pipelines": {

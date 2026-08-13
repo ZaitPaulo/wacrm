@@ -77,7 +77,7 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 ## 9. Vinculación de identidades
 
 - [x] 9.1 Detección de identidades que podrían ser la misma persona — `identity-suggestions.ts`, función pura y conservadora: nombre normalizado igual, distintivo (dos palabras) y canales distintos
-- [ ] 9.2 Presentarlo como sugerencia, sin fusionar — **pendiente**: falta la UI y las rutas de API; la lógica ya no fusiona nada sola
+- [x] 9.2 Presentarlo como sugerencia, sin fusionar — banda en la lista de contactos, con las rutas de API. Unir siempre lo pide una persona, y la sugerencia se puede descartar
 - [x] 9.3 Vincular bajo confirmación de un usuario con permiso de escritura, conservando ambos historiales — `linkContacts`, con `linked_by` obligatorio
 - [x] 9.4 Deshacer una vinculación equivocada, devolviendo cada conversación a su contacto — `unlinkContacts`, que devuelve exactamente lo que se movió según el registro
 - [x] 9.5 Tests de vincular y deshacer sin pérdida de información — 17 tests, incluido el que verifica que deshacer NO devuelve lo que la ficha sobreviviente acumuló después

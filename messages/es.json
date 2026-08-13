@@ -580,6 +580,13 @@
       "windowOpenUntil": "Puedes responder hasta {when}",
       "windowTemplateOnly": "Cerrada — solo con plantilla",
       "windowClosed": "Cerrada"
+    },
+    "suggestions": {
+      "maybeSame": "{name} podría ser la misma persona en dos canales",
+      "link": "Unir",
+      "dismiss": "Descartar",
+      "linked": "Fichas unidas",
+      "linkFailed": "No se pudieron unir"
     }
   },
   "Pipelines": {

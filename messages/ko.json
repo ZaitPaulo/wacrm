@@ -587,6 +587,13 @@
       "windowOpenUntil": "{when}까지 답장할 수 있습니다",
       "windowTemplateOnly": "마감됨 — 템플릿만 가능",
       "windowClosed": "마감됨"
+    },
+    "suggestions": {
+      "maybeSame": "{name} 님이 두 채널에서 동일인일 수 있습니다",
+      "link": "연결",
+      "dismiss": "무시",
+      "linked": "연락처를 연결했습니다",
+      "linkFailed": "연결하지 못했습니다"
     }
   },
   "Pipelines": {
