@@ -19,7 +19,7 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 - [x] 2.6 Backfill: una identidad de WhatsApp por cada contacto con teléfono, y toda conversación existente marcada como WhatsApp
 - [x] 2.7 **Verificar el backfill por conteo** antes de continuar: tantas identidades de WhatsApp como contactos con teléfono. Si no cuadra, detenerse — la comprobación va dentro de la migración y aborta la transacción
 - [x] 2.8 Verificar que el consumo se puede desglosar por canal sin columna nueva: `messages` llega a la cuenta solo por `conversations`, así que el join ya obligatorio arrastra el canal (decisión 9)
-- [ ] 2.9 Aplicar a la nube (lo corre el usuario) y verificar por introspección
+- [ ] 2.9 Aplicar a la nube (lo corre el usuario) y verificar por introspección — **la 514 también está sin aplicar**
 
 ## 3. Identidad sin teléfono
 
@@ -76,11 +76,11 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 
 ## 9. Vinculación de identidades
 
-- [ ] 9.1 Detección de identidades que podrían ser la misma persona
-- [ ] 9.2 Presentarlo como sugerencia, sin fusionar
-- [ ] 9.3 Vincular bajo confirmación de un usuario con permiso de escritura, conservando ambos historiales
-- [ ] 9.4 Deshacer una vinculación equivocada, devolviendo cada conversación a su contacto
-- [ ] 9.5 Tests de vincular y deshacer sin pérdida de información
+- [x] 9.1 Detección de identidades que podrían ser la misma persona — `identity-suggestions.ts`, función pura y conservadora: nombre normalizado igual, distintivo (dos palabras) y canales distintos
+- [ ] 9.2 Presentarlo como sugerencia, sin fusionar — **pendiente**: falta la UI y las rutas de API; la lógica ya no fusiona nada sola
+- [x] 9.3 Vincular bajo confirmación de un usuario con permiso de escritura, conservando ambos historiales — `linkContacts`, con `linked_by` obligatorio
+- [x] 9.4 Deshacer una vinculación equivocada, devolviendo cada conversación a su contacto — `unlinkContacts`, que devuelve exactamente lo que se movió según el registro
+- [x] 9.5 Tests de vincular y deshacer sin pérdida de información — 17 tests, incluido el que verifica que deshacer NO devuelve lo que la ficha sobreviviente acumuló después
 
 ## 10. Verificación
 
