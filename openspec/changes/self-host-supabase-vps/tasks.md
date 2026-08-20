@@ -4,15 +4,15 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 
 - [x] 0.1 Contratar el VPS — Contabo Cloud VPS Plus 6: 6 vCPU AMD EPYC / 12 GB / 300 GB NVMe, Ubuntu 24.04 LTS, US East (Nueva York), IPv4 dedicada, 5 snapshots
 - [x] 0.2 Crear el usuario de trabajo con sudo y endurecer SSH (sin root directo, solo clave), verificando el acceso antes de cerrar la sesión original — verificado con `sshd -T`: `permitrootlogin no`, `passwordauthentication no`
-- [ ] 0.3 Actualizar el sistema, fijar zona horaria, confirmar sincronización de reloj y activar actualizaciones de seguridad automáticas
-- [ ] 0.4 Configurar 4 GB de swap con `vm.swappiness=10`
-- [ ] 0.5 Activar UFW dejando abiertos solo SSH, 80 y 443
-- [ ] 0.6 Instalar Docker Engine y el plugin Compose desde el repositorio oficial, y configurar la rotación de logs del demonio
-- [ ] 0.7 Crear los registros DNS `@`, `www` y `supabase` de loramotors.co, y verificar la propagación con `dig` antes de tocar el proxy
-- [ ] 0.8 Confirmar que nada más ocupa los puertos 80 y 443 en el host
-- [ ] 0.9 Clonar el repositorio en `/opt/crm` con el usuario de trabajo
+- [x] 0.3 Actualizar el sistema, fijar zona horaria, confirmar sincronización de reloj y activar actualizaciones de seguridad automáticas
+- [x] 0.4 Configurar 4 GB de swap con `vm.swappiness=10`
+- [x] 0.5 Activar UFW dejando abiertos solo SSH, 80 y 443
+- [x] 0.6 Instalar Docker Engine y el plugin Compose desde el repositorio oficial, y configurar la rotación de logs del demonio
+- [x] 0.7 Crear los registros DNS `@`, `www` y `supabase` de loramotors.co, y verificar la propagación con `dig` antes de tocar el proxy
+- [x] 0.8 Confirmar que nada más ocupa los puertos 80 y 443 en el host
+- [x] 0.9 Clonar el repositorio en `/opt/crm` con el usuario de trabajo
 - [ ] 0.10 Reunir credenciales: acceso al DNS, correo para Let's Encrypt, Meta App ID y App Secret, credenciales de WhatsApp Business
-- [ ] 0.11 Pasar la verificación final del runbook antes de continuar
+- [x] 0.11 Pasar la verificación final del runbook antes de continuar
 
 ## 1. Estructura y stack de Supabase
 
