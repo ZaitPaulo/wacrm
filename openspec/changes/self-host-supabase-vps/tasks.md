@@ -24,11 +24,11 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 
 ## 2. Secretos y configuración
 
-- [ ] 2.1 Escribir `scripts/generate-secrets.sh`: contraseña de Postgres, `JWT_SECRET`, `ANON_KEY` y `SERVICE_ROLE_KEY` firmadas con ese secreto, `ENCRYPTION_KEY` de 64 hex, `AUTOMATION_CRON_SECRET`, credenciales de Studio y demás claves internas del stack
-- [ ] 2.2 Crear `deploy/.env.example` con todo lo que consumen el stack y el app, comentado y agrupado por servicio
-- [ ] 2.3 Añadir a `.env.local.example` la sección de self-host, señalando qué cambia respecto al despliegue contra la nube
-- [ ] 2.4 Escribir `scripts/preflight.sh`: verificar que no queden valores de plantilla sin reemplazar, que `ENCRYPTION_KEY` tenga 64 caracteres hexadecimales, que `AUTOMATION_CRON_SECRET` esté definido y que las claves `anon`/`service_role` validen contra `JWT_SECRET`
-- [ ] 2.5 Verificar que `deploy/.env` y cualquier archivo de secretos estén cubiertos por `.gitignore`
+- [x] 2.1 Escribir `scripts/generate-secrets.sh`: contraseña de Postgres, `JWT_SECRET`, `ANON_KEY` y `SERVICE_ROLE_KEY` firmadas con ese secreto, `ENCRYPTION_KEY` de 64 hex, `AUTOMATION_CRON_SECRET`, credenciales de Studio y demás claves internas del stack
+- [x] 2.2 Crear `deploy/.env.example` con todo lo que consumen el stack y el app, comentado y agrupado por servicio
+- [x] 2.3 Añadir a `.env.local.example` la sección de self-host, señalando qué cambia respecto al despliegue contra la nube
+- [x] 2.4 Escribir `scripts/preflight.sh`: verificar que no queden valores de plantilla sin reemplazar, que `ENCRYPTION_KEY` tenga 64 caracteres hexadecimales, que `AUTOMATION_CRON_SECRET` esté definido y que las claves `anon`/`service_role` validen contra `JWT_SECRET`
+- [x] 2.5 Verificar que `deploy/.env` y cualquier archivo de secretos estén cubiertos por `.gitignore`
 
 ## 3. Base de datos y migraciones
 
