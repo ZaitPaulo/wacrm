@@ -40,16 +40,20 @@ El repo trae un `Dockerfile` y un `docker-compose.yml` que solo levantan el app.
 
 ## Decisions
 
-### 1. Dos subdominios públicos, no uno
+### 1. Dos nombres de host públicos, no uno
 
-`crm.<dominio>` → app Next.js. `supabase.<dominio>` → gateway de Supabase (Envoy, puerto 8000).
+`loramotors.co` → app Next.js (`www` redirige al apex). `supabase.loramotors.co` → gateway de Supabase (Envoy, puerto 8000).
+
+**El app va en el apex, no en un subdominio `crm.`**, porque la vitrina pública ES la raíz del app: `src/app/page.tsx` renderiza el catálogo de vehículos y `src/app/vehiculo/[id]/page.tsx` la ficha, con `sitemap.ts` y `robots.ts` al lado. El CRM y la vitrina son la misma aplicación Next, así que el hostname que se comparte e indexa tiene que ser el de la marca. El equipo entra por `loramotors.co/login`.
+
+*Alternativa descartada:* servir el app en dos hostnames (`loramotors.co` para el público, `crm.loramotors.co` para el equipo). No da aislamiento —es el mismo contenedor— y sí crea contenido duplicado: `/vehiculo/123` respondería en ambos, obligando a fijar canonical y a bloquear uno en `robots.ts` para no competir contra uno mismo en Google.
 
 Ambos tienen que ser **públicos y con TLS válido**, y esto sorprende a mucha gente que autoaloja: no basta con que el app alcance a Supabase por la red interna de Docker.
 
 - El navegador del usuario habla **directo** con Supabase. `src/lib/supabase/client.ts` corre en el cliente, y el WebSocket de Realtime también. Un `NEXT_PUBLIC_SUPABASE_URL` apuntando a `http://db:8000` no resuelve fuera del VPS.
 - Meta **descarga** las fotos desde Storage. `src/lib/instagram/images.ts:119` genera un `getPublicUrl()` y se lo entrega a Graph API para que Meta lo busque. Si esa URL no es públicamente alcanzable por HTTPS, la publicación en Instagram falla.
 
-*Alternativa descartada:* montar Supabase bajo un path de `crm.<dominio>` (`/supabase/...`). El gateway asume que vive en la raíz (`/rest/v1`, `/auth/v1`, `/storage/v1`, `/realtime/v1`) y reescribir todo eso en el proxy es frágil. Un subdominio cuesta un registro DNS.
+*Alternativa descartada:* montar Supabase bajo un path del apex (`loramotors.co/supabase/...`). El gateway asume que vive en la raíz (`/rest/v1`, `/auth/v1`, `/storage/v1`, `/realtime/v1`) y reescribir todo eso en el proxy es frágil. Un subdominio cuesta un registro DNS.
 
 ### 2. Caddy como reverse proxy
 
@@ -146,7 +150,7 @@ Mínimo: **4 vCPU, 8 GB de RAM, 80 GB NVMe**. El stack son ~10 contenedores; Pos
 
 ## Risks / Trade-offs
 
-**[El webhook de Meta se corta durante la migración]** → Verificar la nueva URL (`https://crm.<dominio>/api/whatsapp/webhook`) en el panel de Meta como último paso, con el stack ya probado. Meta reintenta las entregas fallidas por un tiempo, pero no para siempre: la ventana de corte debe ser de minutos, y conviene hacerla fuera de horario comercial.
+**[El webhook de Meta se corta durante la migración]** → Verificar la nueva URL (`https://loramotors.co/api/whatsapp/webhook`) en el panel de Meta como último paso, con el stack ya probado. Meta reintenta las entregas fallidas por un tiempo, pero no para siempre: la ventana de corte debe ser de minutos, y conviene hacerla fuera de horario comercial.
 
 **[Todo en un solo servidor: sin réplica, sin failover]** → Aceptado explícitamente. La mitigación es el respaldo: dump diario de Postgres + tar del volumen de Storage, **con una restauración probada** antes de declarar el stack listo. Un respaldo que nunca se restauró no es un respaldo.
 

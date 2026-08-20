@@ -235,27 +235,31 @@ Máximo 30 MB de log por contenedor. Aplica a los contenedores creados **despué
 
 ## 7. DNS
 
-Dos registros `A` apuntando a la IP del servidor:
+Tres registros `A` apuntando a la IP del servidor. El dominio es **loramotors.co**:
 
-| Nombre | Tipo | Valor |
-|---|---|---|
-| `crm` | A | TU_IP |
-| `supabase` | A | TU_IP |
+| Nombre | Tipo | Valor | Para qué |
+|---|---|---|---|
+| `@` (apex) | A | TU_IP | Vitrina pública y CRM — el app Next |
+| `www` | A | TU_IP | Redirige al apex desde Caddy |
+| `supabase` | A | TU_IP | Gateway de Supabase |
 
-Sí, hacen falta los dos, y sí, ambos son públicos. `design.md` explica por qué: el navegador habla directo con Supabase, y Meta descarga las fotos de los vehículos desde las URLs públicas de Storage para publicarlas en Instagram.
+Los tres apuntan a **la misma IP**: Caddy los distingue por el nombre de host (SNI) y emite un certificado para cada uno. Varios hostnames no significan varias IPs.
+
+El de `supabase` tiene que ser público, y esto sorprende a quien autoaloja por primera vez. `design.md` explica por qué: el navegador habla directo con Supabase, y Meta descarga las fotos de los vehículos desde las URLs públicas de Storage para publicarlas en Instagram.
 
 Si el servidor tiene IPv6, añade los `AAAA` equivalentes o el navegador podría intentar por IPv6 y fallar.
 
 **Verifica la propagación antes de seguir**:
 
 ```bash
-dig +short crm.tudominio.com
-dig +short supabase.tudominio.com
+dig +short loramotors.co
+dig +short www.loramotors.co
+dig +short supabase.loramotors.co
 ```
 
-Ambos deben devolver la IP del servidor. Esperar aquí no es opcional: Let's Encrypt limita los intentos fallidos de validación, y arrancar el proxy con el DNS a medio propagar te deja una hora sin poder pedir certificados.
+Los tres deben devolver la IP del servidor. Esperar aquí no es opcional: Let's Encrypt limita los intentos fallidos de validación, y arrancar el proxy con el DNS a medio propagar te deja una hora sin poder pedir certificados.
 
-**Si usas Cloudflare**: pon los dos registros en modo **DNS only** (nube gris), al menos hasta que los certificados estén emitidos y todo funcione. El proxy naranja intercepta el TLS y complica tanto la validación como el WebSocket de Realtime.
+**Si usas Cloudflare**: pon los tres registros en modo **DNS only** (nube gris), al menos hasta que los certificados estén emitidos y todo funcione. El proxy naranja intercepta el TLS y complica tanto la validación como el WebSocket de Realtime.
 
 ---
 
@@ -325,8 +329,9 @@ docker compose version                     # v2.x
 cat /etc/docker/daemon.json                # rotación de logs
 
 # Red
-dig +short crm.tudominio.com               # TU_IP
-dig +short supabase.tudominio.com          # TU_IP
+dig +short loramotors.co                   # TU_IP
+dig +short www.loramotors.co               # TU_IP
+dig +short supabase.loramotors.co          # TU_IP
 sudo ss -tlnp | grep -E ':(80|443)\s'      # vacío
 
 # Proyecto

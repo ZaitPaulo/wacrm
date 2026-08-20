@@ -8,7 +8,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 - [ ] 0.4 Configurar 4 GB de swap con `vm.swappiness=10`
 - [ ] 0.5 Activar UFW dejando abiertos solo SSH, 80 y 443
 - [ ] 0.6 Instalar Docker Engine y el plugin Compose desde el repositorio oficial, y configurar la rotación de logs del demonio
-- [ ] 0.7 Crear los registros DNS `crm` y `supabase`, y verificar la propagación con `dig` antes de tocar el proxy
+- [ ] 0.7 Crear los registros DNS `@`, `www` y `supabase` de loramotors.co, y verificar la propagación con `dig` antes de tocar el proxy
 - [ ] 0.8 Confirmar que nada más ocupa los puertos 80 y 443 en el host
 - [ ] 0.9 Clonar el repositorio en `/opt/crm` con el usuario de trabajo
 - [ ] 0.10 Reunir credenciales: acceso al DNS, correo para Let's Encrypt, Meta App ID y App Secret, credenciales de WhatsApp Business
@@ -43,11 +43,11 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 ## 4. App, proxy y exposición pública
 
 - [ ] 4.1 Ajustar el `docker-compose.yml` raíz para unirse a la red externa del stack y dejar de publicar el puerto al host (el proxy se encarga)
-- [ ] 4.2 Escribir `deploy/Caddyfile`: `crm.<dominio>` hacia el app, `supabase.<dominio>` hacia el gateway, y Studio protegido con Basic Auth
+- [ ] 4.2 Escribir `deploy/Caddyfile`: `loramotors.co` hacia el app, `www` redirigiendo al apex, `supabase.loramotors.co` hacia el gateway, y Studio protegido con Basic Auth
 - [ ] 4.3 Añadir el servicio del proxy al compose, con volúmenes persistentes para certificados y datos de Caddy
 - [ ] 4.4 Documentar los registros DNS necesarios y las reglas de firewall (solo 22/80/443 abiertos)
 - [ ] 4.5 Construir la imagen del app en el servidor con los `NEXT_PUBLIC_*` definitivos y levantarla
-- [ ] 4.6 Verificar TLS válido en ambos hosts desde una red externa
+- [ ] 4.6 Verificar TLS válido en los tres hosts desde una red externa
 - [ ] 4.7 Verificar que Postgres no es alcanzable desde una IP externa
 - [ ] 4.8 Verificar que Studio devuelve 401 sin credenciales
 - [ ] 4.9 Corregir la CSP de `next.config.ts:54,58`, que fija `https://*.supabase.co` y `wss://*.supabase.co` en `media-src` y `connect-src`: derivar los orígenes de `NEXT_PUBLIC_SUPABASE_URL` en vez de codificar el dominio de la nube
@@ -90,7 +90,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 ## 9. Corte de producción
 
 - [ ] 9.1 Repasar la lista de verificación completa sobre el VPS definitivo
-- [ ] 9.2 Reapuntar el webhook de Meta a `https://crm.<dominio>/api/whatsapp/webhook` y superar la verificación
+- [ ] 9.2 Reapuntar el webhook de Meta a `https://loramotors.co/api/whatsapp/webhook` y superar la verificación
 - [ ] 9.3 Confirmar con un mensaje real de WhatsApp entrante que llega a la bandeja
 - [ ] 9.4 Verificar el envío saliente y la recepción de estados de entrega
 - [ ] 9.5 Guardar fuera del servidor una copia de `deploy/.env` y `.env.local`, y dejar registrado dónde quedó
