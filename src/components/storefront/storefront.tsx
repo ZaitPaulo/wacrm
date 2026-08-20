@@ -101,7 +101,7 @@ function VehicleCard({
 
   return (
     <article
-      className={`group flex flex-col overflow-hidden rounded-xl border border-[#c5c6cd]/30 bg-white ${LUXURY_SHADOW} transition-transform duration-300 hover:scale-[1.02]`}
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-[#c5c6cd]/30 bg-white ${LUXURY_SHADOW} transition-transform duration-300 hover:scale-[1.02]`}
     >
       <div className="relative aspect-video overflow-hidden bg-[#f2f4f6]">
         {image ? (
@@ -122,19 +122,12 @@ function VehicleCard({
             {s('new')}
           </div>
         )}
-        <Link
-          href={href}
-          className="absolute inset-0"
-          aria-label={s('viewVehicle', { vehicle: `${v.brand} ${v.model} ${v.year}` })}
-        />
       </div>
 
       <div className="flex flex-grow flex-col p-6">
-        <Link href={href}>
-          <h3 className="text-xl font-semibold leading-tight text-[#191c1e] transition-colors group-hover:text-[#0059bb]">
-            {v.brand} {v.model}
-          </h3>
-        </Link>
+        <h3 className="text-xl font-semibold leading-tight text-[#191c1e] transition-colors group-hover:text-[#0059bb]">
+          {v.brand} {v.model}
+        </h3>
         {subtitle && (
           <p className="mb-6 mt-1 text-xs font-semibold uppercase tracking-wider text-[#44474d]">
             {subtitle}
@@ -167,7 +160,7 @@ function VehicleCard({
               href={whatsappHref(whatsapp, v)}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#20b358]"
+              className="relative z-20 flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#20b358]"
             >
               <WhatsAppIcon className="size-[18px]" />
               {s('interested')}
@@ -175,6 +168,15 @@ function VehicleCard({
           ) : null}
         </div>
       </div>
+
+      {/* Toda la tarjeta abre el detalle: un enlace que cubre el artículo
+          completo. El botón de WhatsApp queda por encima (z-20) para que
+          siga siendo un destino propio. */}
+      <Link
+        href={href}
+        className="absolute inset-0 z-10"
+        aria-label={s('viewVehicle', { vehicle: `${v.brand} ${v.model} ${v.year}` })}
+      />
     </article>
   );
 }
