@@ -243,7 +243,7 @@ Cierra la sesión y vuelve a entrar para que el grupo tome efecto. Verifica:
 
 ```bash
 docker run --rm hello-world
-docker compose version     # debe ser v2.x
+docker compose version     # v2 o superior (en agosto de 2026, v5.5.0)
 ```
 
 ### Rotación de logs de Docker
@@ -357,7 +357,7 @@ sudo ufw status | head -5                  # active, solo 22/80/443
 
 # Docker
 docker run --rm hello-world                # sin sudo
-docker compose version                     # v2.x
+docker compose version                     # v2 o superior
 cat /etc/docker/daemon.json                # rotación de logs
 
 # Red
