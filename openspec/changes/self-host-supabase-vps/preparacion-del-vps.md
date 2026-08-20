@@ -65,7 +65,7 @@ Deja esa sesión abierta hasta terminar el paso 2. Es tu salida de emergencia.
 Solo con clave, sin root directo:
 
 ```bash
-sudo tee /etc/ssh/sshd_config.d/99-hardening.conf > /dev/null <<'EOF'
+sudo tee /etc/ssh/sshd_config.d/01-hardening.conf > /dev/null <<'EOF'
 PermitRootLogin no
 PasswordAuthentication no
 PubkeyAuthentication yes
@@ -81,12 +81,44 @@ El `sshd -t` valida la sintaxis antes de reiniciar. Sin él, un error de configu
 
 > En Ubuntu 24.04 el SSH viene activado por socket. Estos cambios se leen en cada conexión nueva, así que reiniciar `ssh` es suficiente. Si más adelante cambias el **puerto**, ahí sí hay que tocar `ssh.socket`.
 
-Ahora, **desde una tercera terminal**, verifica que la configuración quedó bien antes de cerrar nada:
+### El nombre del archivo es `01-`, y no es un detalle
+
+**En SSH gana la PRIMERA aparición de cada directiva, no la última.** Es al revés de lo que asume casi todo el mundo, y los archivos de `sshd_config.d/` se leen en orden alfabético.
+
+La imagen de Contabo llega con dos archivos ya puestos ahí:
+
+```
+50-cloud-init.conf
+60-cloudimg-settings.conf
+```
+
+Ambos anteriores a un `99-`. Uno de ellos trae `PasswordAuthentication yes`, así que un archivo llamado `99-hardening.conf` **queda decorativo para esa directiva**: se lee, pero pierde. El síntoma es engañoso, porque las directivas que nadie más define —`PermitRootLogin`, por ejemplo— sí se aplican, y el archivo parece estar funcionando.
+
+Por eso va como `01-`: gana siempre. Y por eso **no se borran** los otros dos: cloud-init puede regenerar el suyo en cada arranque y reabrir el acceso por contraseña sin que nadie se entere.
+
+### Verificación
+
+Lo único que prueba algo es la configuración **efectiva**, no el contenido de los archivos:
 
 ```bash
-ssh crm@TU_IP          # debe entrar
-ssh root@TU_IP         # debe rechazar
+sudo sshd -T | grep -Ei 'permitrootlogin|passwordauthentication'
 ```
+
+Tiene que responder exactamente:
+
+```
+permitrootlogin no
+passwordauthentication no
+```
+
+Y ahora, **desde una tercera terminal**, antes de cerrar nada:
+
+```bash
+ssh crm@TU_IP          # debe responder: ok
+ssh root@TU_IP         # debe responder: Permission denied (publickey)
+```
+
+Lee con cuidado la respuesta de root. **`Permission denied (publickey)` es correcto**: significa que la clave es el único método que ofrece el servidor. Si en cambio te muestra `root@...'''s password:`, el acceso por contraseña sigue abierto y la configuración no se aplicó — vuelve al apartado anterior. Que aparezca un prompt de contraseña no significa que root esté habilitado; SSH pide credenciales igual y las rechaza siempre, para no revelar qué cuentas existen.
 
 Añade una capa contra fuerza bruta:
 
