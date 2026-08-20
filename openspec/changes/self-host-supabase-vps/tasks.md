@@ -16,10 +16,10 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 
 ## 1. Estructura y stack de Supabase
 
-- [ ] 1.1 Crear `deploy/` con `README.md` que explique la separación entre el compose de upstream y el overlay propio
-- [ ] 1.2 Vendorizar en `deploy/supabase/docker-compose.yml` el compose oficial de `supabase/supabase@docker`, sin modificar, anotando el commit de origen
-- [ ] 1.3 Escribir `deploy/supabase/docker-compose.override.yml`: apagar `functions` y `supavisor`, fijar `storage` al backend `file` sobre volumen nombrado, quitar la publicación del puerto 8000 al host y unir todo a la red externa compartida
-- [ ] 1.4 Fijar todas las imágenes a versiones explícitas y dejar la tabla de versiones en el README de `deploy/`
+- [x] 1.1 Crear `deploy/` con `README.md` que explique la separación entre el compose de upstream y el overlay propio
+- [x] 1.2 Vendorizar en `deploy/supabase/docker-compose.yml` el compose oficial de `supabase/supabase@docker`, sin modificar, anotando el commit de origen
+- [x] 1.3 Escribir `deploy/supabase/docker-compose.crm.yml`: apagar `functions` y `supavisor`, quitar la publicación del puerto 8000 al host y unir todo a la red externa compartida. El backend `file` de `storage` ya viene por defecto de upstream, sobre bind mount y no volumen nombrado — ver design
+- [x] 1.4 Fijar todas las imágenes a versiones explícitas y dejar la tabla de versiones en el README de `deploy/`
 - [ ] 1.5 Levantar el stack en local (o en un VPS de prueba) y verificar que `db`, `api-gw`, `auth`, `rest`, `realtime`, `storage` y `meta` quedan sanos y que ningún contenedor reinicia en bucle
 
 ## 2. Secretos y configuración

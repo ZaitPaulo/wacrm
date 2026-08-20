@@ -1,0 +1,70 @@
+# ============================================================================
+# Overlay propio sobre el compose oficial de Supabase.
+#
+# Todo lo que hay en `docker-compose.yml` y en `volumes/` viene de
+# supabase/supabase@04ddc6b SIN MODIFICAR. Los ajustes de este despliegue
+# viven aquí, para que actualizar Supabase sea traer el upstream nuevo y
+# comparar, en vez de rehacer un merge a mano cada vez.
+#
+# NO se llama `docker-compose.override.yml` —que sería el nombre que Compose
+# carga solo— porque el `.gitignore` de upstream ignora justamente ese nombre
+# y el archivo no quedaría versionado. Se activa con COMPOSE_FILE en el .env:
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.crm.yml
+#
+# Los overlays `docker-compose.envoy.yml` y `docker-compose.pg17.yml` NO se
+# usan: Envoy y Postgres 17 ya son el default del compose base, y upstream
+# marca el primero como deprecado y no-op.
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # El gateway deja de publicar el 8000 en el host.
+  #
+  # Docker escribe sus propias reglas de iptables y se salta UFW: un puerto
+  # publicado queda accesible desde internet aunque `ufw status` jure que está
+  # cerrado. Por eso el único contenedor que publica puertos en este servidor
+  # es Caddy. Caddy alcanza a api-gw por la red interna, donde sigue
+  # escuchando en 8000.
+  # --------------------------------------------------------------------------
+  api-gw:
+    ports: !reset []
+
+  # --------------------------------------------------------------------------
+  # Edge Runtime apagado: no existe `supabase/functions/` en este repo. Toda
+  # la lógica de servidor es Next.js.
+  #
+  # Se apaga con un perfil que nunca se activa, en vez de borrar el servicio,
+  # porque borrarlo obligaría a editar el compose de upstream. Nadie declara
+  # `depends_on: functions`, así que no arrancar no rompe el orden del stack.
+  # --------------------------------------------------------------------------
+  functions:
+    profiles: ["no-usado"]
+
+  # --------------------------------------------------------------------------
+  # Supavisor apagado: es un pooler para conexiones externas a Postgres, y el
+  # app entra por PostgREST, no por el puerto 5432.
+  #
+  # Además es el otro servicio que publicaba puertos al host —5432 y 6543—,
+  # que es exactamente lo que no queremos alcanzable desde fuera. El !reset
+  # queda por si alguien activa el perfil algún día sin releer esto.
+  # --------------------------------------------------------------------------
+  supavisor:
+    profiles: ["no-usado"]
+    ports: !reset []
+
+# ----------------------------------------------------------------------------
+# Una sola red para el stack y para el app.
+#
+# Se redefine la red `default` del proyecto como externa en lugar de añadir
+# una segunda red a cada servicio: así los diez contenedores del stack quedan
+# alcanzables por nombre desde el compose del app y desde Caddy, sin tocar ni
+# una línea del compose de upstream.
+#
+# La red se crea antes del primer arranque:
+#   docker network create loramotors
+# ----------------------------------------------------------------------------
+networks:
+  default:
+    name: loramotors
+    external: true

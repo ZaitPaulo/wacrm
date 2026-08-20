@@ -65,7 +65,11 @@ Caddy también resuelve dos cosas gratis: proxy del WebSocket de Realtime (lo ha
 
 ### 3. El compose de Supabase se toma tal cual de upstream, con overlay propio
 
-`deploy/supabase/` contiene el `docker-compose.yml` oficial de `supabase/supabase@docker` **sin modificar**, pineado a un commit concreto. Los ajustes propios van en `deploy/supabase/docker-compose.override.yml`.
+`deploy/supabase/` contiene el `docker/` oficial de `supabase/supabase` **sin modificar**, pineado al commit `04ddc6b`. Los ajustes propios van en `deploy/supabase/docker-compose.crm.yml`.
+
+**No basta con el compose: hay que vendorizar `volumes/` también.** El compose monta configuración desde el disco —`volumes/api/envoy/*` para el gateway, `volumes/db/*.sql` como semillas de la base—, así que sin ese directorio el stack no arranca. Son unos 350 KB en total, de los cuales `lds.template.yaml` se lleva 50.
+
+**El overlay no puede llamarse `docker-compose.override.yml`**, que era el nombre obvio porque Compose lo carga solo: el `.gitignore` de upstream ignora exactamente ese nombre y el archivo no quedaría versionado. Se llama `docker-compose.crm.yml` y se activa con `COMPOSE_FILE` en el `.env`, el mismo mecanismo que usa upstream para sus propios overlays.
 
 Actualizar Supabase pasa a ser: traer el compose nuevo del upstream, comparar con el anterior, y revisar si el override sigue teniendo sentido. Si editáramos el archivo original, cada actualización sería un merge a mano.
 
@@ -83,13 +87,17 @@ Servicios del stack oficial (versiones al día de hoy) y qué hacemos con cada u
 | `meta` | `supabase/postgres-meta:v0.96.6` | **Se usa**, solo porque Studio lo necesita |
 | `studio` | `supabase/studio` | **Se usa**, detrás de Basic Auth. Es la forma práctica de crear el primer usuario e inspeccionar datos |
 | `functions` | `supabase/edge-runtime:v1.74.0` | **Se apaga.** No hay `supabase/functions/` |
+| — | `docker-compose.envoy.yml` | **No se usa.** Upstream lo marca deprecado y no-op: Envoy ya es el gateway del compose base |
+| — | `docker-compose.pg17.yml` | **No se usa.** Redundante: PG 17 ya es el default del compose base |
 | `supavisor` | `supabase/supavisor:2.9.5` | **Se apaga.** Es un pooler para conexiones externas; el app se conecta por PostgREST, no por Postgres directo |
 
 Las versiones se anotan aquí porque los tags de upstream se mueven; el compose pineado es la fuente de verdad, esta tabla es el registro de la decisión.
 
 ### 4. Storage sobre volumen local, sin MinIO
 
-Backend `file`, montado en un volumen Docker. Los archivos son fotos de vehículos y avatares: decenas de MB, no terabytes. Añadir MinIO agrega un servicio, un juego de credenciales y una fuente más de fallos a cambio de una compatibilidad S3 que nadie está usando.
+Backend `file`, que ya es el default de upstream (`STORAGE_BACKEND: file`). Los archivos son fotos de vehículos y avatares: decenas de MB, no terabytes.
+
+**Bind mount, no volumen nombrado.** Upstream monta `./volumes/storage` desde el disco del host, y se deja así a propósito aunque el plan inicial pedía un volumen nombrado: el respaldo pasa a ser un `tar` de un directorio normal, en vez de tener que levantar un contenedor auxiliar para alcanzar el interior de un volumen. Upstream ya lo tiene en su `.gitignore`, así que los archivos subidos no ensucian el árbol del repo. Añadir MinIO agrega un servicio, un juego de credenciales y una fuente más de fallos a cambio de una compatibilidad S3 que nadie está usando.
 
 *Consecuencia asumida:* el respaldo de Storage es un tar del volumen, no un `aws s3 sync`. Está contemplado en el plan de respaldo.
 
