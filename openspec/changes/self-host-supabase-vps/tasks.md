@@ -70,11 +70,11 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 
 ## 7. Respaldo y restauración
 
-- [ ] 7.1 Escribir `scripts/backup.sh`: `pg_dump` de la base más copia del volumen de Storage, con nombre fechado
-- [ ] 7.2 Implementar la política de retención y dejar el valor por defecto documentado
-- [ ] 7.3 Hacer que un fallo del respaldo quede registrado de forma visible y no se reporte como exitoso
+- [x] 7.1 Escribir `scripts/backup.sh`: `pg_dump` de la base más copia del volumen de Storage, con nombre fechado
+- [x] 7.2 Implementar la política de retención y dejar el valor por defecto documentado
+- [x] 7.3 Hacer que un fallo del respaldo quede registrado de forma visible y no se reporte como exitoso
 - [ ] 7.4 Programar el respaldo diario dentro del compose
-- [ ] 7.5 Escribir `scripts/restore.sh`
+- [x] 7.5 Escribir `scripts/restore.sh`
 - [ ] 7.6 **Ejecutar la restauración de verdad** sobre un stack vacío y verificar login, conversaciones y descarga de archivos. Este paso no se salta ni se da por hecho
 
 ## 8. Documentación
