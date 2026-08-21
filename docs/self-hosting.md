@@ -218,14 +218,22 @@ rclone config
 
 - `n` (new remote) → nombre: **`gdrive`**
 - Tipo: **`drive`** (Google Drive)
-- `client_id` y `client_secret`: en blanco (Enter). *Si te da errores de cuota
-  más adelante, ahí es donde van unas credenciales propias de Google Cloud.*
+- `client_id` y `client_secret`: los tuyos (ver más abajo). Dejarlos en blanco
+  usa el `client_id` compartido de rclone, que **Google retira durante 2026** —
+  el propio rclone lo avisa y te pide confirmar. Sirve para salir del paso, no
+  para dejarlo así.
 - Scope: **`1`** (acceso completo)
 - `service_account_file`: en blanco
 - Advanced config: **`n`**
 - Use web browser: **`y`** ← el túnel hace que se abra en tu PC
 - Configure as Shared Drive: **`n`** (salvo que uses Google Workspace)
 - `y` para confirmar, `q` para salir
+
+Tras autorizar en el navegador puede aparecer `channel N: open failed: connect
+failed: Connection refused`, mezclado con el siguiente prompt. **Es ruido del
+túnel, no un error**: el navegador intenta una conexión más al 53682 cuando
+rclone ya cerró su listener. Si antes salió `NOTICE: Got code`, la autorización
+funcionó; sigue respondiendo.
 
 **4.** Comprueba que habla con Drive y crea la carpeta:
 
@@ -243,6 +251,37 @@ echo "RCLONE_REMOTE=gdrive:crm-backups" >> deploy/.env
 ```
 
 Debe terminar con `archivo(s) confirmado(s) en el remoto` y la ruta de la copia.
+
+#### Crear un client_id propio de Google
+
+No es opcional a medio plazo: el `client_id` compartido de rclone deja de
+funcionar durante 2026, y cuando lo haga la subida empezará a fallar.
+
+1. [Google Cloud Console](https://console.cloud.google.com) → crea un proyecto.
+2. **APIs y servicios → Biblioteca** → busca *Google Drive API* → **Habilitar**.
+3. **Pantalla de consentimiento de OAuth** → tipo **External** → rellena nombre
+   de la app y tu correo.
+4. **Credenciales → Crear credenciales → ID de cliente de OAuth** → tipo
+   **Aplicación de escritorio**. Copia el *client ID* y el *client secret*.
+5. En el servidor:
+
+   ```bash
+   rclone config update gdrive client_id TU_CLIENT_ID client_secret TU_CLIENT_SECRET
+   rclone config reconnect gdrive:      # vuelve a autorizar, con el túnel abierto
+   rclone lsd gdrive:                   # comprobar
+   ```
+
+> ### **Publica la app: en modo «Testing» el token caduca a los 7 días**
+>
+> Con la pantalla de consentimiento en **External + Testing**, Google expira
+> todos los refresh tokens a los **7 días exactos**. El respaldo subiría bien
+> una semana y luego empezaría a fallar con `invalid_grant`, sin que nada haya
+> cambiado en el servidor.
+>
+> En la pantalla de consentimiento, pulsa **PUBLICAR APLICACIÓN** («In
+> production»). Saldrá un aviso de verificación que puedes ignorar: como la app
+> es tuya y solo la usas tú, no hace falta pasar la revisión de Google — el
+> token deja de caducar igualmente.
 
 #### Recuperar desde Drive
 
