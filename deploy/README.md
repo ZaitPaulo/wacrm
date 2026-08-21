@@ -91,6 +91,10 @@ Nunca sin respaldo previo, y nunca a `latest`:
 
 1. `scripts/backup.sh` y comprobar que el dump se escribió.
 2. Descargar el `docker/` del commit nuevo sobre `deploy/supabase/`.
+   **Comprueba los modos de archivo**: upstream tiene los `*-entrypoint.sh`
+   como `100755`, y una descarga por HTTP no trae el bit ejecutable. Se
+   restaura con `git update-index --chmod=+x`. Un `git diff` normal no
+   enseña esa diferencia; `git ls-files -s` sí.
 3. `git diff deploy/supabase/` — leer qué cambió de verdad.
 4. Revisar si `docker-compose.crm.yml` sigue encajando (¿siguen existiendo
    `functions` y `supavisor`? ¿`api-gw` sigue publicando puerto?).
