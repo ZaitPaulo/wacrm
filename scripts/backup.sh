@@ -26,8 +26,26 @@ STORAGE_DIR="$ROOT/deploy/supabase/volumes/storage"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
 DEST="$BACKUP_DIR/$STAMP"
 
+# Monitorización opcional (Healthchecks.io o equivalente). Si BACKUP_PING_URL
+# está definida, se avisa al empezar y al terminar. Sirve para el fallo que de
+# verdad duele: no el respaldo que grita, sino el que dejó de ejecutarse hace
+# tres semanas —cron parado, disco lleno, servidor reinstalado— sin que nadie
+# lo note. Ningún log detecta eso; un servicio que espera una señal, sí.
+# Corriendo desde cron no hay entorno cargado, asi que la URL se lee de
+# deploy/.env. Se extrae con sed en vez de hacer `source`: un .env es datos,
+# y evaluarlo como script convierte cualquier valor raro en ejecucion.
+if [[ -z "${BACKUP_PING_URL:-}" && -f "$ROOT/deploy/.env" ]]; then
+  BACKUP_PING_URL="$(sed -n 's/^BACKUP_PING_URL=//p' "$ROOT/deploy/.env" | head -1)"
+fi
+
+ping() {
+  [[ -n "${BACKUP_PING_URL:-}" ]] || return 0
+  wget -qO- --timeout=10 "${BACKUP_PING_URL}${1:-}" >/dev/null 2>&1 || true
+}
+
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 die() {
+  ping "/fail"
   echo "ERROR: $*" >&2
   # Restos de un intento fallido: fuera. Un directorio a medias en la carpeta
   # de respaldos es peor que ninguno, porque parece uno bueno.
@@ -36,6 +54,7 @@ die() {
   exit 1
 }
 
+ping "/start"
 docker inspect "$DB_CONTAINER" >/dev/null 2>&1 || die "no existe el contenedor '$DB_CONTAINER'"
 
 mkdir -p "$DEST" || die "no se puede escribir en $BACKUP_DIR"
@@ -98,6 +117,7 @@ while IFS= read -r old; do
 done < <(find "$BACKUP_DIR" -maxdepth 1 -mindepth 1 -type d -mtime "+${RETENTION_DAYS}" 2>/dev/null)
 log "  $borrados respaldo(s) antiguo(s) eliminado(s)"
 
+ping
 echo
 log "RESPALDO CORRECTO: $DEST"
 echo

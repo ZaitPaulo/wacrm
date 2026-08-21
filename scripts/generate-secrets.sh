@@ -217,6 +217,12 @@ DOMAIN=${DOMAIN}
 # Adonde avisa Let's Encrypt del vencimiento de los certificados. Caddy los
 # renueva solo, asi que este correo es la red de seguridad de que algo fallo.
 LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+
+# URL de comprobacion (Healthchecks.io o similar) que scripts/backup.sh avisa
+# al empezar y al terminar. Opcional pero muy recomendable: detecta el fallo
+# que ningun log detecta, que es el respaldo que dejo de ejecutarse sin que
+# nadie lo note.
+BACKUP_PING_URL=
 EOF
 
 # El stack se levanta desde deploy/supabase/, y Compose lee el .env del
