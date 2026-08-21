@@ -235,6 +235,11 @@ LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
 # que ningun log detecta, que es el respaldo que dejo de ejecutarse sin que
 # nadie lo note.
 BACKUP_PING_URL=
+
+# Destino de la copia externa, en formato de rclone (ej. gdrive:crm-backups).
+# Vacio = el respaldo se queda en este servidor, que es donde tambien esta la
+# base que pretende proteger. Configuracion en docs/self-hosting.md.
+RCLONE_REMOTE=
 EOF
 
 # El stack se levanta desde deploy/supabase/, y Compose lee el .env del

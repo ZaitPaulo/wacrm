@@ -21,6 +21,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKUP_DIR="${BACKUP_DIR:-/opt/crm-backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
+# Copia externa. Vacio = solo respaldo local. Se lee de deploy/.env mas abajo.
+REMOTE_RETENTION_DAYS="${REMOTE_RETENTION_DAYS:-30}"
 DB_CONTAINER="${SUPABASE_DB_CONTAINER:-supabase-db}"
 STORAGE_DIR="$ROOT/deploy/supabase/volumes/storage"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
@@ -34,9 +36,11 @@ DEST="$BACKUP_DIR/$STAMP"
 # Corriendo desde cron no hay entorno cargado, asi que la URL se lee de
 # deploy/.env. Se extrae con sed en vez de hacer `source`: un .env es datos,
 # y evaluarlo como script convierte cualquier valor raro en ejecucion.
-if [[ -z "${BACKUP_PING_URL:-}" && -f "$ROOT/deploy/.env" ]]; then
-  BACKUP_PING_URL="$(sed -n 's/^BACKUP_PING_URL=//p' "$ROOT/deploy/.env" | head -1)"
+if [[ -f "$ROOT/deploy/.env" ]]; then
+  [[ -n "${BACKUP_PING_URL:-}" ]] || BACKUP_PING_URL="$(sed -n 's/^BACKUP_PING_URL=//p' "$ROOT/deploy/.env" | head -1)"
+  [[ -n "${RCLONE_REMOTE:-}" ]] || RCLONE_REMOTE="$(sed -n 's/^RCLONE_REMOTE=//p' "$ROOT/deploy/.env" | head -1)"
 fi
+RCLONE_REMOTE="${RCLONE_REMOTE:-}"
 
 ping() {
   [[ -n "${BACKUP_PING_URL:-}" ]] || return 0
@@ -117,10 +121,39 @@ while IFS= read -r old; do
 done < <(find "$BACKUP_DIR" -maxdepth 1 -mindepth 1 -type d -mtime "+${RETENTION_DAYS}" 2>/dev/null)
 log "  $borrados respaldo(s) antiguo(s) eliminado(s)"
 
+# --- 5. Copia externa -------------------------------------------------------
+# Va DENTRO de este script, y no como paso aparte despues, a proposito: si la
+# subida falla, el respaldo entero cuenta como fallido y salta el aviso. Un
+# respaldo local que existe pero nunca salio del servidor es exactamente la
+# ilusion que una copia externa deberia eliminar.
+if [[ -n "$RCLONE_REMOTE" ]]; then
+  command -v rclone >/dev/null || die "RCLONE_REMOTE está definido pero rclone no está instalado"
+
+  log "Subiendo a $RCLONE_REMOTE..."
+  rclone copy "$DEST" "$RCLONE_REMOTE/$STAMP"     --transfers 4 --checkers 8 --retries 3 --low-level-retries 10     || die "la subida a $RCLONE_REMOTE falló"
+
+  # No basta con que rclone salga con 0: se comprueba que los archivos estan
+  # ARRIBA, y que db.dump —el que de verdad importa— es uno de ellos.
+  subidos="$(rclone lsf "$RCLONE_REMOTE/$STAMP" 2>/dev/null || true)"
+  grep -q '^db.dump$' <<< "$subidos" || die "la subida terminó pero db.dump no está en el remoto"
+  log "  $(wc -l <<< "$subidos") archivo(s) confirmado(s) en el remoto"
+
+  # Retención remota, aparte de la local: el disco del servidor y la cuota de
+  # la nube no tienen por qué aguantar lo mismo.
+  log "Retención remota (${REMOTE_RETENTION_DAYS} días)..."
+  rclone delete "$RCLONE_REMOTE" --min-age "${REMOTE_RETENTION_DAYS}d" --rmdirs 2>/dev/null || true
+else
+  log "AVISO: sin RCLONE_REMOTE, este respaldo NO sale del servidor"
+fi
+
 ping
 echo
 log "RESPALDO CORRECTO: $DEST"
-echo
-echo "  Esto NO es una copia externa. Sigue en el mismo servidor y en el mismo"
-echo "  proveedor: si se pierde la cuenta o el disco, se pierden los dos a la"
-echo "  vez. Súbelo a un almacenamiento de terceros."
+if [[ -n "$RCLONE_REMOTE" ]]; then
+  echo "  Copia externa en $RCLONE_REMOTE/$STAMP"
+else
+  echo
+  echo "  Esto NO es una copia externa. Sigue en el mismo servidor y en el mismo"
+  echo "  proveedor: si se pierde la cuenta o el disco, se pierden los dos a la"
+  echo "  vez. Configura RCLONE_REMOTE en deploy/.env."
+fi

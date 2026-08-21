@@ -76,6 +76,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 - [x] 7.4 Programar el respaldo diario — en el crontab del host vía `scripts/install-backup-cron.sh`, NO dentro del compose: necesitaría el socket de Docker montado, que es acceso root al host
 - [x] 7.5 Escribir `scripts/restore.sh`
 - [x] 7.6 **Ejecutar la restauración de verdad** sobre un stack vacío y verificar login, conversaciones y descarga de archivos. Este paso no se salta ni se da por hecho
+- [ ] 7.7 Subir los respaldos fuera del proveedor (Google Drive vía rclone) y comprobar que uno bajado del remoto restaura
 
 ## 8. Documentación
 

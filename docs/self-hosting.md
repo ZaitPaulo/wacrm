@@ -184,6 +184,90 @@ Tres cosas que hay que tener claras:
    fotos.** Los datos viven en `deploy/supabase/volumes/`, dentro del árbol del
    repo pero ignorados por git.
 
+### Copia externa a Google Drive
+
+Los respaldos de `/opt/crm-backups` viven en el mismo disco que la base que
+protegen. `backup.sh` los sube a un destino externo si `RCLONE_REMOTE` está
+configurada, y **falla el respaldo entero si la subida falla**: un respaldo
+local que nunca salió del servidor es justo la ilusión que esto elimina.
+
+#### Configurar rclone (una vez)
+
+Google Drive necesita autorización por navegador, y el servidor no tiene. Se
+resuelve con un túnel SSH: autorizas en **tu** navegador y el token queda en el
+servidor.
+
+**1.** Instala rclone en el servidor:
+
+```bash
+ssh loramotors
+sudo -v && curl https://rclone.org/install.sh | sudo bash
+```
+
+**2.** Desde tu PC, abre el túnel y déjalo abierto:
+
+```
+ssh -L localhost:53682:localhost:53682 loramotors
+```
+
+**3.** En esa misma sesión:
+
+```bash
+rclone config
+```
+
+- `n` (new remote) → nombre: **`gdrive`**
+- Tipo: **`drive`** (Google Drive)
+- `client_id` y `client_secret`: en blanco (Enter). *Si te da errores de cuota
+  más adelante, ahí es donde van unas credenciales propias de Google Cloud.*
+- Scope: **`1`** (acceso completo)
+- `service_account_file`: en blanco
+- Advanced config: **`n`**
+- Use web browser: **`y`** ← el túnel hace que se abra en tu PC
+- Configure as Shared Drive: **`n`** (salvo que uses Google Workspace)
+- `y` para confirmar, `q` para salir
+
+**4.** Comprueba que habla con Drive y crea la carpeta:
+
+```bash
+rclone lsd gdrive:
+rclone mkdir gdrive:crm-backups
+```
+
+**5.** Apúntalo en el `.env` y prueba:
+
+```bash
+cd /opt/crm
+echo "RCLONE_REMOTE=gdrive:crm-backups" >> deploy/.env
+./scripts/backup.sh
+```
+
+Debe terminar con `archivo(s) confirmado(s) en el remoto` y la ruta de la copia.
+
+#### Recuperar desde Drive
+
+```bash
+rclone copy gdrive:crm-backups/20260821-031500 /tmp/bak
+./scripts/restore.sh /tmp/bak --dry-run
+./scripts/restore.sh /tmp/bak
+```
+
+#### Lo que conviene tener presente
+
+- **Los archivos van sin cifrar**, por decisión explícita: se prioriza poder
+  recuperarlos desde cualquier sitio sin depender de otra contraseña. La
+  contrapartida es que quien entre a esa cuenta de Google —o a un dispositivo
+  con la sesión abierta— se lleva la base de clientes. Ponle verificación en dos
+  pasos a esa cuenta y no la compartas.
+- **Retención separada**: 14 días en local, 30 en el remoto (`REMOTE_RETENTION_DAYS`).
+  El disco del servidor y la cuota de Drive no tienen por qué aguantar lo mismo.
+- **El token OAuth puede caducar o revocarse** —cambio de contraseña de Google,
+  inactividad larga— y entonces la subida empieza a fallar. Como la subida es
+  parte del respaldo, `BACKUP_PING_URL` te avisa; sin esa comprobación te
+  enterarías el día que necesites restaurar.
+- **15 GB gratis** incluyen Gmail y Fotos. Vigila el espacio cuando el inventario
+  acumule fotos.
+
 ### Correo saliente
 
 El relay es Resend (`smtp.resend.com:587`). Tres trampas al configurarlo:
