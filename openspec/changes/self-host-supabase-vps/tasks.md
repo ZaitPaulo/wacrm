@@ -59,7 +59,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 - [ ] 5.2 Subir un avatar y una foto de vehículo, y comprobar que su URL pública responde 200 desde fuera del servidor con certificado válido
 - [ ] 5.3 Validar Realtime: insertar una fila en `messages` y confirmar que aparece en la bandeja abierta sin recargar
 - [ ] 5.4 Reiniciar el stack completo y confirmar que los archivos subidos siguen descargándose
-- [ ] 5.5 Reiniciar el servidor y confirmar que todo vuelve solo, sin ejecutar comandos
+- [x] 5.5 Reiniciar el servidor y confirmar que todo vuelve solo, sin ejecutar comandos
 
 ## 6. Tareas programadas
 
