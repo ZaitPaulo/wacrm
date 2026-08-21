@@ -5,6 +5,11 @@ node_modules
 docs
 mcp-server
 supabase
+# Infraestructura del despliegue autoalojado. Nada de aquí entra en la imagen
+# del app, y ademas Postgres y Storage escriben SUS DATOS dentro de este
+# arbol (deploy/supabase/volumes/db/data y .../storage) con el UID del
+# contenedor: el build fallaria con "permission denied" al intentar leerlos.
+deploy
 *.md
 !README.md
 .env*

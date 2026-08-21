@@ -61,6 +61,27 @@ borrarlos obligaría a editar el compose de upstream. Nadie declara
 marca deprecado y no-op: Envoy ya es el gateway por defecto) y
 `docker-compose.pg17.yml` (redundante: PG 17 ya es el default).
 
+## Los datos viven dentro de esta carpeta
+
+Postgres y Storage escriben en bind mounts de upstream, así que en el
+servidor acabas con:
+
+```
+deploy/supabase/volumes/db/data/     ← la base de datos entera
+deploy/supabase/volumes/storage/     ← las fotos de los vehículos
+```
+
+Están en el `.gitignore` de upstream, así que no ensucian `git status`. Pero
+hay dos consecuencias que conviene tener presentes:
+
+- **`git clean -xdf` en el servidor borra la base de datos y todos los
+  archivos subidos.** Es un comando que la gente ejecuta sin pensar para
+  limpiar un árbol; aquí destruye producción. Si necesitas limpiar, hazlo con
+  rutas explícitas.
+- **El build del app no debe ver esta carpeta.** Los datos los crea el
+  contenedor con su propio UID, y el `docker build` fallaría con
+  `permission denied` al leerlos. Por eso `deploy` está en `.dockerignore`.
+
 ## Versiones
 
 Todas las imágenes vienen pineadas desde upstream — ninguna usa `latest`, y
