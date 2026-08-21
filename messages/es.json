@@ -15,7 +15,6 @@
     "createAccount": "Crear cuenta"
   },
   "Sidebar": {
-    "title": "AutoNova",
     "dashboard": "Panel",
     "inbox": "Bandeja",
     "notifications": "Notificaciones",
@@ -1569,7 +1568,7 @@
       "labelTooLong": "La etiqueta debe tener {max} caracteres o menos",
       "copied": "Se copió el enlace de invitación",
       "clipboardBlocked": "El portapapeles está bloqueado — copia el enlace a mano",
-      "whatsappMessage": "Únete a {accountName} en wacrm con este enlace (sirve por {expiresInDays} días): {url}"
+      "whatsappMessage": "Únete a {accountName} con este enlace (sirve por {expiresInDays} días): {url}"
     },
     "tagsAndFields": {
       "title": "Campos y etiquetas",
@@ -1680,8 +1679,8 @@
       "saveResubmit": "Guardar y reenviar",
       "submitApproval": "Enviar para aprobación",
       "deleteDialogTitle": "¿Eliminar la plantilla?",
-      "deleteMetaDesc": "\"{name}\" se va a eliminar de Meta y de wacrm. Las difusiones activas que la usen van a empezar a fallar en su próximo envío. Esto no se puede deshacer.",
-      "deleteLocalDesc": "\"{name}\" se va a eliminar de wacrm. Nunca se envió a Meta, así que no hay nada que limpiar del lado remoto.",
+      "deleteMetaDesc": "\"{name}\" se va a eliminar de Meta y de LoraMotors. Las difusiones activas que la usen van a empezar a fallar en su próximo envío. Esto no se puede deshacer.",
+      "deleteLocalDesc": "\"{name}\" se va a eliminar de LoraMotors. Nunca se envió a Meta, así que no hay nada que limpiar del lado remoto.",
       "deleting": "Eliminando…",
       "delete": "Eliminar",
       "toastLoadFailed": "No se pudieron cargar las plantillas",
@@ -1722,7 +1721,7 @@
       "notConnected": "Sin conectar",
       "connectedDesc": "Tu token de acceso autentica con Meta. Mira el estado de registro más abajo para saber si los webhooks están realmente conectados.",
       "notConnectedDesc": "Configura abajo tus credenciales de la API de Meta para conectar tu cuenta de WhatsApp Business.",
-      "registered": "Registrado — Meta va a entregar los eventos a wacrm",
+      "registered": "Registrado — Meta va a entregar los eventos a LoraMotors",
       "notRegistered": "Sin registrar — Meta no va a entregar eventos",
       "verifyWithMeta": "Verificar con Meta",
       "subscribedSince": "Suscrito desde el {date}. Haz clic en Verificar con Meta si dejan de llegar eventos.",
@@ -1746,7 +1745,7 @@
       "twoStepPin": "PIN de verificación en dos pasos",
       "optional": "(opcional)",
       "pinPlaceholder": "PIN de 6 dígitos del Administrador de WhatsApp de Meta",
-      "pinHint": "Solo hace falta para conectar los mensajes entrantes de un número de producción. Configúralo en Meta Business Manager → Cuentas de WhatsApp → Números de teléfono → Verificación en dos pasos y pégalo acá para que wacrm pueda suscribir el número. Si no, Meta manda los eventos entrantes a la última aplicación que lo reclamó (el síntoma típico del segundo número dentro de una WABA compartida). Los números de prueba de Meta no tienen PIN y vienen registrados: déjalo en blanco para ellos. Dejarlo en blanco también conserva un registro existente sin tocarlo.",
+      "pinHint": "Solo hace falta para conectar los mensajes entrantes de un número de producción. Configúralo en Meta Business Manager → Cuentas de WhatsApp → Números de teléfono → Verificación en dos pasos y pégalo acá para que LoraMotors pueda suscribir el número. Si no, Meta manda los eventos entrantes a la última aplicación que lo reclamó (el síntoma típico del segundo número dentro de una WABA compartida). Los números de prueba de Meta no tienen PIN y vienen registrados: déjalo en blanco para ellos. Dejarlo en blanco también conserva un registro existente sin tocarlo.",
       "webhookTitle": "Configuración del webhook",
       "webhookDesc": "Usa esta URL como callback del webhook en el panel de aplicaciones de Meta.",
       "webhookUrl": "URL de callback del webhook",
@@ -1913,7 +1912,7 @@
     },
     "aiConfig": {
       "title": "Configuración del agente",
-      "description": "Usa tu propia clave de OpenAI, Anthropic, OpenRouter o Gemini. wacrm llama al proveedor directamente con tu clave: sin costo por usuario y tus datos siguen siendo tuyos. Esto alimenta las respuestas redactadas con IA en la bandeja, el bot de respuesta automática y el Playground.",
+      "description": "Usa tu propia clave de OpenAI, Anthropic, OpenRouter o Gemini. LoraMotors llama al proveedor directamente con tu clave: sin costo por usuario y tus datos siguen siendo tuyos. Esto alimenta las respuestas redactadas con IA en la bandeja, el bot de respuesta automática y el Playground.",
       "adminOnlyConfig": "Solo los administradores y propietarios pueden cambiar la configuración de IA.",
       "loadFailed": "No se pudo cargar la configuración de IA",
       "providerAndKey": "Proveedor y clave",
@@ -2447,7 +2446,14 @@
     "welcome": "Bienvenido al equipo",
     "networkError": "No se pudo conectar con el servidor",
     "signOutFailed": "No se pudo cerrar la sesión. Intenta recargar la página.",
-    "wrongAccount": "Ya perteneces a otra cuenta. Inicia sesión con un correo distinto para unirte a esta."
+    "wrongAccount": "Ya perteneces a otra cuenta. Inicia sesión con un correo distinto para unirte a esta.",
+    "metaTitle": "Invitación para unirte a {brand}",
+    "metaDescription": "Te invitaron a formar parte del equipo. Abre el enlace para crear tu cuenta y aceptar la invitación.",
+    "ogEyebrow": "Invitación al equipo",
+    "ogInvitedGeneric": "Te invitaron a unirte al equipo",
+    "ogRole": "Rol: {role}",
+    "ogValidUntil": "Válido hasta el {date}",
+    "ogFooter": "Abre el enlace para crear tu cuenta y aceptar"
   },
   "AccountAccess": {
     "unlinkedTitle": "Este usuario no está vinculado a ninguna cuenta",
@@ -2496,5 +2502,8 @@
     "rewrite": "Reescribir con IA",
     "rewritten": "Reescrito — revísalo antes de publicar",
     "rewriteFailed": "No se pudo reescribir el texto"
+  },
+  "Brand": {
+    "description": "CRM de WhatsApp para la compraventa de vehículos."
   }
 }

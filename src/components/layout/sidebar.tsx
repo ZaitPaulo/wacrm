@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { APP_NAME } from "@/lib/brand";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
@@ -205,8 +206,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <MessageSquare className="h-4 w-4" />
             </div>
+            {/* El nombre de la marca sale de una constante y no del
+                catálogo de traducciones: no se traduce, y tenerlo por
+                idioma dejaba a `en`/`ko` con el nombre del template
+                upstream mucho después de renombrar `es`. */}
             <span className="text-sm font-semibold text-foreground">
-              {t("title")}
+              {APP_NAME}
             </span>
           </Link>
           <button

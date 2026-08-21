@@ -2,7 +2,7 @@
   "name": "wacrm",
   "version": "0.8.0",
   "private": true,
-  "description": "Self-hostable CRM template for WhatsApp built on Next.js and Supabase — shared inbox, contacts, sales pipelines, broadcasts, and no-code automations.",
+  "description": "LoraMotors — WhatsApp CRM for vehicle dealerships, built on Next.js and Supabase: shared inbox, contacts, inventory, sales pipelines, broadcasts, and no-code automations.",
   "license": "MIT",
   "author": "Arnas Donauskas",
   "homepage": "https://github.com/ArnasDon/wacrm",
@@ -21,8 +21,8 @@
     "supabase",
     "automation",
     "broadcast",
-    "self-hosted",
-    "template"
+    "inventory",
+    "dealership"
   ],
   "engines": {
     "node": ">=20.0.0"

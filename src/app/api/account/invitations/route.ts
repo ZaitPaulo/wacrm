@@ -46,10 +46,12 @@ import {
 //      operator to set an env var.
 //   3. `Host` header + the protocol the request arrived on —
 //      bare deployments without a proxy.
-//   4. Last-resort marketing-site fallback. Only hit if the
-//      request has no Host header at all, which is essentially
-//      impossible from a real browser. Logs a warning so the
-//      operator can spot the misconfig.
+//   4. Nothing. Only reachable if the request has no Host header
+//      at all (essentially impossible from a real browser) or an
+//      allow-list is set and no candidate matched it. The caller
+//      turns this into a 500 *before* inserting the row, so the
+//      admin gets a loud error instead of a link that silently
+//      points somewhere else.
 //
 // Defense-in-depth: `ALLOWED_INVITE_HOSTS`
 //
@@ -63,16 +65,17 @@ import {
 //
 //   When `ALLOWED_INVITE_HOSTS` is set (comma-separated hostnames),
 //   we validate the derived host against the list. Anything not
-//   on the list falls through to the wacrm.tech fallback with a
-//   loud console.warn. Operators who care about this attack
-//   surface should set this to their canonical hostnames; everyone
-//   else gets today's permissive behavior.
+//   on the list fails the request with a loud console.warn.
+//   Operators who care about this attack surface should set this to
+//   their canonical hostnames; everyone else gets today's
+//   permissive behavior.
 //
-// Previous implementation hard-defaulted to `https://wacrm.tech`
-// (the docs/marketing site, a different repo). Forks that didn't
-// set `NEXT_PUBLIC_SITE_URL` got invite links pointing at the
-// marketing site, which 404s on `/join/<token>`. This resolution
-// chain removes the foot-gun.
+// An earlier implementation hard-defaulted to the upstream
+// template's marketing domain, so a deploy that hit this branch
+// handed the admin a link pointing at a site that 404s on
+// `/join/<token>` — and that carried someone else's brand into a
+// message meant for our own team. Failing loudly beats minting a
+// link we know is wrong.
 function parseAllowedHosts(): readonly string[] | null {
   const raw = process.env.ALLOWED_INVITE_HOSTS?.trim();
   if (!raw) return null;
@@ -91,7 +94,7 @@ function isHostAllowed(
   return allowList.includes(hostname.toLowerCase());
 }
 
-function getBaseUrl(request: Request): string {
+function getBaseUrl(request: Request): string | null {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (explicit) return explicit.replace(/\/+$/, "");
 
@@ -128,10 +131,10 @@ function getBaseUrl(request: Request): string {
     );
   } else {
     console.warn(
-      "[POST /api/account/invitations] could not derive base URL from request; falling back to marketing domain",
+      "[POST /api/account/invitations] could not derive a base URL from the request; set NEXT_PUBLIC_SITE_URL",
     );
   }
-  return "https://wacrm.tech";
+  return null;
 }
 
 const MAX_LABEL_LEN = 80;
@@ -214,6 +217,20 @@ export async function POST(request: Request) {
       label = trimmed === "" ? null : trimmed;
     }
 
+    // Se resuelve antes del insert a propósito: si no hay una URL base
+    // fiable no hay enlace que devolver, y fallar después dejaría una
+    // fila de invitación que nadie puede compartir ni ver.
+    const baseUrl = getBaseUrl(request);
+    if (!baseUrl) {
+      return NextResponse.json(
+        {
+          error:
+            "Could not determine this deployment's public URL. Set NEXT_PUBLIC_SITE_URL (or add this host to ALLOWED_INVITE_HOSTS) and try again.",
+        },
+        { status: 500 },
+      );
+    }
+
     const { token, hash } = generateInviteToken();
 
     const { data, error } = await ctx.supabase
@@ -242,7 +259,7 @@ export async function POST(request: Request) {
         invitation: data,
         // Plaintext payload — visible to the admin exactly once.
         token,
-        url: inviteUrl(token, getBaseUrl(request)),
+        url: inviteUrl(token, baseUrl),
         expiresInDays: expiryDays,
       },
       { status: 201 },

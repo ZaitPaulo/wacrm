@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/lib/brand'
 import { type ProviderResult } from '../types'
 import { generateOpenAiCompatible } from './openai-compatible'
 import { type ProviderArgs } from './shared'
@@ -14,7 +15,7 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
  */
 function attributionHeaders(): Record<string, string> {
   const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, '')
-  return site ? { 'HTTP-Referer': site, 'X-Title': 'WACRM' } : {}
+  return site ? { 'HTTP-Referer': site, 'X-Title': APP_NAME } : {}
 }
 
 /**

@@ -136,6 +136,15 @@ export const RATE_LIMITS = {
    *  enabling brute-force token enumeration. With 256-bit tokens the
    *  enumeration risk is theoretical; this is belt-and-braces. */
   invitationPeek: { limit: 30, windowMs: 60_000 },
+  /** Previa del enlace de invitación — la OG image que dibuja
+   *  /join/[token]/opengraph-image (público, por IP). Bucket propio y
+   *  mucho más holgado que `invitationPeek` porque quien lo consume son
+   *  crawlers (WhatsApp, Telegram, Slack) que salen por un puñado de IPs
+   *  compartidas por todo el mundo: colgarlos del mismo cupo de 30/min
+   *  haría que las previas dejaran de renderizar justo cuando el enlace
+   *  se comparte mucho. Sigue acotando el martilleo a la base si alguien
+   *  itera tokens contra esta ruta en vez de contra el endpoint de peek. */
+  invitationPreview: { limit: 120, windowMs: 60_000 },
   /** Invitation redeem (authed, per-IP+user). Tighter than peek —
    *  successful redemption mutates two profiles and an invite row, so
    *  the abuse surface is "spam join attempts." */

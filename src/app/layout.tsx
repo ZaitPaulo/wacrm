@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from 'next-intl';
-import { getLocale, getMessages } from 'next-intl/server';
+import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ThemedToaster } from "@/components/themed-toaster";
+import { APP_NAME } from "@/lib/brand";
+import { configuredBaseUrl } from "@/lib/showcase/site-url";
 import {
   DEFAULT_MODE,
   DEFAULT_THEME,
@@ -20,25 +22,43 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "wacrm",
-    template: "%s — wacrm",
-  },
-  description: "Self-hostable CRM template for WhatsApp.",
-  robots: {
-    index: false,
-    follow: false,
-  },
-  icons: {
-    icon: [{ url: "/icon" }],
-  },
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
-};
+// `metadataBase` resuelve a URL absoluta todo campo de metadata que sea
+// una ruta relativa — y el `og:image` que Next genera desde los archivos
+// `opengraph-image.tsx` es uno de ellos. Sin esta base, en un despliegue
+// propio (sin las VERCEL_* que Next usa de respaldo) el og:image sale
+// como `http://localhost:3000/...`, que ningún crawler externo puede
+// descargar: así es como los enlaces compartidos por WhatsApp quedaban
+// sin miniatura. Ver node_modules/next/dist/lib/metadata/resolvers/resolve-url.js.
+//
+// Se lee de NEXT_PUBLIC_SITE_URL y no del request porque `headers()` en
+// el layout raíz volvería dinámica toda la app. Las rutas que necesitan
+// funcionar aunque la variable falte (p. ej. /join) declaran su propia
+// `metadataBase` derivada del request.
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("Brand");
+
+  return {
+    metadataBase: configuredBaseUrl(),
+    title: {
+      default: APP_NAME,
+      template: `%s — ${APP_NAME}`,
+    },
+    description: t("description"),
+    applicationName: APP_NAME,
+    robots: {
+      index: false,
+      follow: false,
+    },
+    icons: {
+      icon: [{ url: "/icon" }],
+    },
+    formatDetection: {
+      email: false,
+      address: false,
+      telephone: false,
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#020617",

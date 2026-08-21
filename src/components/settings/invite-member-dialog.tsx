@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Copy, Loader2, MessageCircle, Sparkles } from 'lucide-react';
 
+import { APP_NAME } from '@/lib/brand';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
@@ -131,11 +132,11 @@ export function InviteMemberDialog({
         role,
         expiresInDays: data.expiresInDays,
         // Snapshot the account name into the result so the wa.me
-        // share message has team context. Falls back to a generic
-        // string if `account` hasn't loaded yet (shouldn't happen
-        // — the dialog requires admin+ which requires a loaded
-        // profile — but stay safe).
-        accountName: account?.name ?? 'our wacrm account',
+        // share message has team context. Falls back to the product
+        // name if `account` hasn't loaded yet (shouldn't happen — the
+        // dialog requires admin+ which requires a loaded profile — but
+        // stay safe).
+        accountName: account?.name ?? APP_NAME,
       });
       onCreated();
     } catch (err) {
@@ -162,9 +163,9 @@ export function InviteMemberDialog({
   function whatsappShareUrl(url: string): string {
     // Include the account name so the recipient knows which team
     // they're being invited to before clicking through. This matters
-    // for users in multi-team contexts where "our wacrm account"
+    // for users in multi-team contexts where the bare product name
     // wouldn't be enough to disambiguate.
-    const accountName = result?.accountName ?? 'our wacrm account';
+    const accountName = result?.accountName ?? APP_NAME;
     const message = t('whatsappMessage', { accountName, expiresInDays: result?.expiresInDays ?? 0, url });
     return `https://wa.me/?text=${encodeURIComponent(message)}`;
   }
