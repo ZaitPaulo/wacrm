@@ -34,17 +34,27 @@ www.{$DOMAIN} {
 	# que no tienen ninguna razón para ser alcanzables desde internet. El
 	# secreto compartido las protege igual; esto es la capa de antes: lo que
 	# no se publica no se puede atacar por fuerza bruta ni saturar.
+	# OJO con el orden: en cuanto hay un bloque `handle`, TODO lo que sirve
+	# este host tiene que ir dentro de un `handle`. Caddy no evalúa las
+	# directivas en el orden del archivo sino por su orden interno, y
+	# `reverse_proxy` va ANTES que `handle` — un reverse_proxy suelto aquí
+	# capturaría la petición antes de que el matcher de abajo llegue a verla,
+	# y el bloqueo no serviría de nada. Con todo en `handle`, gana el primero
+	# que hace match, de arriba abajo.
 	@cron path /api/automations/cron /api/flows/cron
 	handle @cron {
 		respond "Not Found" 404
 	}
 
-	reverse_proxy app:3000 {
-		# El app deriva su URL pública del request cuando NEXT_PUBLIC_SITE_URL
-		# no está fijada (src/lib/showcase/site-url.ts). Sin estas cabeceras
-		# generaría enlaces http://app:3000 en el sitemap y las imágenes OG.
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
+	handle {
+		reverse_proxy app:3000 {
+			# El app deriva su URL pública del request cuando
+			# NEXT_PUBLIC_SITE_URL no está fijada
+			# (src/lib/showcase/site-url.ts). Sin estas cabeceras generaría
+			# enlaces http://app:3000 en el sitemap y las imágenes OG.
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+		}
 	}
 
 	header -server
