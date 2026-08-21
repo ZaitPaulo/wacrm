@@ -51,10 +51,10 @@ for v in POSTGRES_PASSWORD JWT_SECRET ANON_KEY SERVICE_ROLE_KEY SECRET_KEY_BASE 
          SUPABASE_PUBLIC_URL API_EXTERNAL_URL SITE_URL \
          NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY \
          NEXT_PUBLIC_SITE_URL SUPABASE_SERVICE_ROLE_KEY \
-         ENCRYPTION_KEY AUTOMATION_CRON_SECRET DOMAIN; do
+         ENCRYPTION_KEY AUTOMATION_CRON_SECRET DOMAIN LETSENCRYPT_EMAIL; do
   [[ -n "$(get "$v")" ]] || fail "$v está vacía o no existe"
 done
-[[ $errors -eq 0 ]] && ok "las 20 obligatorias tienen valor"
+[[ $errors -eq 0 ]] && ok "las 21 obligatorias tienen valor"
 
 # --- 3. Longitudes exactas que exige cada servicio --------------------------
 echo

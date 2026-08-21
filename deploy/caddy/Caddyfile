@@ -1,0 +1,78 @@
+# ============================================================================
+# Reverse proxy y TLS de todo el despliegue.
+#
+# Caddy pide y renueva solo los certificados de Let's Encrypt, así que aquí
+# no hay certbot, ni cron de renovación, ni recarga de nginx.
+#
+# Tres nombres, UNA sola IP: Caddy los distingue por SNI y emite un
+# certificado para cada uno.
+# ============================================================================
+
+{
+	email {$LETSENCRYPT_EMAIL}
+}
+
+# ----------------------------------------------------------------------------
+# www -> apex
+#
+# El app se sirve en el dominio raíz porque la vitrina pública ES la raíz de
+# la aplicación (src/app/page.tsx). Tener la misma ficha de vehículo
+# respondiendo en dos hostnames sería contenido duplicado para Google, así
+# que www no sirve nada: redirige.
+# ----------------------------------------------------------------------------
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+# ----------------------------------------------------------------------------
+# El app Next.js: vitrina pública en / y CRM en /login
+# ----------------------------------------------------------------------------
+{$DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy app:3000 {
+		# El app deriva su URL pública del request cuando NEXT_PUBLIC_SITE_URL
+		# no está fijada (src/lib/showcase/site-url.ts). Sin estas cabeceras
+		# generaría enlaces http://app:3000 en el sitemap y las imágenes OG.
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	header -server
+}
+
+# ----------------------------------------------------------------------------
+# Gateway de Supabase
+#
+# Este host TIENE que ser público, y es lo que más sorprende de autoalojar:
+# no basta con que el app lo alcance por la red interna de Docker.
+#
+#   - El navegador habla directo con Supabase. src/lib/supabase/client.ts
+#     corre en el cliente, y el WebSocket de Realtime también.
+#   - Meta DESCARGA las fotos de los vehículos desde las URLs públicas de
+#     Storage para publicarlas en Instagram (src/lib/instagram/images.ts).
+#
+# Las rutas de API van al gateway; todo lo demás es Studio, y Studio da
+# acceso total a la base, así que no queda abierto.
+# ----------------------------------------------------------------------------
+supabase.{$DOMAIN} {
+	encode zstd gzip
+
+	@api path /auth/v1/* /rest/v1/* /graphql/v1 /realtime/v1/* /storage/v1/* /sso/*
+
+	handle @api {
+		# reverse_proxy pasa el WebSocket de Realtime sin configuración extra.
+		reverse_proxy api-gw:8000
+	}
+
+	handle {
+		basic_auth {
+			# El hash bcrypt lo calcula el arranque del contenedor a partir de
+			# DASHBOARD_PASSWORD; aquí solo llega ya hasheado.
+			{$DASHBOARD_USERNAME} {$DASHBOARD_PASSWORD_HASH}
+		}
+		reverse_proxy studio:3000
+	}
+
+	header -server
+}

@@ -1,0 +1,85 @@
+# ============================================================================
+# Overlay del app para el despliegue autoalojado, más el reverse proxy.
+#
+# Se combina con el docker-compose.yml de la raíz, que NO se modifica: ese
+# sigue sirviendo para correr el app contra Supabase Cloud, que es lo que
+# hace la mayoría de quien clona el repo. Si le pusiéramos la red externa y
+# el env de deploy/ directamente, ese caso dejaría de funcionar — la red
+# `loramotors` no existiría en su máquina.
+#
+# Se levanta desde la raíz del repo:
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.app.yml \
+#     --env-file deploy/.env up -d --build
+#
+# El --env-file importa: los NEXT_PUBLIC_* llegan como build args, y Compose
+# los resuelve desde el env-file, no desde el env_file del servicio.
+# ============================================================================
+
+services:
+  app:
+    # Los secretos de servidor se leen en ejecución, nunca se hornean en la
+    # imagen. El compose raíz apunta a .env.local; en self-host el archivo es
+    # deploy/.env, el mismo que consume el stack de Supabase.
+    env_file: !override
+      - deploy/.env
+
+    # El proxy es el único que escucha en el servidor. Publicar el 3000 aquí
+    # lo dejaría accesible desde internet saltándose UFW, porque Docker
+    # escribe sus reglas de iptables antes en la cadena.
+    ports: !reset []
+
+    networks:
+      - default
+
+  # --------------------------------------------------------------------------
+  # Caddy: TLS automático de Let's Encrypt para los tres nombres.
+  #
+  # Se elige sobre nginx+certbot (tres piezas móviles y un cron propio que
+  # falla en silencio) y sobre Traefik (potente, pero su configuración por
+  # labels es más superficie de la que este despliegue necesita).
+  # --------------------------------------------------------------------------
+  caddy:
+    container_name: crm-caddy
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"     # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?falta DOMAIN en deploy/.env}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:?falta LETSENCRYPT_EMAIL en deploy/.env}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:?falta DASHBOARD_USERNAME}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:?falta DASHBOARD_PASSWORD}
+    # basic_auth necesita un hash bcrypt, no la contraseña. Se calcula al
+    # arrancar para no tener que guardar el hash en el .env ni versionarlo.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        export DASHBOARD_PASSWORD_HASH="$$(caddy hash-password --plaintext "$$DASHBOARD_PASSWORD")" && \
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Los certificados viven en un volumen: sin esto, cada recreación del
+      # contenedor volvería a pedirlos, y Let's Encrypt limita las emisiones
+      # por dominio y semana.
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - default
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+# La misma red externa donde vive el stack de Supabase, para que Caddy
+# alcance a `api-gw` y a `studio` por nombre, y el app alcance al gateway.
+networks:
+  default:
+    name: loramotors
+    external: true

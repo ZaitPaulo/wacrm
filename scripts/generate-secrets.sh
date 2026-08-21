@@ -35,6 +35,12 @@ if [[ -z "$DOMAIN" ]]; then
 fi
 [[ -n "$DOMAIN" ]] || { echo "ERROR: el dominio es obligatorio" >&2; exit 1; }
 
+LETSENCRYPT_EMAIL="${2:-}"
+if [[ -z "$LETSENCRYPT_EMAIL" ]]; then
+  read -rp "Correo para los avisos de Let's Encrypt: " LETSENCRYPT_EMAIL
+fi
+[[ -n "$LETSENCRYPT_EMAIL" ]] || { echo "ERROR: el correo es obligatorio" >&2; exit 1; }
+
 APP_URL="https://${DOMAIN}"
 SUPABASE_URL="https://supabase.${DOMAIN}"
 
@@ -205,8 +211,12 @@ AUTOMATION_CRON_SECRET=${AUTOMATION_CRON_SECRET}
 META_APP_ID=
 META_APP_SECRET=
 
-# --- Dominio (lo usan el Caddyfile y los scripts) ---------------------------
+# --- Dominio y proxy (lo usan el Caddyfile y los scripts) -------------------
 DOMAIN=${DOMAIN}
+
+# Adonde avisa Let's Encrypt del vencimiento de los certificados. Caddy los
+# renueva solo, asi que este correo es la red de seguridad de que algo fallo.
+LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
 EOF
 
 # El stack se levanta desde deploy/supabase/, y Compose lee el .env del

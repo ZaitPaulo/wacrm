@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendored minified opus-recorder encoder worker (served statically).
     "public/opus/**",
+    // Vendored upstream: deploy/supabase/ mirrors supabase/supabase@docker
+    // byte for byte so updates are a readable diff. Its Deno edge functions
+    // aren't ours to lint.
+    "deploy/supabase/**",
   ]),
 ]);
 

@@ -19,6 +19,39 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
  *     deny them. A supply-chain compromise or a forgotten plugin
  *     can't silently opt back in.
  */
+/**
+ * Origen de Supabase, derivado de `NEXT_PUBLIC_SUPABASE_URL`.
+ *
+ * Antes estaba escrito a mano como `https://*.supabase.co`, lo que daba
+ * por hecho que Supabase siempre sería el servicio en la nube. En un
+ * despliegue autoalojado el origen es el dominio propio, y dejar el
+ * comodín ahí rompería dos cosas a la vez:
+ *
+ *   - La CSP. Hoy viaja como Report-Only, así que solo ensucia la
+ *     consola; el día que se pase a modo bloqueo —la intención declarada
+ *     arriba— cortaría de golpe Realtime y todas las llamadas a Supabase.
+ *   - `next/image`. Un host que no esté en `remotePatterns` hace fallar
+ *     la optimización, y con ello las fotos de los vehículos: la vitrina
+ *     entera se queda sin imágenes.
+ *
+ * Sin la variable definida (build sin configurar) se cae al comodín de la
+ * nube, que es el comportamiento anterior.
+ */
+const SUPABASE_ORIGIN = (() => {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+})();
+
+const SUPABASE_HTTP_SRC = SUPABASE_ORIGIN ?? "https://*.supabase.co";
+const SUPABASE_WS_SRC = SUPABASE_ORIGIN
+  ? SUPABASE_ORIGIN.replace(/^https:/, "wss:")
+  : "wss://*.supabase.co";
+
 const SECURITY_HEADERS = [
   {
     key: "Strict-Transport-Security",
@@ -51,11 +84,11 @@ const SECURITY_HEADERS = [
       "img-src 'self' data: blob: https:",
       // Outbound media previews (blob: from MediaRecorder + file picker)
       // and Supabase public-bucket audio/video the inbox renders.
-      "media-src 'self' blob: https://*.supabase.co",
+      `media-src 'self' blob: ${SUPABASE_HTTP_SRC}`,
       "font-src 'self' data:",
       // Supabase REST + realtime (WSS). All Meta API calls happen
       // server-side, so graph.facebook.com does not belong here.
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+      `connect-src 'self' ${SUPABASE_HTTP_SRC} ${SUPABASE_WS_SRC}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -67,7 +100,11 @@ const SECURITY_HEADERS = [
 // fotos de la vitrina viven en el bucket público de Supabase; picsum e
 // images.unsplash.com son para los vehículos demo (picsum devuelve fotos
 // aleatorias, unsplash las de autos). Otros hosts externos se agregan aquí.
-const IMAGE_HOSTS = ["**.supabase.co", "picsum.photos", "images.unsplash.com"];
+const IMAGE_HOSTS = [
+  SUPABASE_ORIGIN ? new URL(SUPABASE_ORIGIN).hostname : "**.supabase.co",
+  "picsum.photos",
+  "images.unsplash.com",
+];
 
 const nextConfig: NextConfig = {
   images: {

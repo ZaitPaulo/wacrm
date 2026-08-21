@@ -30,5 +30,12 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    // Codigo de upstream vendorizado en deploy/supabase/: los ficheros de
+    // volumes/functions/ son Edge Functions de Deno (usan `Deno` y
+    // `EdgeRuntime`, que no existen en este proyecto) y no forman parte del
+    // app. Se guardan solo para que deploy/supabase/ sea identico a upstream.
+    "deploy"
+  ]
 }
