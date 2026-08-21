@@ -6,6 +6,12 @@ runs as a non-root user) and a `docker-compose.yml` with a single
 (or self-hosted) Supabase project via env vars; no database container
 is included.
 
+> **Looking to run Supabase yourself, on the same box?**
+> That's a different setup: it adds Postgres, Auth, Storage, Realtime, a
+> gateway and a TLS reverse proxy, and it lives in `deploy/` as an *overlay*
+> on top of this compose file — which is why nothing on this page changes.
+> See **[self-hosting.md](./self-hosting.md)** (in Spanish).
+
 ## Quick start
 
 1. Copy the env template and fill it in:

@@ -79,13 +79,13 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 
 ## 8. Documentación
 
-- [ ] 8.1 Escribir `docs/self-hosting.md`: requisitos del servidor, instalación desde cero, arquitectura de los dos subdominios y cuadro de diagnóstico de fallos frecuentes
-- [ ] 8.2 Reescribir `docs/docker.md`, que hoy afirma que Supabase es externo y que no se incluye contenedor de base de datos
-- [ ] 8.3 Documentar el procedimiento de actualización del stack, con respaldo previo obligatorio
-- [ ] 8.4 Documentar la rotación de secretos, advirtiendo que rotar `ENCRYPTION_KEY` obliga a reconectar WhatsApp en cada cuenta
-- [ ] 8.5 Documentar la limitación conocida del reseteo de contraseña sin SMTP, con el procedimiento manual desde Studio
-- [ ] 8.6 Advertir en negrita que cambiar cualquier `NEXT_PUBLIC_*` exige reconstruir la imagen, no reiniciarla
-- [ ] 8.7 Actualizar el README con un puntero al despliegue autoalojado
+- [x] 8.1 Escribir `docs/self-hosting.md`: requisitos del servidor, instalación desde cero, arquitectura de los dos subdominios y cuadro de diagnóstico de fallos frecuentes
+- [x] 8.2 `docs/docker.md` NO se reescribe: su premisa sigue siendo cierta porque el compose raíz no se tocó y correr contra Supabase Cloud funciona igual. Gana un puntero a la guía de autoalojado
+- [x] 8.3 Documentar el procedimiento de actualización del stack, con respaldo previo obligatorio
+- [x] 8.4 Documentar la rotación de secretos, advirtiendo que rotar `ENCRYPTION_KEY` obliga a reconectar WhatsApp en cada cuenta
+- [x] 8.5 Documentar la limitación conocida del reseteo de contraseña sin SMTP, con el procedimiento manual desde Studio
+- [x] 8.6 Advertir en negrita que cambiar cualquier `NEXT_PUBLIC_*` exige reconstruir la imagen, no reiniciarla
+- [x] 8.7 Actualizar el README con un puntero al despliegue autoalojado
 
 ## 9. Corte de producción
 
