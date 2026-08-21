@@ -8,6 +8,11 @@ export const alt = 'Vehículos disponibles'
 
 // OG image dinámica de la portada de la vitrina (texto, sin imágenes
 // remotas → siempre renderiza).
+//
+// Dinámica de verdad, como la página que acompaña: cuenta vehículos
+// disponibles, así que prerenderizarla la dejaría anunciando para siempre
+// el inventario del día del build.
+export const dynamic = 'force-dynamic'
 export default async function OgImage() {
   const data = await getShowcase()
   const t = await getTranslations('Storefront')

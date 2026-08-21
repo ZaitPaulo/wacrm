@@ -11,6 +11,10 @@ type Params = { params: Promise<{ id: string }> }
 // OG image dinámica por vehículo: foto principal + marca/modelo/año +
 // precio, para que los enlaces compartidos (WhatsApp, redes) muestren el
 // auto. Si no hay foto, renderiza una tarjeta con solo texto.
+//
+// Dinámica como la ficha que acompaña: el precio cambia, y una imagen
+// prerenderizada anunciaría en WhatsApp un precio que ya no es el vigente.
+export const dynamic = 'force-dynamic'
 export default async function OgImage({ params }: Params) {
   const { id } = await params
   const data = await getShowcaseVehicle(id)
