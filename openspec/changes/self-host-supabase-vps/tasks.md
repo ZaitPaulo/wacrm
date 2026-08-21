@@ -75,7 +75,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 - [x] 7.3 Hacer que un fallo del respaldo quede registrado de forma visible y no se reporte como exitoso
 - [x] 7.4 Programar el respaldo diario — en el crontab del host vía `scripts/install-backup-cron.sh`, NO dentro del compose: necesitaría el socket de Docker montado, que es acceso root al host
 - [x] 7.5 Escribir `scripts/restore.sh`
-- [ ] 7.6 **Ejecutar la restauración de verdad** sobre un stack vacío y verificar login, conversaciones y descarga de archivos. Este paso no se salta ni se da por hecho
+- [x] 7.6 **Ejecutar la restauración de verdad** sobre un stack vacío y verificar login, conversaciones y descarga de archivos. Este paso no se salta ni se da por hecho
 
 ## 8. Documentación
 
