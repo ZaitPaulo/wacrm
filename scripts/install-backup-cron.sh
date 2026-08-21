@@ -33,6 +33,14 @@ LOG="${BACKUP_LOG:-/opt/crm-backups/backup.log}"
 LINE="${SCHEDULE} ${ROOT}/scripts/backup.sh >> ${LOG} 2>&1"
 
 current() { crontab -l 2>/dev/null || true; }
+
+# El crontab sin NUESTRAS lineas, para poder reinstalar sin duplicar y sin
+# tocar lo que el usuario tenga programado por su cuenta.
+#
+# Filtra por dos cosas —el marcador Y la ruta del script— porque una
+# instalacion anterior pudo dejar la linea sin marcador, o alguien pudo
+# borrar el comentario a mano. Con un solo filtro, reinstalar acumularia
+# respaldos duplicados cada vez.
 without_ours() { current | grep -vF "$MARKER" | grep -vF "${ROOT}/scripts/backup.sh" || true; }
 
 case "${1:-install}" in

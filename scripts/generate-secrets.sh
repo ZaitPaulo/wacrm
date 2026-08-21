@@ -48,8 +48,20 @@ SUPABASE_URL="https://supabase.${DOMAIN}"
 # Las claves anon y service_role son JWT firmados con JWT_SECRET. Tienen que
 # estar firmados con el MISMO secreto que usa el stack, o el gateway rechaza
 # todas las peticiones del app con un 401 que no dice por qué.
+# base64 -> base64url. No es lo mismo: JWT viaja en URLs y cabeceras, asi que
+# cambia '+' y '/' por '-' y '_' y elimina el relleno '='. Un base64 normal
+# aqui produce un token que unas librerias aceptan y otras rechazan, que es
+# peor que uno que falle siempre.
 b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
 
+# Firma un JWT HS256 con la forma que espera el stack de Supabase.
+#
+#   sign_jwt anon "$JWT_SECRET"   ->  header.payload.firma
+#
+# $1: el `role` del payload — `anon` o `service_role`; es lo que decide que
+#     permisos tiene la clave frente a la RLS de Postgres.
+# $2: el secreto con el que se firma. TIENE que ser el mismo JWT_SECRET que
+#     recibe el stack, o el gateway rechaza la clave con un 401 mudo.
 sign_jwt() {
   local role="$1" secret="$2" iat exp header payload input sig
   iat="$(date +%s)"

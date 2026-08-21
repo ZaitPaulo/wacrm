@@ -94,8 +94,16 @@ pgm="$(get PG_META_CRYPTO_KEY)"
 echo
 echo "Coherencia de las claves con JWT_SECRET:"
 
+# Mismo base64url que usa generate-secrets.sh al firmar. Tiene que coincidir
+# byte a byte o la firma recalculada no cuadraria nunca.
 b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
 
+# Comprueba que un JWT esta firmado con $3, recalculando el HMAC sobre su
+# propio header.payload y comparandolo con la firma que trae.
+#
+# Se recalcula en vez de inspeccionar el token porque el formato no prueba
+# nada: una clave de OTRA instalacion es un JWT perfectamente valido, pasa
+# cualquier revision visual, y solo se delata cuando el gateway la rechaza.
 check_jwt() {
   local name="$1" token="$2" secret="$3" input sig expected role
   input="${token%.*}"
@@ -105,6 +113,10 @@ check_jwt() {
     fail "$name NO está firmada con el JWT_SECRET de este archivo"
     return
   fi
+  # El '=====' devuelve el relleno que b64url quito al firmar: `base64 -d`
+  # exige que la longitud sea multiplo de 4 y falla sin el. Sobran '=' a
+  # proposito — el decodificador ignora los de mas, y asi no hay que calcular
+  # cuantos faltaban.
   role="$(printf '%s' "${input#*.}=====" | tr '_-' '/+' | openssl base64 -d -A 2>/dev/null | sed -n 's/.*"role":"\([^"]*\)".*/\1/p')"
   ok "$name: firma válida, role=$role"
 }
