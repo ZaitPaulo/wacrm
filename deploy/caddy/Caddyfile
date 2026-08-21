@@ -30,6 +30,15 @@ www.{$DOMAIN} {
 {$DOMAIN} {
 	encode zstd gzip
 
+	# Las rutas de cron las llama el contenedor `cron` por la red interna, así
+	# que no tienen ninguna razón para ser alcanzables desde internet. El
+	# secreto compartido las protege igual; esto es la capa de antes: lo que
+	# no se publica no se puede atacar por fuerza bruta ni saturar.
+	@cron path /api/automations/cron /api/flows/cron
+	handle @cron {
+		respond "Not Found" 404
+	}
+
 	reverse_proxy app:3000 {
 		# El app deriva su URL pública del request cuando NEXT_PUBLIC_SITE_URL
 		# no está fijada (src/lib/showcase/site-url.ts). Sin estas cabeceras

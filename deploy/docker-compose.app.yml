@@ -73,6 +73,43 @@ services:
     networks:
       - default
 
+  # --------------------------------------------------------------------------
+  # Tareas programadas.
+  #
+  # Vive DENTRO del compose y no como systemd timer en el host: un timer
+  # funciona, pero se pierde al reinstalar el servidor y no aparece en
+  # `docker compose ps` cuando lleva días sin correr. Aquí se ve.
+  #
+  # Imagen alpine pelada: busybox trae crond y un wget que admite --header,
+  # asi que no hay nada que instalar en cada arranque.
+  # --------------------------------------------------------------------------
+  cron:
+    container_name: crm-cron
+    image: alpine:3.22
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      AUTOMATION_CRON_SECRET: ${AUTOMATION_CRON_SECRET:?falta AUTOMATION_CRON_SECRET en deploy/.env}
+    volumes:
+      - ./deploy/cron/crontab:/etc/crontabs/root:ro
+      - ./deploy/cron/tick.sh:/tick.sh:ro
+    # Un tick inmediato al arrancar: si el secreto no coincide se ve en los
+    # logs YA, en vez de descubrirlo dentro de un minuto — o de un mes,
+    # cuando alguien note que las esperas no avanzan.
+    #
+    # crond -f no se demoniza (Docker necesita el proceso en primer plano) y
+    # -d 8 manda la salida a stdout para que `docker logs` la recoja.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        /tick.sh /api/automations/cron || true
+        exec crond -f -d 8
+    networks:
+      - default
+
 volumes:
   caddy_data:
   caddy_config:

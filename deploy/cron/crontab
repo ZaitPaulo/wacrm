@@ -1,0 +1,24 @@
+# ============================================================================
+# Tareas programadas del CRM. Formato crontab de busybox.
+#
+# Las dos rutas son operaciones independientes y viven en URLs separadas para
+# que una fallando no bloquee la otra.
+# ============================================================================
+
+# --- Automatizaciones: cada minuto ------------------------------------------
+# Drena `automation_pending_executions` con `run_at` ya vencido. Es lo que
+# hace avanzar los pasos Wait, así que el intervalo es la PRECISIÓN de esas
+# esperas: con cinco minutos, un "esperar 10 minutos" se cumpliría entre el
+# minuto 10 y el 15. Procesa hasta 50 filas por pasada.
+* * * * * /tick.sh /api/automations/cron
+
+# --- Flows: cada 5 minutos --------------------------------------------------
+# Cierra los flow runs abandonados. El propio código lo dice: "a 5-minute
+# interval is more than enough for a 24h timeout default".
+#
+# No es opcional aunque el timeout sea de 24 horas. Un cliente que abandona
+# un flujo a medias mantiene su fila en `idx_one_active_run_per_contact` —el
+# índice único parcial sobre los runs activos— y eso le BLOQUEA cualquier
+# disparo nuevo mientras no se barra. Sin este sweep, un contacto puede
+# quedar mudo para siempre sin que nadie entienda por qué.
+*/5 * * * * /tick.sh /api/flows/cron

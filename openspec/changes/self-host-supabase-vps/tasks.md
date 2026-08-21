@@ -63,10 +63,10 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 
 ## 6. Tareas programadas
 
-- [ ] 6.1 Añadir al compose el contenedor de cron que invoca `/api/automations/cron` y `/api/flows/cron` por la red interna con la cabecera `x-cron-secret`
-- [ ] 6.2 Definir y documentar la frecuencia de cada ruta
+- [x] 6.1 Añadir al compose el contenedor de cron que invoca `/api/automations/cron` y `/api/flows/cron` por la red interna con la cabecera `x-cron-secret`
+- [x] 6.2 Definir y documentar la frecuencia de cada ruta
 - [ ] 6.3 Verificar de punta a punta que una automatización con paso Wait avanza sola al cumplirse la espera
-- [ ] 6.4 Comprobar que las rutas de cron no quedan publicadas en el proxy
+- [x] 6.4 Comprobar que las rutas de cron no quedan publicadas en el proxy
 
 ## 7. Respaldo y restauración
 
