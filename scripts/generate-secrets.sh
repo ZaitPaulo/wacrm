@@ -102,6 +102,15 @@ JWT_EXPIRY=3600
 ANON_KEY=${ANON_KEY}
 SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}
 
+# Claves opacas nuevas de Supabase. Se dejan VACIAS a proposito: el app lee
+# NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY y las pasa a
+# @supabase/ssr, asi que las JWT de arriba funcionan sin tocar src/. Migrar a
+# claves asimetricas es un cambio aparte, con su propia rotacion.
+# Van declaradas aunque vacias para que Compose no avise en cada comando: un
+# warning que sale siempre es un warning que se deja de leer.
+SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
+
 # --- Secretos internos del stack --------------------------------------------
 SECRET_KEY_BASE=${SECRET_KEY_BASE}
 REALTIME_DB_ENC_KEY=${REALTIME_DB_ENC_KEY}
@@ -162,6 +171,11 @@ POOLER_MAX_CLIENT_CONN=100
 POOLER_DB_POOL_SIZE=5
 POOLER_PROXY_PORT_TRANSACTION=6543
 DOCKER_SOCKET_LOCATION=/var/run/docker.sock
+REGION=local
+
+# Asistente SQL de Studio. Opcional y sin relacion con la IA del CRM, que es
+# bring-your-own-key por cuenta desde la interfaz.
+OPENAI_API_KEY=
 
 # ============================================================================
 # Del app Next.js — no los consume el stack de Supabase

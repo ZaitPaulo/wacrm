@@ -20,7 +20,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 - [x] 1.2 Vendorizar en `deploy/supabase/docker-compose.yml` el compose oficial de `supabase/supabase@docker`, sin modificar, anotando el commit de origen
 - [x] 1.3 Escribir `deploy/supabase/docker-compose.crm.yml`: apagar `functions` y `supavisor`, quitar la publicación del puerto 8000 al host y unir todo a la red externa compartida. El backend `file` de `storage` ya viene por defecto de upstream, sobre bind mount y no volumen nombrado — ver design
 - [x] 1.4 Fijar todas las imágenes a versiones explícitas y dejar la tabla de versiones en el README de `deploy/`
-- [ ] 1.5 Levantar el stack en local (o en un VPS de prueba) y verificar que `db`, `api-gw`, `auth`, `rest`, `realtime`, `storage` y `meta` quedan sanos y que ningún contenedor reinicia en bucle
+- [x] 1.5 Levantar el stack en local (o en un VPS de prueba) y verificar que `db`, `api-gw`, `auth`, `rest`, `realtime`, `storage` y `meta` quedan sanos y que ningún contenedor reinicia en bucle
 
 ## 2. Secretos y configuración
 
@@ -32,8 +32,8 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 
 ## 3. Base de datos y migraciones
 
-- [ ] 3.1 Escribir `scripts/bootstrap-db.sh`: crear `supabase_migrations.schema_migrations` si falta y crear la publicación `supabase_realtime` de forma idempotente
-- [ ] 3.2 Escribir `scripts/apply-migrations.sh`: recorrer `supabase/migrations/*.sql` en orden numérico, ejecutar cada una en una transacción con `psql` dentro del contenedor `db`, registrar la versión y omitir las ya aplicadas
+- [x] 3.1 Escribir `scripts/bootstrap-db.sh`: crear `supabase_migrations.schema_migrations` si falta y crear la publicación `supabase_realtime` de forma idempotente
+- [x] 3.2 Escribir `scripts/apply-migrations.sh`: recorrer `supabase/migrations/*.sql` en orden numérico, ejecutar cada una en una transacción con `psql` dentro del contenedor `db`, registrar la versión y omitir las ya aplicadas
 - [ ] 3.3 Verificar el comportamiento ante fallo: introducir una migración inválida a propósito y comprobar que revierte, no se registra y detiene el proceso informando cuál falló
 - [ ] 3.4 Aplicar las 53 migraciones sobre base limpia y confirmar que las extensiones `uuid-ossp` y `vector` quedan creadas
 - [ ] 3.5 Verificar que la publicación `supabase_realtime` incluye `messages`, `conversations`, `message_reactions`, `flow_runs`, `member_presence` y `notifications`
