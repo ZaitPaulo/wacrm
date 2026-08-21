@@ -145,7 +145,28 @@ echo "Meta (no bloquea el arranque del stack):"
 [[ -n "$(get META_APP_ID)" ]] && ok "META_APP_ID definido" \
   || warn "META_APP_ID vacío"
 
-# --- 7. Permisos ------------------------------------------------------------
+# --- 7. Correo saliente -----------------------------------------------------
+# Avisa, no bloquea: el stack arranca igual. Pero sin relay, GoTrue responde
+# exito a resetPasswordForEmail SIN enviar nada —para no revelar que correos
+# existen— y /forgot-password dice "revisa tu correo" ante un correo que no
+# llegara nunca. Es un fallo silencioso para el usuario final.
+echo
+echo "Correo saliente:"
+if [[ -n "$(get SMTP_HOST)" ]]; then
+  ok "SMTP_HOST = $(get SMTP_HOST)"
+  [[ -n "$(get SMTP_USER)" ]] || fail "SMTP_HOST definido pero SMTP_USER vacío"
+  [[ -n "$(get SMTP_PASS)" ]] || fail "SMTP_HOST definido pero SMTP_PASS vacío"
+  admin_mail="$(get SMTP_ADMIN_EMAIL)"
+  if [[ -n "$admin_mail" && "$admin_mail" == *"@$(get DOMAIN)" ]]; then
+    ok "SMTP_ADMIN_EMAIL = $admin_mail"
+  else
+    warn "SMTP_ADMIN_EMAIL ('$admin_mail') debería ser del dominio verificado en el relay, o el envío se rechaza"
+  fi
+else
+  warn "sin SMTP: el reseteo de contraseña NO funciona (se hace desde Studio)"
+fi
+
+# --- 8. Permisos ------------------------------------------------------------
 echo
 echo "Permisos:"
 perm="$(stat -c '%a' "$ENV_FILE" 2>/dev/null || echo '?')"

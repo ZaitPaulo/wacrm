@@ -126,7 +126,7 @@ Un contenedor mínimo (`alpine` + `crond`) que hace `curl` a `/api/automations/c
 
 Al ir por la red interna, estas rutas no necesitan salir a internet. `AUTOMATION_CRON_SECRET` sigue siendo obligatorio: ambas rutas devuelven 503 si no está definido.
 
-### 8. Correo saliente: autoconfirmación ahora, SMTP externo después
+### 8. Correo saliente: relay externo (Resend), autoconfirmación en el registro
 
 GoTrue con `ENABLE_EMAIL_AUTOCONFIRM=true`, coherente con `supabase/config.toml:226` (`enable_confirmations = false`). Los usuarios se crean desde Studio o por el flujo de invitaciones del propio app (`/api/account/invitations`, que genera un link — no manda correo).
 
@@ -134,7 +134,17 @@ Esto deja **sin funcionar el reseteo de contraseña por correo**, y hay que mira
 
 Por eso, mientras no haya relay SMTP, la página `/forgot-password` SHALL quedar deshabilitada o mostrar el procedimiento manual, en lugar de fingir que envió algo. La contraseña se resetea desde Studio.
 
-Autoalojar SMTP en un VPS nuevo es la peor opción disponible — sin reputación de IP, sin SPF/DKIM establecidos, el correo va directo a spam o se rechaza. Cuando haga falta, se conecta un relay externo (el propio del dominio, o cualquier proveedor transaccional). Es una decisión de una variable de entorno, no de arquitectura, y por eso no bloquea este cambio.
+Autoalojar SMTP en un VPS nuevo es la peor opción disponible — sin reputación de IP, sin SPF/DKIM establecidos, el correo va directo a spam o se rechaza.
+
+**Resuelto: el relay es Resend** (`smtp.resend.com:587`, usuario literal `resend`, la API key como contraseña). Su plan gratuito son 3.000 correos al mes, permanente; este despliegue manda decenas — reseteos de contraseña e invitaciones—, así que sobra con margen de dos órdenes de magnitud.
+
+Se eligió sobre Brevo, que da más volumen (300/día) pero es una plataforma de marketing con el envío transaccional al lado. Aquí no hace falta el volumen y sí importa que la configuración sean cuatro variables.
+
+*Descartado por incompatible:* Resend se promociona como API-first, y varias comparativas afirman que no ofrece relay SMTP. Es falso a día de hoy, y valía la pena comprobarlo porque GoTrue habla SMTP y nada más: una API de correo no le sirve.
+
+**Con el relay conectado, `/forgot-password` deja de mentir.** Sin él, `src/app/(auth)/forgot-password/page.tsx:32` llama a `resetPasswordForEmail`, GoTrue responde éxito sin enviar nada —para no revelar qué correos existen— y la página dice "revisa tu correo" ante un correo que no llegará nunca. Ese fallo silencioso era la razón de dejar la página deshabilitada; conectando SMTP se arregla de raíz en vez de taparlo.
+
+*Lo que NO cambia:* `ENABLE_EMAIL_AUTOCONFIRM` sigue en `true`, coherente con `supabase/config.toml:226`. Con `DISABLE_SIGNUP=true` no hay registro abierto que validar, así que exigir confirmación solo añadiría un paso a la creación de usuarios que hace el propio equipo.
 
 ### 9. El app se construye en el servidor
 
@@ -191,6 +201,6 @@ Mínimo: **4 vCPU, 8 GB de RAM, 80 GB NVMe**. El stack son ~10 contenedores; Pos
 ## Open Questions
 
 - ~~**¿Dónde se hospeda el VPS y con qué proveedor?**~~ **Resuelto:** Contabo Cloud VPS Plus 6, US East (Nueva York). Ver decisión 10. El respaldo externo va fuera de Contabo, a un proveedor de object storage de terceros.
-- **¿Habrá relay SMTP, y cuál?** No bloquea el despliegue (decisión 8), pero define si el reseteo de contraseña queda manual de forma permanente.
+- ~~**¿Habrá relay SMTP, y cuál?**~~ **Resuelto:** Resend. Ver decisión 8.
 - **¿Qué se hace con la cuenta de producción actual?** Este cambio arranca limpio; queda pendiente decidir si esa base se migra, se archiva o convive.
 - **¿Quién tiene acceso SSH y a Studio?** Hoy hay un solo operador; conviene definirlo antes de que sean varios.

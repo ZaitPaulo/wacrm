@@ -45,17 +45,17 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 - [x] 4.1 Overlay `deploy/docker-compose.app.yml` que une el app a la red externa y deja de publicar el puerto — el `docker-compose.yml` raíz NO se toca, para que seguir corriendo contra Supabase Cloud siga funcionando
 - [x] 4.2 Escribir `deploy/caddy/Caddyfile`: `loramotors.co` hacia el app, `www` redirigiendo al apex, `supabase.loramotors.co` hacia el gateway, y Studio protegido con Basic Auth
 - [x] 4.3 Añadir el servicio del proxy al compose, con volúmenes persistentes para certificados y datos de Caddy
-- [ ] 4.4 Documentar los registros DNS necesarios y las reglas de firewall (solo 22/80/443 abiertos)
-- [ ] 4.5 Construir la imagen del app en el servidor con los `NEXT_PUBLIC_*` definitivos y levantarla
-- [ ] 4.6 Verificar TLS válido en los tres hosts desde una red externa
-- [ ] 4.7 Verificar que Postgres no es alcanzable desde una IP externa
-- [ ] 4.8 Verificar que Studio devuelve 401 sin credenciales
+- [x] 4.4 Documentar los registros DNS necesarios y las reglas de firewall (solo 22/80/443 abiertos)
+- [x] 4.5 Construir la imagen del app en el servidor con los `NEXT_PUBLIC_*` definitivos y levantarla
+- [x] 4.6 Verificar TLS válido en los tres hosts desde una red externa
+- [x] 4.7 Verificar que Postgres no es alcanzable desde una IP externa
+- [x] 4.8 Verificar que Studio devuelve 401 sin credenciales
 - [x] 4.9 Corregir la CSP de `next.config.ts:54,58`, que fija `https://*.supabase.co` y `wss://*.supabase.co` en `media-src` y `connect-src`: derivar los orígenes de `NEXT_PUBLIC_SUPABASE_URL` en vez de codificar el dominio de la nube
 - [ ] 4.10 Confirmar en la consola del navegador que no quedan violaciones de CSP tras el cambio
 
 ## 5. Verificación funcional
 
-- [ ] 5.1 Crear el primer usuario y validar el inicio de sesión y la carga del panel
+- [x] 5.1 Crear el primer usuario y validar el inicio de sesión y la carga del panel
 - [ ] 5.2 Subir un avatar y una foto de vehículo, y comprobar que su URL pública responde 200 desde fuera del servidor con certificado válido
 - [ ] 5.3 Validar Realtime: insertar una fila en `messages` y confirmar que aparece en la bandeja abierta sin recargar
 - [ ] 5.4 Reiniciar el stack completo y confirmar que los archivos subidos siguen descargándose
