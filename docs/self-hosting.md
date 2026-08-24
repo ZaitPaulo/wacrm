@@ -339,6 +339,44 @@ Síntomas reales de este despliegue, con su causa:
 | Un contacto deja de disparar flujos | Su flow run abandonado bloquea `idx_one_active_run_per_contact` | Es lo que barre `/api/flows/cron`; comprobar que el cron corre |
 | Fallos de auth intermitentes | Reloj desfasado: los JWT caducan por tiempo | `timedatectl status \| grep synchronized` |
 | Un `.sh` da `Permission denied` | Perdió el bit ejecutable | `git ls-files -s scripts/` — debe decir `100755`, no `100644` |
+| El webhook **no recibe nada**, pero el botón «Probar» de Meta sí llega | Meta todavía no propagó el enrutamiento de eventos de la WABA | Esperar ~1 h antes de tocar nada — ver la sección siguiente |
+
+### Cuando el webhook de WhatsApp no entrega
+
+Le pasó a este despliegue el 2026-08-24, al tomar un número que venía reclamado
+por otro proveedor: la configuración estaba correcta en los cinco niveles y aun
+así no llegaba **ni un solo evento**. No había nada que arreglar.
+
+**El primer entrante disparó webhook 57 minutos después del `/register`.** Si
+acabas de tomar un número, espera una hora antes de cambiar nada. Rehacer la
+suscripción en ese rato «arregla» algo que solo necesitaba tiempo, y te deja
+creyendo que la causa era otra.
+
+Ojo con el botón **«Probar»** de la consola de Meta: prueba la suscripción a
+nivel de aplicación y llega aunque los eventos reales no se estén enrutando. Que
+funcione **no** significa que el webhook esté operativo.
+
+Para saber de qué lado está el fallo, en este orden. Todas las consultas usan el
+token guardado en `whatsapp_config`, que hay que descifrar con `ENCRYPTION_KEY`
+— hazlo dentro del contenedor y no lo imprimas:
+
+| Qué preguntar | Endpoint | Respuesta sana |
+|---|---|---|
+| Estado del número | `GET /{phone_number_id}?fields=status,platform_type,code_verification_status` | `CONNECTED` y `CLOUD_API` |
+| Quién recibe los eventos de la WABA | `GET /{waba_id}/subscribed_apps` | **solo** tu app; si sale otra, ese es el ladrón |
+| URL y campos suscritos | `GET /{app_id}/subscriptions` (token `app_id\|app_secret`) | `active: true`, tu URL, campo `messages` |
+| URL sobrescrita en el número | `GET /{phone_number_id}?fields=webhook_configuration` | tu propia URL — Meta permite sobrescribirla por número, y un proveedor anterior puede haber dejado la suya |
+| Salud de la cuenta | `GET /{waba_id}?fields=status,account_review_status,health_status` | `ACTIVE`, `APPROVED`, todo `AVAILABLE` |
+
+Si todo eso está bien, queda una prueba que separa «Meta no vio el mensaje» de
+«Meta lo vio y no lo reenvió»: **manda un texto libre** al número que escribió.
+Meta solo lo permite dentro de la ventana de 24 h.
+
+- Error **131047** → Meta nunca registró el entrante. El problema está antes del
+  webhook.
+- **HTTP 200 con `wamid`** → Meta sí lo registró y la ventana está abierta. El
+  fallo está aislado en la entrega del webhook, y con eso el reporte a soporte
+  va con evidencia en vez de con sospechas.
 
 ### Comandos de diagnóstico
 

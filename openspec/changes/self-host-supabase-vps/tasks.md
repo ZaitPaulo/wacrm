@@ -91,7 +91,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 ## 9. Corte de producción
 
 - [ ] 9.1 Repasar la lista de verificación completa sobre el VPS definitivo
-- [ ] 9.2 Reapuntar el webhook de Meta a `https://loramotors.co/api/whatsapp/webhook` y superar la verificación
-- [ ] 9.3 Confirmar con un mensaje real de WhatsApp entrante que llega a la bandeja
-- [ ] 9.4 Verificar el envío saliente y la recepción de estados de entrega
+- [x] 9.2 Reapuntar el webhook de Meta a `https://loramotors.co/api/whatsapp/webhook` y superar la verificación — el número se recuperó del proveedor anterior quitándole el acceso de socio a la WABA; `/register` y `subscribed_apps` a las 19:46 UTC del 2026-08-24
+- [x] 9.3 Confirmar con un mensaje real de WhatsApp entrante que llega a la bandeja — **el primer entrante disparó webhook 57 minutos después del registro**; hasta entonces Meta aceptaba los mensajes (doble check) sin generar ningún evento. Ver `docs/self-hosting.md` → "Cuando el webhook de WhatsApp no entrega"
+- [ ] 9.4 Verificar el envío saliente y la recepción de estados de entrega — el **envío** está verificado (mensaje recibido en el celular el 2026-08-24), pero se hizo por la API antes de que Meta propagara, así que **falta confirmar el estado de entrega** enviando desde la bandeja del CRM y viendo que el mensaje pase a entregado/leído
 - [ ] 9.5 Guardar fuera del servidor una copia de `deploy/.env` y `.env.local`, y dejar registrado dónde quedó
