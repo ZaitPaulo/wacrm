@@ -2428,6 +2428,7 @@
     "doors": "Doors",
     "contact": "Contact",
     "administration": "Administration",
+    "privacy": "Privacy",
     "ogTagline": "Find your next vehicle",
     "ogAvailability": "{count} {count, plural, =1 {vehicle available} other {vehicles available}}"
   },

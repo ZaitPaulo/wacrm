@@ -2428,6 +2428,7 @@
     "doors": "도어 수",
     "contact": "연락처",
     "administration": "관리",
+    "privacy": "개인정보 처리방침",
     "ogTagline": "다음 차량을 찾아보세요",
     "ogAvailability": "구매 가능 차량 {count}대"
   },

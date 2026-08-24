@@ -88,9 +88,14 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
           <span>
             © {new Date().getFullYear()} {displayName}
           </span>
-          <Link href="/login" className="transition-colors hover:text-black">
-            {t('administration')}
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/privacidad" className="transition-colors hover:text-black">
+              {t('privacy')}
+            </Link>
+            <Link href="/login" className="transition-colors hover:text-black">
+              {t('administration')}
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
