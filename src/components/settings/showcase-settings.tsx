@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { uploadAccountMedia } from '@/lib/storage/upload-media';
+import {
+  uploadAccountMedia,
+  MEDIA_MAX_BYTES_BY_KIND,
+} from '@/lib/storage/upload-media';
+import { compressImage } from '@/lib/storage/compress-image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,7 +47,14 @@ export function ShowcaseSettings() {
     if (!file) return;
     setUploadingLogo(true);
     try {
-      const { publicUrl } = await uploadAccountMedia('showcase-media', file);
+      // WebP y no JPEG también por el logo: conserva la transparencia,
+      // que un JPEG convertiría en un rectángulo blanco.
+      const optimized = await compressImage(file);
+      if (optimized.size > MEDIA_MAX_BYTES_BY_KIND.image) {
+        toast.error(t('showcase.logoTooLarge'));
+        return;
+      }
+      const { publicUrl } = await uploadAccountMedia('showcase-media', optimized);
       setLogoUrl(publicUrl);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('showcase.logoUploadFailed'));

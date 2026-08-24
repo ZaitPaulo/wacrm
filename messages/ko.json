@@ -2008,6 +2008,7 @@
       "hoursPlaceholder": "월–토 8:00–18:00",
       "save": "저장",
       "logoUploadFailed": "로고를 업로드하지 못했습니다",
+      "logoTooLarge": "로고가 최적화 후에도 5MB를 넘습니다. 더 가벼운 이미지를 사용하세요.",
       "saved": "쇼케이스가 업데이트되었습니다",
       "saveFailed": "저장하지 못했습니다",
       "urlLabel": "쇼케이스 URL:",
@@ -2181,6 +2182,7 @@
     },
     "toasts": {
       "uploadFailed": "이미지를 업로드하지 못했습니다",
+      "imageTooLarge": "{name}은(는) 최적화 후에도 5MB를 넘습니다. 더 가벼운 사진을 사용하세요.",
       "loadFailed": "재고를 불러오지 못했습니다",
       "requiredFields": "제조사, 모델, 연식은 필수입니다",
       "updated": "차량이 수정되었습니다",

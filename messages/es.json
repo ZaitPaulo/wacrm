@@ -2001,6 +2001,7 @@
       "hoursPlaceholder": "Lun–Sáb 8:00–18:00",
       "save": "Guardar",
       "logoUploadFailed": "No se pudo subir el logo",
+      "logoTooLarge": "El logo pesa más de 5 MB incluso optimizado. Usa una imagen más liviana.",
       "saved": "Vitrina actualizada",
       "saveFailed": "No se pudo guardar",
       "urlLabel": "URL de la vitrina:",
@@ -2174,6 +2175,7 @@
     },
     "toasts": {
       "uploadFailed": "No se pudo subir la imagen",
+      "imageTooLarge": "{name} sigue pesando más de 5 MB después de optimizarla. Usa una foto más liviana.",
       "loadFailed": "No se pudo cargar el inventario",
       "requiredFields": "Marca, modelo y año son obligatorios",
       "updated": "Vehículo actualizado",

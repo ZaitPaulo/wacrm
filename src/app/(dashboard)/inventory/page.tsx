@@ -60,7 +60,11 @@ import {
   suggestedWarrantyPrice,
   labelOf,
 } from '@/lib/inventory/specs';
-import { uploadAccountMedia } from '@/lib/storage/upload-media';
+import {
+  uploadAccountMedia,
+  MEDIA_MAX_BYTES_BY_KIND,
+} from '@/lib/storage/upload-media';
+import { compressImage } from '@/lib/storage/compress-image';
 
 // Sólo la variante visual vive acá; la etiqueta sale del catálogo, por
 // clave, para que el orden del selector siga siendo el de este objeto.
@@ -284,7 +288,15 @@ export default function InventoryPage() {
     try {
       const urls: string[] = [];
       for (const file of files) {
-        const { publicUrl } = await uploadAccountMedia('showcase-media', file);
+        // Comprimir antes de subir: una foto de celular supera de largo
+        // el tope de 5 MB del bucket, y sin esto la mitad de las fotos
+        // de un vehículo fallan.
+        const optimized = await compressImage(file);
+        if (optimized.size > MEDIA_MAX_BYTES_BY_KIND.image) {
+          toast.error(t('toasts.imageTooLarge', { name: file.name }));
+          continue;
+        }
+        const { publicUrl } = await uploadAccountMedia('showcase-media', optimized);
         urls.push(publicUrl);
       }
       setDraft((d) => ({ ...d, images: [...d.images, ...urls] }));

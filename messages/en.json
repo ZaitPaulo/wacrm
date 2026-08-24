@@ -2008,6 +2008,7 @@
       "hoursPlaceholder": "Mon–Sat 8:00–18:00",
       "save": "Save",
       "logoUploadFailed": "Couldn't upload the logo",
+      "logoTooLarge": "The logo is over 5 MB even after optimizing. Use a lighter image.",
       "saved": "Showcase updated",
       "saveFailed": "Couldn't save",
       "urlLabel": "Showcase URL:",
@@ -2181,6 +2182,7 @@
     },
     "toasts": {
       "uploadFailed": "Couldn't upload the image",
+      "imageTooLarge": "{name} is still over 5 MB after optimizing. Use a lighter photo.",
       "loadFailed": "Couldn't load the inventory",
       "requiredFields": "Brand, model and year are required",
       "updated": "Vehicle updated",
