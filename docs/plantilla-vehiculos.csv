@@ -1,0 +1,3 @@
+placa,marca,linea,anio,precio,kilometraje,transmision,combustible,carroceria,color,puertas,cilindraje,estado,ciudad_placa,soat_vence,tecnomecanica_vence,tiene_prenda,acepta_retoma,en_exhibicion,precio_garantia,caracteristicas,vin,notas_internas
+ABC123,Mazda,Mazda 3 Grand Touring,2020,78000000,45000,automatica,gasolina,sedan,Rojo,4,2000,usado,Barranquilla,2027-03-15,2027-01-20,no,si,si,1500000,Sunroof;Camara de reversa;Sensores de parqueo,MM8DK4W1AJ1234567,Recibido en retoma de un cliente
+XYZ789,Chevrolet,Onix Turbo RS,2022,62000000,28000,automatica,gasolina,hatchback,Blanco,5,1000,usado,Barranquilla,2026-11-02,2026-09-30,si,no,no,,Pantalla tactil;Bluetooth;Rines de lujo,,Tiene prenda con el banco - verificar antes de vender
