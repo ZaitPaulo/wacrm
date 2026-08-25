@@ -154,6 +154,15 @@ function validateOne(step: StepLike, path: string, issues: ValidationIssue[]): v
         issues.push({ path: `${path}.title`, code: 'titleRequired' })
       }
       break
+    case 'move_deal_stage':
+      // Sin titulo ni valor: el paso mueve un negocio que ya existe.
+      if (!nonEmpty(c.pipeline_id)) {
+        issues.push({ path: `${path}.pipeline_id`, code: 'pipelineRequired' })
+      }
+      if (!nonEmpty(c.stage_id)) {
+        issues.push({ path: `${path}.stage_id`, code: 'stageRequired' })
+      }
+      break
     case 'wait':
       if (typeof c.amount !== 'number' || !Number.isFinite(c.amount) || c.amount <= 0) {
         issues.push({ path: `${path}.amount`, code: 'waitAmountPositive' })

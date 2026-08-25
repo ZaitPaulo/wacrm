@@ -16,6 +16,7 @@ import type {
   UpdateContactFieldStepConfig,
   WaitStepConfig,
   CreateDealStepConfig,
+  MoveDealStageStepConfig,
   AssignConversationStepConfig,
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
@@ -559,6 +560,19 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
     case 'create_deal': {
       const cfg = step.step_config as CreateDealStepConfig
       if (!cfg.pipeline_id || !cfg.stage_id) throw new Error('create_deal needs pipeline + stage')
+      if (!args.contactId) throw new Error('create_deal needs a contact')
+      // Un contacto tiene un solo negocio abierto por embudo. Sin esta
+      // guarda, dos automatizaciones que crean negocio sobre el mismo
+      // contacto — la de alta y la de calificacion — dejan dos tarjetas
+      // gemelas en la misma columna. La guarda vive aqui y no en un indice
+      // unico porque un asesor SI puede abrir a mano un segundo negocio
+      // (alguien que pregunta por dos carros distintos).
+      const open = await findOpenDeal(db, {
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+        pipelineId: cfg.pipeline_id,
+      })
+      if (open) return `deal already open (${open.id})`
       // Match the account's configured default currency rather than
       // the static `deals.currency` DB default — keeps automation-
       // created deals consistent with the one-currency-per-account
@@ -582,6 +596,50 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
         status: 'open',
       })
       return 'deal created'
+    }
+
+    case 'move_deal_stage': {
+      const cfg = step.step_config as MoveDealStageStepConfig
+      if (!cfg.pipeline_id || !cfg.stage_id) {
+        throw new Error('move_deal_stage needs pipeline + stage')
+      }
+      if (!args.contactId) throw new Error('move_deal_stage needs a contact')
+
+      // La etapa tiene que ser de ese embudo Y de esta cuenta. Una etapa
+      // ajena no es un estado del mundo, es configuracion rota: mover el
+      // negocio alli lo sacaria del tablero donde alguien lo esta mirando.
+      // Por eso esto lanza, y se comprueba antes de tocar `deals`.
+      const { data: stage, error: stageErr } = await db
+        .from('pipeline_stages')
+        .select('id, name, pipeline_id, pipelines!inner(account_id)')
+        .eq('id', cfg.stage_id)
+        .eq('pipeline_id', cfg.pipeline_id)
+        .eq('pipelines.account_id', args.automation.account_id)
+        .maybeSingle()
+      if (stageErr) throw new Error(`could not read stage: ${stageErr.message}`)
+      if (!stage) throw new Error('move_deal_stage: stage not in that pipeline')
+
+      const deal = await findOpenDeal(db, {
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+        pipelineId: cfg.pipeline_id,
+      })
+      // Nada que mover NO es un error: si este paso lanzara, el `break` de
+      // executeStepsFrom se llevaria por delante los pasos siguientes —
+      // un send_message o un assign_conversation que no tienen la culpa.
+      if (!deal) return 'no open deal to move'
+      if (deal.stage_id === cfg.stage_id) {
+        return `deal ${deal.id} already in stage ${(stage as { name: string }).name}`
+      }
+
+      const { error: moveErr } = await db
+        .from('deals')
+        .update({ stage_id: cfg.stage_id, updated_at: new Date().toISOString() })
+        .eq('id', deal.id)
+        .eq('account_id', args.automation.account_id)
+      if (moveErr) throw new Error(`could not move deal: ${moveErr.message}`)
+
+      return `deal ${deal.id} moved to ${(stage as { name: string }).name}`
     }
 
     case 'send_webhook': {
@@ -788,6 +846,36 @@ async function evaluateCondition(cfg: ConditionStepConfig, args: ExecuteArgs): P
 function waitMs(cfg: WaitStepConfig): number {
   const unitMs = cfg.unit === 'days' ? 86_400_000 : cfg.unit === 'hours' ? 3_600_000 : 60_000
   return Math.max(1_000, cfg.amount * unitMs)
+}
+
+/**
+ * El negocio abierto del contacto en un embudo, o null.
+ *
+ * Es la definicion unica de "ya tiene negocio" que comparten `create_deal`
+ * (para no duplicar) y `move_deal_stage` (para saber que mover). Cuando hay
+ * varios abiertos en el mismo embudo — solo posible si alguien los creo a
+ * mano — gana el mas reciente, y el paso deja dicho cual movio.
+ *
+ * El motor corre con el cliente de servicio, que se salta RLS: el filtro por
+ * `account_id` es la barrera de inquilino, no un adorno.
+ */
+async function findOpenDeal(
+  db: ReturnType<typeof supabaseAdmin>,
+  args: { accountId: string; contactId: string; pipelineId: string },
+): Promise<{ id: string; stage_id: string } | null> {
+  const { data, error } = await db
+    .from('deals')
+    .select('id, stage_id')
+    .eq('account_id', args.accountId)
+    .eq('contact_id', args.contactId)
+    .eq('pipeline_id', args.pipelineId)
+    .eq('status', 'open')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw new Error(`could not read deals: ${error.message}`)
+  return (data as { id: string; stage_id: string } | null) ?? null
 }
 
 function interpolate(s: string, args: ExecuteArgs): string {

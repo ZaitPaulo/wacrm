@@ -962,6 +962,7 @@
         "assign_conversation": "Asignar conversación",
         "update_contact_field": "Actualizar campo del contacto",
         "create_deal": "Crear negocio",
+        "move_deal_stage": "Mover negocio de etapa",
         "wait": "Esperar",
         "condition": "Condición (Si/Si no)",
         "send_webhook": "Enviar webhook",

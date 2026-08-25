@@ -116,6 +116,24 @@ describe("validateStepsForActivation", () => {
     ]);
   });
 
+  it("flags move_deal_stage when pipeline or stage is missing", () => {
+    expect(
+      validateStepsForActivation([
+        { step_type: "move_deal_stage", step_config: {} },
+      ]).map((i) => i.path).sort(),
+    ).toEqual(["steps[0].pipeline_id", "steps[0].stage_id"]);
+
+    // No pide titulo ni valor: mueve un negocio que ya existe.
+    expect(
+      validateStepsForActivation([
+        {
+          step_type: "move_deal_stage",
+          step_config: { pipeline_id: "p1", stage_id: "s1" },
+        },
+      ]),
+    ).toEqual([]);
+  });
+
   it("validates send_buttons / send_list interactive payloads", () => {
     const good = validateStepsForActivation([
       {

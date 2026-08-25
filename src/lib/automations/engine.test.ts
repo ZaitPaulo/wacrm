@@ -13,6 +13,13 @@ const h = vi.hoisted(() => ({
     upsertCalls: [] as { table: string; payload: unknown }[],
     logInserts: [] as Record<string, unknown>[],
     logUpdates: [] as Record<string, unknown>[],
+    // Negocios: `openDeal` es lo que devuelve el SELECT de deals, `stage`
+    // lo que devuelve el de pipeline_stages (null = etapa ajena al embudo).
+    openDeal: null as { id: string; stage_id: string } | null,
+    stage: null as { id: string; name: string } | null,
+    dealInserts: [] as Record<string, unknown>[],
+    dealUpdates: [] as { payload: unknown; filters: [string, string, unknown][] }[],
+    dealSelects: [] as [string, string, unknown][][],
   },
 }));
 
@@ -58,6 +65,19 @@ vi.mock("./admin-client", () => {
       return { data: { steps_executed: [], status: "success" }, error: null };
     }
     if (table === "automation_steps") return { data: state.steps, error: null };
+    if (table === "deals") {
+      if (type === "insert") {
+        state.dealInserts.push(ops.payload as Record<string, unknown>);
+        return { data: null, error: null };
+      }
+      if (type === "update") {
+        state.dealUpdates.push({ payload: ops.payload, filters: ops.filters });
+        return { data: null, error: null };
+      }
+      state.dealSelects.push(ops.filters);
+      return { data: state.openDeal, error: null };
+    }
+    if (table === "pipeline_stages") return { data: state.stage, error: null };
     return { data: null, error: null };
   }
 
@@ -119,6 +139,11 @@ beforeEach(() => {
   h.state.upsertCalls = [];
   h.state.logInserts = [];
   h.state.logUpdates = [];
+  h.state.openDeal = null;
+  h.state.stage = null;
+  h.state.dealInserts = [];
+  h.state.dealUpdates = [];
+  h.state.dealSelects = [];
 });
 
 describe("runAutomationsForTrigger — tenant isolation", () => {
@@ -548,5 +573,198 @@ describe("triggerMatches — keyword_match", () => {
   it("ignores empty keywords and empty messages in `word` mode", () => {
     expect(on(automation({ keywords: [""], match_type: "word" }), "anything")).toBe(false);
     expect(on(automation({ keywords: ["hi"], match_type: "word" }), "")).toBe(false);
+  });
+});
+
+// ------------------------------------------------------------
+// Negocios: una automatizacion crea el negocio y otra lo avanza, sin
+// que entre las dos dejen dos tarjetas gemelas en la misma columna.
+// ------------------------------------------------------------
+
+const PIPE = "pipe-1";
+const STAGE_A = "stage-a";
+const STAGE_B = "stage-b";
+
+const QUALIFY_TAG = "tag-a";
+
+function dealAutomation(trigger = "first_inbound_message") {
+  return {
+    id: "a1",
+    account_id: ACCOUNT,
+    user_id: "u1",
+    name: "alta de prospecto",
+    trigger_type: trigger,
+    // tag_added solo dispara si el id del evento coincide con el de la
+    // config, igual que la automatizacion real de calificacion.
+    trigger_config: trigger === "tag_added" ? { tag_id: QUALIFY_TAG } : {},
+    is_active: true,
+  };
+}
+
+function createDealStep(position = 0) {
+  return {
+    id: "s1",
+    automation_id: "a1",
+    step_type: "create_deal",
+    position,
+    parent_step_id: null,
+    step_config: { pipeline_id: PIPE, stage_id: STAGE_A, title: "Prospecto", value: 0 },
+  };
+}
+
+function moveStep(stageId = STAGE_B, position = 0) {
+  return {
+    id: "s1",
+    automation_id: "a1",
+    step_type: "move_deal_stage",
+    position,
+    parent_step_id: null,
+    step_config: { pipeline_id: PIPE, stage_id: stageId },
+  };
+}
+
+async function run(trigger = "first_inbound_message") {
+  await runAutomationsForTrigger({
+    accountId: ACCOUNT,
+    triggerType: trigger as Parameters<typeof runAutomationsForTrigger>[0]["triggerType"],
+    contactId: "c1",
+    context: trigger === "tag_added" ? { tag_id: QUALIFY_TAG } : {},
+  });
+}
+
+/** Los resultados de pasos que quedaron en el log de la corrida. */
+function stepResults(): { step_type: string; status: string; detail?: string }[] {
+  const withSteps = h.state.logUpdates.filter((u) => "steps_executed" in u);
+  const last = withSteps[withSteps.length - 1];
+  return (last?.steps_executed ?? []) as {
+    step_type: string;
+    status: string;
+    detail?: string;
+  }[];
+}
+
+describe("create_deal — un solo negocio abierto por embudo", () => {
+  beforeEach(() => {
+    h.state.owned = { id: "c1" };
+    h.state.automations = [dealAutomation()];
+    h.state.steps = [createDealStep()];
+  });
+
+  it("no inserta si el contacto ya tiene un negocio abierto en ese embudo", async () => {
+    h.state.openDeal = { id: "d1", stage_id: STAGE_A };
+
+    await run();
+
+    expect(h.state.dealInserts).toHaveLength(0);
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({ step_type: "create_deal", status: "success", detail: "deal already open (d1)" }),
+    );
+  });
+
+  it("inserta cuando no hay ninguno abierto", async () => {
+    h.state.openDeal = null;
+
+    await run();
+
+    expect(h.state.dealInserts).toHaveLength(1);
+    expect(h.state.dealInserts[0]).toEqual(
+      expect.objectContaining({ account_id: ACCOUNT, contact_id: "c1", pipeline_id: PIPE, stage_id: STAGE_A, status: "open" }),
+    );
+  });
+
+  it("busca el negocio acotado a la cuenta, al contacto, al embudo y a status abierto", async () => {
+    // Es lo que separa "ya tiene negocio aqui" de "tiene uno en otro
+    // embudo" o de "tuvo uno y ya se cerro": ambos deben dejar crear.
+    await run();
+
+    expect(h.state.dealSelects[0]).toEqual(
+      expect.arrayContaining([
+        ["eq", "account_id", ACCOUNT],
+        ["eq", "contact_id", "c1"],
+        ["eq", "pipeline_id", PIPE],
+        ["eq", "status", "open"],
+      ]),
+    );
+  });
+});
+
+describe("move_deal_stage", () => {
+  beforeEach(() => {
+    h.state.owned = { id: "c1" };
+    h.state.automations = [dealAutomation("tag_added")];
+    h.state.steps = [moveStep()];
+    h.state.stage = { id: STAGE_B, name: "Contactado" };
+  });
+
+  it("mueve el negocio abierto a la etapa configurada", async () => {
+    h.state.openDeal = { id: "d1", stage_id: STAGE_A };
+
+    await run("tag_added");
+
+    expect(h.state.dealUpdates).toHaveLength(1);
+    expect(h.state.dealUpdates[0].payload).toEqual(
+      expect.objectContaining({ stage_id: STAGE_B }),
+    );
+    expect(h.state.dealUpdates[0].filters).toEqual(
+      expect.arrayContaining([["eq", "id", "d1"], ["eq", "account_id", ACCOUNT]]),
+    );
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({ status: "success", detail: "deal d1 moved to Contactado" }),
+    );
+  });
+
+  it("no escribe si el negocio ya estaba en esa etapa", async () => {
+    h.state.openDeal = { id: "d1", stage_id: STAGE_B };
+
+    await run("tag_added");
+
+    expect(h.state.dealUpdates).toHaveLength(0);
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({ status: "success", detail: "deal d1 already in stage Contactado" }),
+    );
+  });
+
+  it("no crea nada ni falla cuando el contacto no tiene negocio abierto", async () => {
+    h.state.openDeal = null;
+
+    await run("tag_added");
+
+    expect(h.state.dealInserts).toHaveLength(0);
+    expect(h.state.dealUpdates).toHaveLength(0);
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({ status: "success", detail: "no open deal to move" }),
+    );
+  });
+
+  it("falla ruidosamente si la etapa no pertenece a ese embudo", async () => {
+    // Etapa de otro embudo (o de otra cuenta): el SELECT no la encuentra.
+    h.state.stage = null;
+    h.state.openDeal = { id: "d1", stage_id: STAGE_A };
+
+    await run("tag_added");
+
+    expect(h.state.dealUpdates).toHaveLength(0);
+    expect(h.state.logUpdates).toContainEqual(
+      expect.objectContaining({
+        status: "failed",
+        error_message: "move_deal_stage: stage not in that pipeline",
+      }),
+    );
+  });
+
+  it("sin negocio que mover, los pasos siguientes se ejecutan igual", async () => {
+    // El motor corta la corrida en el primer paso que lanza. Por eso este
+    // paso devuelve en vez de lanzar: si no, se llevaria por delante un
+    // send_message o un assign_conversation que no tienen la culpa.
+    h.state.openDeal = null;
+    h.state.steps = [moveStep(STAGE_B, 0), { ...updateStep(), position: 1 }];
+
+    await run("tag_added");
+
+    expect(h.state.updateCalls.map((u) => u.table)).toContain("contacts");
+    expect(stepResults().map((r) => r.step_type)).toEqual([
+      "move_deal_stage",
+      "update_contact_field",
+    ]);
   });
 });

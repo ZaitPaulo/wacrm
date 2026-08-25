@@ -482,6 +482,8 @@ export type AutomationStepType =
   | 'assign_conversation'
   | 'update_contact_field'
   | 'create_deal'
+  /** Avanza el negocio abierto del contacto en vez de crear otro. */
+  | 'move_deal_stage'
   | 'wait'
   | 'condition'
   | 'send_webhook'
@@ -573,6 +575,17 @@ export interface CreateDealStepConfig {
   value?: number;
 }
 
+/**
+ * `move_deal_stage` mueve el negocio abierto del contacto a otra etapa.
+ * Lleva el embudo además de la etapa porque el paso valida que una
+ * pertenezca al otro antes de tocar nada — mover un negocio a la etapa de
+ * otro embudo lo sacaría del tablero donde alguien lo está mirando.
+ */
+export interface MoveDealStageStepConfig {
+  pipeline_id: string;
+  stage_id: string;
+}
+
 export interface WaitStepConfig {
   amount: number;
   unit: 'minutes' | 'hours' | 'days';
@@ -607,6 +620,7 @@ export type AutomationStepConfig =
   | AssignConversationStepConfig
   | UpdateContactFieldStepConfig
   | CreateDealStepConfig
+  | MoveDealStageStepConfig
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig
