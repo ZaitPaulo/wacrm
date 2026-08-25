@@ -336,7 +336,12 @@
       "deals": "Negocios",
       "noTags": "Sin etiquetas",
       "noDeals": "Sin negocios",
-      "addNotePlaceholder": "Agrega una nota..."
+      "addNotePlaceholder": "Agrega una nota...",
+      "manageTags": "Gestionar etiquetas",
+      "tagPickerHint": "Haz clic en una etiqueta para agregarla o quitarla de este contacto.",
+      "noTagsAvailable": "No hay etiquetas disponibles. Créalas en Ajustes.",
+      "removeTag": "Quitar la etiqueta {tag}",
+      "tagUpdateFailed": "No se pudo actualizar la etiqueta"
     },
     "aiBanner": {
       "pausedTitle": "El asistente de IA está pausado acá",

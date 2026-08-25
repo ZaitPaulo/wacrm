@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { addContactTag, deleteContactTag } from "@/lib/contacts/tag-api";
 import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Contact, Deal, ContactNote, Tag } from "@/types";
 import {
@@ -15,8 +17,14 @@ import {
   DollarSign,
   StickyNote,
   Plus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { useTranslations } from "next-intl";
@@ -33,7 +41,13 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   const [copied, setCopied] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
-  const [tags, setTags] = useState<(Tag & { contact_tag_id: string })[]>([]);
+  // Todas las etiquetas de la cuenta + los ids de las que tiene el contacto.
+  // Van separadas (no un join) para que el selector pueda pintar tambien las
+  // no asignadas y para que el chip aparezca apenas se marca, sin releer.
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [contactTagIds, setContactTagIds] = useState<string[]>([]);
+  const [savingTags, setSavingTags] = useState(false);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
 
@@ -43,7 +57,7 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     const supabase = createClient();
 
     // Fetch deals, notes, and tags in parallel
-    const [dealsRes, notesRes, tagsRes] = await Promise.all([
+    const [dealsRes, notesRes, contactTagsRes, allTagsRes] = await Promise.all([
       supabase
         .from("deals")
         .select("*, stage:pipeline_stages(*)")
@@ -56,20 +70,16 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
         .order("created_at", { ascending: false }),
       supabase
         .from("contact_tags")
-        .select("id, tag_id, tags(*)")
+        .select("tag_id")
         .eq("contact_id", contact.id),
+      supabase.from("tags").select("*").order("name"),
     ]);
 
     if (dealsRes.data) setDeals(dealsRes.data);
     if (notesRes.data) setNotes(notesRes.data);
-    if (tagsRes.data) {
-      const mapped = tagsRes.data
-        .filter((ct: Record<string, unknown>) => ct.tags)
-        .map((ct: Record<string, unknown>) => ({
-          ...(ct.tags as Tag),
-          contact_tag_id: ct.id as string,
-        }));
-      setTags(mapped);
+    if (allTagsRes.data) setAllTags(allTagsRes.data);
+    if (contactTagsRes.data) {
+      setContactTagIds(contactTagsRes.data.map((ct) => ct.tag_id as string));
     }
   }, [contact]);
 
@@ -89,6 +99,32 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     // React Compiler's inference agrees with the manual dep list —
     // fixes the `preserve-manual-memoization` lint error.
   }, [contact]);
+
+  // Alta/baja de etiqueta contra la API route: escribir contact_tags directo
+  // se saltaria el despacho del evento tag_added que dispara automatizaciones
+  // y flujos.
+  const handleToggleTag = useCallback(
+    async (tagId: string) => {
+      if (!contact) return;
+      const isAssigned = contactTagIds.includes(tagId);
+      setSavingTags(true);
+      try {
+        if (isAssigned) {
+          await deleteContactTag(contact.id, tagId);
+          setContactTagIds((prev) => prev.filter((id) => id !== tagId));
+        } else {
+          await addContactTag(contact.id, tagId);
+          setContactTagIds((prev) => [...prev, tagId]);
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : tSidebar("tagUpdateFailed")
+        );
+      }
+      setSavingTags(false);
+    },
+    [contact, contactTagIds, tSidebar]
+  );
 
   const handleAddNote = useCallback(async () => {
     if (!contact || !newNote.trim()) return;
@@ -131,6 +167,7 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   // igual tiene que existir para la inicial del avatar.
   const displayName = contact.name || contact.phone || "—";
   const initials = displayName.charAt(0).toUpperCase();
+  const contactTags = allTags.filter((tag) => contactTagIds.includes(tag.id));
 
   return (
     <div className="flex h-full w-70 flex-col border-l border-border bg-card">
@@ -187,22 +224,78 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
           <div>
             <div className="flex items-center gap-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               <TagIcon className="h-3 w-3" />
-              {tSidebar("tags")}
+              <span className="flex-1">{tSidebar("tags")}</span>
+              <Popover open={tagPickerOpen} onOpenChange={setTagPickerOpen}>
+                <PopoverTrigger
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label={tSidebar("manageTags")}
+                >
+                  <Plus className="h-3 w-3" />
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64">
+                  {allTags.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {tSidebar("noTagsAvailable")}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        {tSidebar("tagPickerHint")}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {allTags.map((tag) => {
+                          const selected = contactTagIds.includes(tag.id);
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() => handleToggleTag(tag.id)}
+                              disabled={savingTags}
+                              className={cn(
+                                "inline-flex cursor-pointer items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-all disabled:cursor-not-allowed",
+                                selected
+                                  ? "ring-2 ring-primary ring-offset-1 ring-offset-popover"
+                                  : "opacity-50 hover:opacity-80"
+                              )}
+                              style={{
+                                backgroundColor: `${tag.color}20`,
+                                color: tag.color,
+                              }}
+                            >
+                              {selected && <Check className="mr-1 h-2.5 w-2.5" />}
+                              {tag.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="mt-2 flex flex-wrap gap-1">
-              {tags.length === 0 ? (
+              {contactTags.length === 0 ? (
                 <p className="px-1 text-xs text-muted-foreground">{tSidebar("noTags")}</p>
               ) : (
-                tags.map((tag) => (
+                contactTags.map((tag) => (
                   <span
-                    key={tag.contact_tag_id}
-                    className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    key={tag.id}
+                    className="inline-flex items-center gap-1 rounded-full py-0.5 pl-2 pr-1 text-[10px] font-medium"
                     style={{
                       backgroundColor: `${tag.color}20`,
                       color: tag.color,
                     }}
                   >
                     {tag.name}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTag(tag.id)}
+                      disabled={savingTags}
+                      aria-label={tSidebar("removeTag", { tag: tag.name })}
+                      className="flex h-3 w-3 cursor-pointer items-center justify-center rounded-full opacity-60 transition-opacity hover:opacity-100 disabled:cursor-not-allowed"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
                   </span>
                 ))
               )}
