@@ -49,9 +49,11 @@ export async function generateMetadata(): Promise<Metadata> {
       index: false,
       follow: false,
     },
-    icons: {
-      icon: [{ url: "/icon" }],
-    },
+    // El icono NO se declara aquí a propósito: `src/app/icon.png` es una
+    // convención de archivo y Next inyecta su <link rel="icon"> solo, con
+    // el hash de contenido en la URL. Declararlo a mano apuntaba a
+    // `/icon`, la ruta que servía el `icon.tsx` generado que ya no existe,
+    // y ahora sería un 404 pisando al icono bueno.
     formatDetection: {
       email: false,
       address: false,

@@ -89,7 +89,7 @@ export default async function OgImage({ params }: Params) {
         }}
       >
         {/* Membrete: el mismo cuadrado violeta con el glifo de chat que
-            usan el favicon (app/icon.tsx) y el logo del sidebar. */}
+            usan el favicon (app/icon.png) y el logo del sidebar. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div
             style={{
