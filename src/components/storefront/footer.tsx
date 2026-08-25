@@ -21,17 +21,22 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {/* Marca */}
           <div>
-            {account.public_logo_url && (
+            {account.public_logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={account.public_logo_url}
                 alt={displayName}
-                className="mb-3 h-10 w-auto"
+                className="h-10 w-auto"
               />
+            ) : (
+              // El nombre en texto es el SUPLENTE del logo, no su pie:
+              // un logotipo ya lleva el nombre dentro, así que mostrar
+              // los dos lo repetía. Mismo criterio que la cabecera
+              // (`store-nav.tsx`), que siempre enseñó uno u otro.
+              <p className="text-xl font-black uppercase tracking-tight text-black">
+                {displayName}
+              </p>
             )}
-            <p className="text-xl font-black uppercase tracking-tight text-black">
-              {displayName}
-            </p>
             {account.public_hours && (
               <p className="mt-3 flex items-start gap-2 text-sm text-[#44474d]">
                 <Clock className="mt-0.5 size-4 shrink-0 text-[#75777e]" />
