@@ -391,6 +391,7 @@ export interface Deal {
   created_at: string;
   updated_at?: string;
   contact?: Contact;
+  pipeline?: Pipeline;
   stage?: PipelineStage;
   assignee?: Profile;
 }

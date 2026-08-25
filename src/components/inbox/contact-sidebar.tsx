@@ -60,7 +60,7 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     const [dealsRes, notesRes, contactTagsRes, allTagsRes] = await Promise.all([
       supabase
         .from("deals")
-        .select("*, stage:pipeline_stages(*)")
+        .select("*, pipeline:pipelines(*), stage:pipeline_stages(*)")
         .eq("contact_id", contact.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -320,26 +320,39 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
                     key={deal.id}
                     className="rounded-lg bg-muted px-3 py-2"
                   >
-                    <p className="text-sm font-medium text-foreground">
-                      {deal.title}
-                    </p>
-                    <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-sm font-medium text-foreground">
+                        {deal.title}
+                      </p>
+                      <span className="shrink-0 text-xs text-muted-foreground">
                         {deal.currency ?? "$"}
                         {deal.value.toLocaleString()}
                       </span>
-                      {deal.stage && (
-                        <span
-                          className="rounded-full px-1.5 py-0.5 text-[10px]"
-                          style={{
-                            backgroundColor: `${deal.stage.color}20`,
-                            color: deal.stage.color,
-                          }}
-                        >
-                          {deal.stage.name}
-                        </span>
-                      )}
                     </div>
+                    {/* El embudo del contacto no vive en el contacto: lo lleva
+                        el negocio, asi que la ubicacion se lee aqui como
+                        "<embudo> · <etapa>". */}
+                    {(deal.pipeline || deal.stage) && (
+                      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        {deal.pipeline && (
+                          <span className="truncate">{deal.pipeline.name}</span>
+                        )}
+                        {deal.pipeline && deal.stage && (
+                          <span aria-hidden="true">·</span>
+                        )}
+                        {deal.stage && (
+                          <span
+                            className="shrink-0 rounded-full px-1.5 py-0.5"
+                            style={{
+                              backgroundColor: `${deal.stage.color}20`,
+                              color: deal.stage.color,
+                            }}
+                          >
+                            {deal.stage.name}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
