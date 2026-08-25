@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { MapPin, Phone, Mail, Clock, MessageCircle } from 'lucide-react';
-import type { ShowcaseAccount } from '@/lib/showcase/format';
+import { splitHours, type ShowcaseAccount } from '@/lib/showcase/format';
 
 // Footer del negocio (paleta Loramotors), compartido por la portada y las
 // páginas de detalle. Solo muestra los datos cargados en Ajustes → Public
@@ -10,6 +10,7 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
   const t = await getTranslations('Storefront');
   const displayName = account.public_name?.trim() || account.name;
   const waDigits = account.public_whatsapp?.replace(/\D/g, '') || null;
+  const hourLines = splitHours(account.public_hours);
 
   // Fondo blanco y no el gris de antes: el logo del negocio llega con el
   // fondo blanco horneado —es un JPEG— y sobre gris se recortaba como un
@@ -37,11 +38,20 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
                 {displayName}
               </p>
             )}
-            {account.public_hours && (
-              <p className="mt-3 flex items-start gap-2 text-sm text-[#44474d]">
+            {hourLines.length > 0 && (
+              // Una línea por franja, en vez de un párrafo corrido: el
+              // navegador partía donde le cabía y dejaba "Sábados de
+              // 8:00 a. m." en un renglón y "a 2:00 p. m." en el
+              // siguiente. El reloj va una sola vez, alineado con la
+              // primera línea.
+              <div className="mt-3 flex items-start gap-2 text-sm text-[#44474d]">
                 <Clock className="mt-0.5 size-4 shrink-0 text-[#75777e]" />
-                {account.public_hours}
-              </p>
+                <div className="space-y-1">
+                  {hourLines.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 

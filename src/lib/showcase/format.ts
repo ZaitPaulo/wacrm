@@ -96,3 +96,25 @@ export function whatsappHref(
   if (vehicle.public_ref) msg += ` ${formatRefTag(vehicle.public_ref)}`
   return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`
 }
+
+/**
+ * Parte el horario de atención en una línea por franja.
+ *
+ * El campo es un textarea, así que lo natural es que el negocio escriba
+ * un renglón por franja — pero también hay valores guardados en una
+ * sola línea con `·` de separador, y quien está acostumbrado a un campo
+ * corto tiende a usar `;`. Se aceptan los tres y se normaliza a lista,
+ * porque el pie de la vitrina lo pintaba todo seguido y el navegador
+ * partía el texto donde le cabía: "Sábados de 8:00 a. m." terminaba en
+ * un renglón y "a 2:00 p. m." en el siguiente.
+ *
+ * Devuelve lista vacía si no hay nada que mostrar, para que quien llama
+ * decida con un solo `length` si pinta el bloque.
+ */
+export function splitHours(value: string | null | undefined): string[] {
+  if (!value) return []
+  return value
+    .split(/[\n·;]+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
