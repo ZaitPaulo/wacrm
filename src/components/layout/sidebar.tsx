@@ -203,8 +203,17 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             close button is hidden since the sidebar is always-visible. */}
         <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <MessageSquare className="h-4 w-4" />
+            {/* Mismo monograma que el favicon (`src/app/icon.png`): las
+                iniciales en blanco sobre negro con la línea roja de la
+                marca. Se dibuja con CSS en vez de servir el PNG para que
+                no pixele en pantallas hi-dpi y no cueste una petición.
+                El borde lo separa del fondo del sidebar, que en tema
+                oscuro es casi negro y se lo tragaría. */}
+            <div className="flex h-8 w-8 flex-col items-center justify-center gap-[2px] rounded-lg border border-border bg-black">
+              <span className="text-[11px] font-black leading-none tracking-tight text-white">
+                LM
+              </span>
+              <span className="h-[2px] w-4 rounded-full bg-[#e10600]" />
             </div>
             {/* El nombre de la marca sale de una constante y no del
                 catálogo de traducciones: no se traduce, y tenerlo por
