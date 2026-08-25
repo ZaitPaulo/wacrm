@@ -11,8 +11,12 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
   const displayName = account.public_name?.trim() || account.name;
   const waDigits = account.public_whatsapp?.replace(/\D/g, '') || null;
 
+  // Fondo blanco y no el gris de antes: el logo del negocio llega con el
+  // fondo blanco horneado —es un JPEG— y sobre gris se recortaba como un
+  // rectángulo. Lo que sigue separando el pie del cuerpo de la página,
+  // que es apenas más oscuro (#f7f9fb), es el borde superior.
   return (
-    <footer className="mt-auto w-full border-t border-[#c5c6cd] bg-[#e6e8ea] text-[#191c1e]">
+    <footer className="mt-auto w-full border-t border-[#c5c6cd] bg-white text-[#191c1e]">
       <div className="mx-auto max-w-[1280px] px-6 py-12 lg:px-12">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {/* Marca */}
