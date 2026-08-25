@@ -24,6 +24,15 @@ services:
     env_file: !override
       - deploy/.env
 
+    # El contenedor arrancaba en UTC y el negocio vive en UTC-5. Eso no
+    # es cosmético: la condición `time_of_day` de las automatizaciones
+    # compara contra el reloj del proceso, así que un "fuera de horario
+    # 18:00-08:00" pensado para Barranquilla se disparaba de 1 p. m. a
+    # 3 a. m. Node trae su propia base de zonas horarias, de modo que
+    # basta la variable — la imagen es alpine y NO tiene tzdata.
+    environment:
+      TZ: ${TZ:-America/Bogota}
+
     # El proxy es el único que escucha en el servidor. Publicar el 3000 aquí
     # lo dejaría accesible desde internet saltándose UFW, porque Docker
     # escribe sus reglas de iptables antes en la cadena.
