@@ -611,7 +611,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       // Por eso esto lanza, y se comprueba antes de tocar `deals`.
       const { data: stage, error: stageErr } = await db
         .from('pipeline_stages')
-        .select('id, name, pipeline_id, pipelines!inner(account_id)')
+        .select('id, name, position, pipeline_id, pipelines!inner(account_id)')
         .eq('id', cfg.stage_id)
         .eq('pipeline_id', cfg.pipeline_id)
         .eq('pipelines.account_id', args.automation.account_id)
@@ -630,6 +630,28 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!deal) return 'no open deal to move'
       if (deal.stage_id === cfg.stage_id) {
         return `deal ${deal.id} already in stage ${(stage as { name: string }).name}`
+      }
+
+      // UN EMBUDO NO RETROCEDE SOLO. Las reglas que mueven de etapa se
+      // disparan por palabra clave, y las palabras se repiten: alguien que
+      // ya esta negociando vuelve a escribir "precio" y, sin esta guarda,
+      // su negocio caeria de Negociacion a Cotizado. El movimiento hacia
+      // atras existe —cambia de opinion, se enfria— pero es una decision
+      // de quien lleva la venta, no algo que se deduzca de una palabra
+      // suelta en un mensaje.
+      //
+      // Si la etapa actual ya no existe (la borraron del embudo) se deja
+      // pasar el movimiento: quedarse quieto en una etapa fantasma seria
+      // peor que avanzar.
+      const { data: current } = await db
+        .from('pipeline_stages')
+        .select('name, position')
+        .eq('id', deal.stage_id)
+        .eq('pipeline_id', cfg.pipeline_id)
+        .maybeSingle()
+      const target = stage as { name: string; position: number }
+      if (current && (current as { position: number }).position > target.position) {
+        return `deal ${deal.id} left in ${(current as { name: string }).name}: ${target.name} is earlier in the pipeline`
       }
 
       const { error: moveErr } = await db

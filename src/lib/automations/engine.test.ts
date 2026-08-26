@@ -16,7 +16,11 @@ const h = vi.hoisted(() => ({
     // Negocios: `openDeal` es lo que devuelve el SELECT de deals, `stage`
     // lo que devuelve el de pipeline_stages (null = etapa ajena al embudo).
     openDeal: null as { id: string; stage_id: string } | null,
-    stage: null as { id: string; name: string } | null,
+    stage: null as { id: string; name: string; position?: number } | null,
+    /** Etapas por id, para poder distinguir la de origen de la de destino.
+     *  Si un id no esta aqui, se cae a `stage` (lo que esperan los tests
+     *  que no necesitan la distincion). */
+    stagesById: {} as Record<string, { id: string; name: string; position: number }>,
     dealInserts: [] as Record<string, unknown>[],
     dealUpdates: [] as { payload: unknown; filters: [string, string, unknown][] }[],
     dealSelects: [] as [string, string, unknown][][],
@@ -77,7 +81,11 @@ vi.mock("./admin-client", () => {
       state.dealSelects.push(ops.filters);
       return { data: state.openDeal, error: null };
     }
-    if (table === "pipeline_stages") return { data: state.stage, error: null };
+    if (table === "pipeline_stages") {
+      const byId = ops.filters.find((f) => f[0] === "eq" && f[1] === "id");
+      const hit = byId ? state.stagesById[String(byId[2])] : undefined;
+      return { data: hit ?? state.stage, error: null };
+    }
     return { data: null, error: null };
   }
 
@@ -141,6 +149,7 @@ beforeEach(() => {
   h.state.logUpdates = [];
   h.state.openDeal = null;
   h.state.stage = null;
+  h.state.stagesById = {};
   h.state.dealInserts = [];
   h.state.dealUpdates = [];
   h.state.dealSelects = [];
@@ -750,6 +759,57 @@ describe("move_deal_stage", () => {
         error_message: "move_deal_stage: stage not in that pipeline",
       }),
     );
+  });
+
+  // Las reglas que mueven de etapa se disparan por palabra clave, y las
+  // palabras se repiten a lo largo de la venta. Sin esta guarda, alguien
+  // que ya esta negociando y vuelve a preguntar el precio veria su
+  // negocio caer a una etapa anterior.
+  it("no retrocede el negocio a una etapa anterior del embudo", async () => {
+    h.state.stagesById = {
+      [STAGE_A]: { id: STAGE_A, name: "Negociación", position: 4 },
+      [STAGE_B]: { id: STAGE_B, name: "Cotizado", position: 2 },
+    };
+    h.state.stage = h.state.stagesById[STAGE_B];
+    h.state.openDeal = { id: "d1", stage_id: STAGE_A };
+
+    await run("tag_added");
+
+    expect(h.state.dealUpdates).toHaveLength(0);
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({
+        status: "success",
+        detail: "deal d1 left in Negociación: Cotizado is earlier in the pipeline",
+      }),
+    );
+  });
+
+  it("sigue avanzando hacia adelante con normalidad", async () => {
+    h.state.stagesById = {
+      [STAGE_A]: { id: STAGE_A, name: "Contactado", position: 1 },
+      [STAGE_B]: { id: STAGE_B, name: "Cotizado", position: 2 },
+    };
+    h.state.stage = h.state.stagesById[STAGE_B];
+    h.state.openDeal = { id: "d1", stage_id: STAGE_A };
+
+    await run("tag_added");
+
+    expect(h.state.dealUpdates).toHaveLength(1);
+    expect(h.state.dealUpdates[0].payload).toEqual(
+      expect.objectContaining({ stage_id: STAGE_B }),
+    );
+  });
+
+  // Una etapa borrada del embudo deja al negocio en una posicion que ya no
+  // existe. Quedarse quieto ahi es peor que avanzar.
+  it("mueve igual si la etapa actual ya no existe", async () => {
+    h.state.stagesById = { [STAGE_B]: { id: STAGE_B, name: "Cotizado", position: 2 } };
+    h.state.stage = h.state.stagesById[STAGE_B];
+    h.state.openDeal = { id: "d1", stage_id: "etapa-borrada" };
+
+    await run("tag_added");
+
+    expect(h.state.dealUpdates).toHaveLength(1);
   });
 
   it("sin negocio que mover, los pasos siguientes se ejecutan igual", async () => {
