@@ -16,7 +16,9 @@ export const AI_PROVIDER_DEFAULT_MODEL: Record<AiProvider, string> = {
   // OpenRouter ids are `vendor/model`; this default routes to Gemini
   // Flash, a cheap general-purpose choice for WhatsApp-length replies.
   openrouter: 'google/gemini-2.5-flash',
-  gemini: 'gemini-2.5-flash',
+  // gemini-2.5-flash devuelve 404 'no longer available to new users'
+  // desde agosto de 2026; Google remite a 3.6 en el propio mensaje.
+  gemini: 'gemini-3.6-flash',
 }
 
 /**
