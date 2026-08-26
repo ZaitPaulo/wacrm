@@ -28,9 +28,25 @@ export const AI_PROVIDER_DEFAULT_MODEL: Record<AiProvider, string> = {
  */
 export const HANDOFF_SENTINEL = '[[HANDOFF]]'
 
-/** Cap on generated reply length — keeps WhatsApp replies short and
- *  bounds token spend on the caller's own key. */
-export const MAX_OUTPUT_TOKENS = 1024
+/**
+ * Techo duro de la respuesta del proveedor. NO es la palanca para que las
+ * respuestas salgan cortas — de eso se encarga el prompt; esto es la red
+ * que evita un gasto desbocado en la key del propio usuario.
+ *
+ * Estaba en 1024 y cortaba mensajes a media palabra. La razón es que los
+ * modelos que razonan antes de escribir —Gemini 3.x entre ellos— gastan
+ * tokens invisibles del MISMO presupuesto: medido contra
+ * gemini-3.6-flash, una respuesta de 103 tokens de texto consumió 376 de
+ * razonamiento. Con el prompt del negocio y los extractos del inventario
+ * ya dentro, lo que quedaba para escribir no alcanzaba, y el corte no
+ * avisa: llega un mensaje truncado a mitad de frase. En producción se vio
+ * un precio partido como "$59.00" en vez de "$59.000.000", que es peor
+ * que no responder porque parece un precio real.
+ *
+ * 3072 deja margen para el razonamiento y para la respuesta completa. El
+ * gasto real no sube: lo que se escribe lo sigue decidiendo el prompt.
+ */
+export const MAX_OUTPUT_TOKENS = 3072
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 const DEFAULT_CONTEXT_MESSAGE_LIMIT = 20
