@@ -46,7 +46,6 @@ export interface ShowcaseData {
 /** Vehículo con todos los campos que muestra la página de detalle. */
 export interface ShowcaseVehicleDetail extends ShowcaseVehicle {
   color: string | null
-  doors: number | null
 }
 
 /** Formatea un número con separadores de miles (sin decimales). */

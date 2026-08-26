@@ -88,7 +88,7 @@ export const getShowcaseVehicle = cache(
     const { data: vehicle, error: vehErr } = await db
       .from('inventory_vehicles')
       .select(
-        'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, color, condition, doors, features, images, public_ref',
+        'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, color, condition, features, images, public_ref',
       )
       .eq('account_id', account.id)
       .eq('id', id)

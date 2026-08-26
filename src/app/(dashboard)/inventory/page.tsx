@@ -83,7 +83,6 @@ interface VehicleDraft {
   model: string;
   year: string;
   license_plate: string;
-  vin: string;
   price: string;
   mileage: string;
   transmission: string;
@@ -91,7 +90,6 @@ interface VehicleDraft {
   body_type: string;
   color: string;
   condition: string;
-  doors: string;
   status: VehicleStatus;
   // Lista de precios del cliente (510).
   engine_displacement: string;
@@ -119,7 +117,6 @@ const EMPTY_DRAFT: VehicleDraft = {
   model: '',
   year: String(new Date().getFullYear()),
   license_plate: '',
-  vin: '',
   price: '',
   mileage: '',
   transmission: '',
@@ -127,7 +124,6 @@ const EMPTY_DRAFT: VehicleDraft = {
   body_type: '',
   color: '',
   condition: 'used',
-  doors: '',
   status: 'available',
   engine_displacement: '',
   plate_city: '',
@@ -205,7 +201,6 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
     model: v.model,
     year: String(v.year),
     license_plate: v.license_plate ?? '',
-    vin: v.vin ?? '',
     price: String(v.price),
     mileage: v.mileage != null ? String(v.mileage) : '',
     transmission: v.transmission ?? '',
@@ -213,7 +208,6 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
     body_type: v.body_type ?? '',
     color: v.color ?? '',
     condition: v.condition ?? 'used',
-    doors: v.doors != null ? String(v.doors) : '',
     status: v.status,
     engine_displacement: v.engine_displacement ?? '',
     plate_city: v.plate_city ?? '',
@@ -382,7 +376,6 @@ export default function InventoryPage() {
         model: draft.model.trim(),
         year: Number(draft.year),
         license_plate: draft.license_plate.trim() || null,
-        vin: draft.vin.trim() || null,
         price: draft.price.trim() === '' ? 0 : Number(draft.price),
         mileage: draft.mileage.trim() === '' ? null : Number(draft.mileage),
         transmission: draft.transmission || null,
@@ -390,7 +383,6 @@ export default function InventoryPage() {
         body_type: draft.body_type || null,
         color: draft.color.trim() || null,
         condition: draft.condition || 'used',
-        doors: draft.doors.trim() === '' ? null : Number(draft.doors),
         status: draft.status,
         engine_displacement: draft.engine_displacement.trim() || null,
         plate_city: draft.plate_city.trim() || null,
@@ -775,14 +767,6 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="vin">{t('fields.vin')}</Label>
-              <Input
-                id="vin"
-                value={draft.vin}
-                onChange={(e) => setDraft({ ...draft, vin: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="transmission">{t('fields.transmission')}</Label>
               <Select
                 value={draft.transmission}
@@ -860,15 +844,6 @@ export default function InventoryPage() {
                 id="color"
                 value={draft.color}
                 onChange={(e) => setDraft({ ...draft, color: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="doors">{t('fields.doors')}</Label>
-              <Input
-                id="doors"
-                type="number"
-                value={draft.doors}
-                onChange={(e) => setDraft({ ...draft, doors: e.target.value })}
               />
             </div>
             <div className="space-y-2">

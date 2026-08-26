@@ -90,7 +90,6 @@ export default async function VehiclePage({ params }: Params) {
     [s('fuel'), labelOf(t, FUEL_TYPES, v.fuel_type)],
     [s('bodyType'), labelOf(t, BODY_TYPES, v.body_type)],
     [s('color'), v.color || '—'],
-    [s('doors'), v.doors != null ? String(v.doors) : '—'],
     [s('condition'), labelOf(t, CONDITIONS, v.condition)],
   ]
 
@@ -125,7 +124,6 @@ export default async function VehiclePage({ params }: Params) {
     ...(v.color ? { color: v.color } : {}),
     ...(v.fuel_type ? { fuelType: labelOf(t, FUEL_TYPES, v.fuel_type) } : {}),
     ...(v.body_type ? { bodyType: labelOf(t, BODY_TYPES, v.body_type) } : {}),
-    ...(v.doors != null ? { numberOfDoors: v.doors } : {}),
     offers: {
       '@type': 'Offer',
       priceCurrency: 'USD',

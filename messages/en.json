@@ -2119,13 +2119,11 @@
       "price": "Price",
       "mileage": "Mileage",
       "plate": "Plate",
-      "vin": "VIN",
       "transmission": "Transmission",
       "fuelType": "Fuel",
       "bodyType": "Body type",
       "condition": "Condition",
       "color": "Color",
-      "doors": "Doors",
       "features": "Features (one per line, \"Key: Value\")",
       "featuresPlaceholder": "Transmission: Automatic\nColor: Black\nAir conditioning",
       "images": "Images",
@@ -2202,7 +2200,7 @@
       "title": "Purchase",
       "hint": "Only admins can see this. Enables margin calculation.",
       "cost": "Purchase cost",
-      "date": "Purchase date"
+      "date": "Entry date"
     },
     "sale": {
       "title": "Sale details",
@@ -2433,7 +2431,6 @@
     "features": "Features",
     "condition": "Condition",
     "color": "Color",
-    "doors": "Doors",
     "contact": "Contact",
     "administration": "Administration",
     "privacy": "Privacy",

@@ -2112,13 +2112,11 @@
       "price": "Precio",
       "mileage": "Kilometraje",
       "plate": "Placa",
-      "vin": "VIN",
       "transmission": "Transmisión",
       "fuelType": "Combustible",
       "bodyType": "Carrocería",
       "condition": "Condición",
       "color": "Color",
-      "doors": "Puertas",
       "features": "Características (una por línea, «Clave: Valor»)",
       "featuresPlaceholder": "Transmisión: Automática\nColor: Negro\nAire acondicionado",
       "images": "Imágenes",
@@ -2195,7 +2193,7 @@
       "title": "Compra",
       "hint": "Solo lo ven los administradores. Habilita el cálculo de margen.",
       "cost": "Costo de compra",
-      "date": "Fecha de compra"
+      "date": "Fecha de ingreso"
     },
     "sale": {
       "title": "Datos de la venta",
@@ -2426,7 +2424,6 @@
     "features": "Características",
     "condition": "Condición",
     "color": "Color",
-    "doors": "Puertas",
     "contact": "Contacto",
     "administration": "Administración",
     "privacy": "Privacidad",
