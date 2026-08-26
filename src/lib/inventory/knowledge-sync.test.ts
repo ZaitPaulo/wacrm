@@ -16,6 +16,8 @@ import { formatVehicleForKb } from './knowledge-sync'
 // ============================================================
 
 const base = {
+  id: '3f1c9a20-0000-4000-8000-000000000001',
+  public_ref: 'gdy4br',
   brand: 'MAZDA',
   model: '2 GRAND TOURING LX',
   year: 2018,
@@ -59,6 +61,7 @@ describe('formatVehicleForKb', () => {
   it('omite los campos que faltan sin dejar etiquetas huérfanas', () => {
     const out = formatVehicleForKb({
       ...base,
+      public_ref: null,
       mileage: null,
       color: null,
       transmission: null,
@@ -67,6 +70,27 @@ describe('formatVehicleForKb', () => {
       condition: null,
     }).content
     expect(out).toBe('Vehículo disponible: MAZDA 2 GRAND TOURING LX 2018. Precio: 59000000.')
+  })
+
+  // El bot manda este enlace por WhatsApp; si la base no esta configurada
+  // vale mas no mandar nada que mandar media URL.
+  it('incluye el enlace a la ficha y el código cuando hay base', () => {
+    const out = formatVehicleForKb(base, 'https://loramotors.co').content
+    expect(out).toContain('Ficha con fotos: https://loramotors.co/vehiculo/3f1c9a20-0000-4000-8000-000000000001.')
+    expect(out).toContain('Código: GDY4BR.')
+  })
+
+  it('tolera una base con barra final sin duplicarla', () => {
+    expect(formatVehicleForKb(base, 'https://loramotors.co/').content).toContain(
+      'https://loramotors.co/vehiculo/3f1c9a20',
+    )
+    expect(formatVehicleForKb(base, 'https://loramotors.co/').content).not.toContain('co//vehiculo')
+  })
+
+  it('omite el enlace si no hay base configurada', () => {
+    const out = formatVehicleForKb(base).content
+    expect(out).not.toContain('Ficha con fotos')
+    expect(out).not.toContain('/vehiculo/')
   })
 
   it('aplana las características para el texto del documento', () => {

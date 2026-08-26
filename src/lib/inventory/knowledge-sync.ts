@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/ai/admin-client'
+import { configuredBaseUrl } from '@/lib/showcase/site-url'
 import { loadEmbeddingsKey } from '@/lib/ai/config'
 import { ingestDocument } from '@/lib/ai/knowledge'
 
@@ -20,6 +21,8 @@ import { ingestDocument } from '@/lib/ai/knowledge'
 // ============================================================
 
 interface VehicleForKb {
+  id: string
+  public_ref: string | null
   brand: string
   model: string
   year: number
@@ -75,7 +78,10 @@ const KB_CONDITION: Record<string, string> = { new: 'nuevo', used: 'usado' }
  * El VIN tampoco entra: identifica al vehículo ante terceros y no le
  * sirve a nadie que esté preguntando por un carro en WhatsApp.
  */
-export function formatVehicleForKb(v: VehicleForKb): {
+export function formatVehicleForKb(
+  v: VehicleForKb,
+  baseUrl?: string | null,
+): {
   title: string
   content: string
 } {
@@ -92,6 +98,13 @@ export function formatVehicleForKb(v: VehicleForKb): {
   if (v.condition) parts.push(`Estado: ${KB_CONDITION[v.condition] ?? v.condition}.`)
   const feats = featuresToText(v.features)
   if (feats) parts.push(`Detalles: ${feats}.`)
+  // El enlace a la ficha publica, para que el bot pueda mandarlo. Si no
+  // hay base configurada se omite: media URL no le sirve a nadie, y un
+  // enlace roto en WhatsApp es peor que no mandar ninguno.
+  if (baseUrl) {
+    parts.push(`Ficha con fotos: ${baseUrl.replace(/\/+$/, '')}/vehiculo/${v.id}.`)
+  }
+  if (v.public_ref) parts.push(`Código: ${v.public_ref.toUpperCase()}.`)
   return { title, content: parts.join(' ') }
 }
 
@@ -116,7 +129,7 @@ export async function syncVehicleKnowledge(
   const { data: v, error } = await admin
     .from('inventory_vehicles')
     .select(
-      'id, brand, model, year, price, mileage, color, transmission, engine_displacement, plate_city, condition, features, status, kb_document_id',
+      'id, public_ref, brand, model, year, price, mileage, color, transmission, engine_displacement, plate_city, condition, features, status, kb_document_id',
     )
     .eq('account_id', accountId)
     .eq('id', vehicleId)
@@ -140,7 +153,10 @@ export async function syncVehicleKnowledge(
     return
   }
 
-  const { title, content } = formatVehicleForKb(v as VehicleForKb)
+  const { title, content } = formatVehicleForKb(
+    v as VehicleForKb,
+    configuredBaseUrl()?.origin ?? null,
+  )
 
   let documentId: string | null = v.kb_document_id
   if (documentId) {
