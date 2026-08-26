@@ -25,9 +25,12 @@ interface VehicleForKb {
   year: number
   price: number
   mileage: number | null
-  vin: string | null
+  color: string | null
+  transmission: string | null
+  engine_displacement: string | null
+  plate_city: string | null
+  condition: string | null
   features: unknown
-  internal_notes: string | null
 }
 
 /**
@@ -48,7 +51,30 @@ function featuresToText(features: unknown): string {
   return String(features)
 }
 
-/** Título + cuerpo en texto plano para el documento del KB del vehículo. */
+/** Etiquetas en español de los códigos de `specs.ts`, para que el
+ *  documento se lea como lo diría un vendedor y no como un enum. */
+const KB_TRANSMISSION: Record<string, string> = {
+  manual: 'mecánica',
+  automatic: 'automática',
+  cvt: 'CVT',
+  other: 'otra',
+}
+const KB_CONDITION: Record<string, string> = { new: 'nuevo', used: 'usado' }
+
+/**
+ * Título + cuerpo en texto plano para el documento del KB del vehículo.
+ *
+ * SOLO LLEVA LO QUE SE LE DIRÍA A UN CLIENTE. `internal_notes` queda
+ * deliberadamente fuera: ahí viven el asesor, el banco de la prenda, el
+ * dueño anterior y observaciones como "2 reclamaciones de menor
+ * cuantía", y este texto alimenta respuestas que salen solas por
+ * WhatsApp cuando `auto_reply_enabled` está activo. El prompt instruye
+ * al modelo a preferir estos extractos para cualquier dato concreto, así
+ * que todo lo que entre aquí es, en la práctica, decible al cliente.
+ *
+ * El VIN tampoco entra: identifica al vehículo ante terceros y no le
+ * sirve a nadie que esté preguntando por un carro en WhatsApp.
+ */
 export function formatVehicleForKb(v: VehicleForKb): {
   title: string
   content: string
@@ -57,10 +83,15 @@ export function formatVehicleForKb(v: VehicleForKb): {
   const parts: string[] = [`Vehículo disponible: ${v.brand} ${v.model} ${v.year}.`]
   parts.push(`Precio: ${v.price}.`)
   if (v.mileage != null) parts.push(`Kilometraje: ${v.mileage} km.`)
+  if (v.color) parts.push(`Color: ${v.color}.`)
+  if (v.transmission) {
+    parts.push(`Transmisión: ${KB_TRANSMISSION[v.transmission] ?? v.transmission}.`)
+  }
+  if (v.engine_displacement) parts.push(`Motor: ${v.engine_displacement}.`)
+  if (v.plate_city) parts.push(`Placa de ${v.plate_city}.`)
+  if (v.condition) parts.push(`Estado: ${KB_CONDITION[v.condition] ?? v.condition}.`)
   const feats = featuresToText(v.features)
   if (feats) parts.push(`Detalles: ${feats}.`)
-  if (v.internal_notes) parts.push(`Notas: ${v.internal_notes}.`)
-  if (v.vin) parts.push(`VIN: ${v.vin}.`)
   return { title, content: parts.join(' ') }
 }
 
@@ -85,7 +116,7 @@ export async function syncVehicleKnowledge(
   const { data: v, error } = await admin
     .from('inventory_vehicles')
     .select(
-      'id, brand, model, year, price, mileage, vin, features, internal_notes, status, kb_document_id',
+      'id, brand, model, year, price, mileage, color, transmission, engine_displacement, plate_city, condition, features, status, kb_document_id',
     )
     .eq('account_id', accountId)
     .eq('id', vehicleId)
