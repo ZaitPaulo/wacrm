@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import type { AiConfig, AiProvider } from './types'
+import type { EmbeddingsProvider } from './embeddings'
 
 interface AiConfigRow {
   // Sigue a `AiProvider`, no una copia literal: la fila se lee con un
@@ -58,7 +59,12 @@ export async function loadAiConfig(
   // The embeddings key is optional and independent of the chat key —
   // a corrupt/undecryptable one should downgrade to lexical KB, not
   // take down draft/auto-reply, so decrypt failures are swallowed here.
-  let embeddingsApiKey: string | null = null
+  const embeddingsProvider = embeddingsProviderFor(row.provider)
+  // Con Gemini la clave del chat sirve tambien para embeber, asi que se
+  // usa de respaldo: pedirle al usuario que pegue la misma clave dos
+  // veces solo crea la ocasion de pegar una mal.
+  let embeddingsApiKey: string | null =
+    embeddingsProvider === 'gemini' ? decrypt(row.api_key) : null
   if (row.embeddings_api_key) {
     try {
       embeddingsApiKey = decrypt(row.embeddings_api_key)
@@ -68,7 +74,9 @@ export async function loadAiConfig(
       console.error(
         `[ai config] embeddings key for account ${accountId} could not be decrypted — check ENCRYPTION_KEY; semantic search is disabled until it is re-entered.`,
       )
-      embeddingsApiKey = null
+      // Con Gemini queda el respaldo de la clave del chat; con los demas
+      // no hay a que caer y se pierde la busqueda semantica.
+      embeddingsApiKey = embeddingsProvider === 'gemini' ? decrypt(row.api_key) : null
     }
   }
 
@@ -82,7 +90,15 @@ export async function loadAiConfig(
     autoReplyMaxPerConversation: row.auto_reply_max_per_conversation,
     handoffAgentId: row.handoff_agent_id,
     embeddingsApiKey,
+    embeddingsProvider,
   }
+}
+
+/** Gemini embebe con Gemini; todo lo demas con OpenAI. Anthropic no
+ *  tiene endpoint de embeddings propio, y OpenRouter no enruta esa
+ *  llamada, asi que para ambos el destino sigue siendo OpenAI. */
+export function embeddingsProviderFor(provider: string): EmbeddingsProvider {
+  return provider === 'gemini' ? 'gemini' : 'openai'
 }
 
 /**
@@ -99,19 +115,39 @@ export async function loadAiConfig(
 export async function loadEmbeddingsKey(
   db: SupabaseClient,
   accountId: string,
-): Promise<{ key: string | null; corrupt: boolean }> {
+): Promise<{ key: string | null; corrupt: boolean; provider: EmbeddingsProvider }> {
   const { data, error } = await db
     .from('ai_configs')
-    .select('embeddings_api_key')
+    .select('provider, api_key, embeddings_api_key')
     .eq('account_id', accountId)
     .maybeSingle()
-  if (error || !data?.embeddings_api_key) return { key: null, corrupt: false }
+  if (error || !data) return { key: null, corrupt: false, provider: 'openai' }
+
+  const provider = embeddingsProviderFor(data.provider)
+  // Con Gemini la clave del chat embebe igual de bien, asi que se usa de
+  // respaldo y la cuenta no necesita una segunda credencial.
+  const fallback = () => {
+    if (provider !== 'gemini' || !data.api_key) return null
+    try {
+      return decrypt(data.api_key)
+    } catch {
+      return null
+    }
+  }
+
+  if (!data.embeddings_api_key) {
+    return { key: fallback(), corrupt: false, provider }
+  }
   try {
-    return { key: decrypt(data.embeddings_api_key), corrupt: false }
+    return { key: decrypt(data.embeddings_api_key), corrupt: false, provider }
   } catch {
     console.error(
       `[ai config] embeddings key for account ${accountId} could not be decrypted — check ENCRYPTION_KEY.`,
     )
-    return { key: null, corrupt: true }
+    const respaldo = fallback()
+    // `corrupt` solo si no queda nada con que embeber: si el respaldo
+    // sirve, la busqueda semantica sigue viva y avisar de un fallo seria
+    // ruido.
+    return { key: respaldo, corrupt: respaldo === null, provider }
   }
 }

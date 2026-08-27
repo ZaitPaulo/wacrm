@@ -27,7 +27,7 @@ interface MatchRow {
 export async function ingestDocument(
   db: SupabaseClient,
   accountId: string,
-  config: Pick<AiConfig, 'embeddingsApiKey'>,
+  config: Pick<AiConfig, 'embeddingsApiKey' | 'embeddingsProvider'>,
   documentId: string,
   content: string,
 ): Promise<void> {
@@ -52,7 +52,10 @@ export async function ingestDocument(
   let embedError: unknown = null
   if (config.embeddingsApiKey) {
     try {
-      embeddings = await embedTexts(config.embeddingsApiKey, chunks)
+      embeddings = await embedTexts(config.embeddingsApiKey, chunks, {
+        provider: config.embeddingsProvider,
+        kind: 'document',
+      })
     } catch (err) {
       embedError = err
     }
@@ -84,7 +87,7 @@ export async function ingestDocument(
 export async function retrieveKnowledge(
   db: SupabaseClient,
   accountId: string,
-  config: Pick<AiConfig, 'embeddingsApiKey'>,
+  config: Pick<AiConfig, 'embeddingsApiKey' | 'embeddingsProvider'>,
   queryText: string,
   k = 5,
 ): Promise<string[]> {
@@ -110,7 +113,13 @@ export async function retrieveKnowledge(
   // Semantic path.
   if (config.embeddingsApiKey) {
     try {
-      const [queryEmbedding] = await embedTexts(config.embeddingsApiKey, [query])
+      // 'query' y no 'document': Gemini embebe una pregunta distinto de
+      // como embebe el texto que la responde, y acertar aqui es la mitad
+      // de la calidad de la busqueda.
+      const [queryEmbedding] = await embedTexts(config.embeddingsApiKey, [query], {
+        provider: config.embeddingsProvider,
+        kind: 'query',
+      })
       if (queryEmbedding) {
         const { data, error } = await db.rpc('match_ai_knowledge_semantic', {
           p_account_id: accountId,

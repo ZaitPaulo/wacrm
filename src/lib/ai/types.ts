@@ -1,3 +1,5 @@
+import type { EmbeddingsProvider } from './embeddings'
+
 // ============================================================
 // Shared types for the AI reply assistant (bring-your-own-key).
 //
@@ -50,10 +52,14 @@ export interface AiConfig {
    *  agent's `auth.users.id`, or null to leave it unassigned (drop into
    *  the shared queue). */
   handoffAgentId: string | null
-  /** Optional OpenAI-compatible key for embeddings. When set, the
-   *  knowledge base is embedded and semantic retrieval turns on; when
-   *  null, retrieval falls back to lexical full-text search. */
+  /** Clave para embeddings. Con ella el knowledge base se embebe y la
+   *  recuperacion semantica se enciende; sin ella se cae a busqueda
+   *  lexica. Con proveedor Gemini vale la misma clave del chat, asi que
+   *  no hay que configurar nada aparte. */
   embeddingsApiKey: string | null
+  /** Quien embebe. Se deriva del proveedor de la cuenta y no se
+   *  configura: Gemini embebe con Gemini, todo lo demas con OpenAI. */
+  embeddingsProvider: EmbeddingsProvider
 }
 
 /** A single conversation turn in the shape both providers accept. */

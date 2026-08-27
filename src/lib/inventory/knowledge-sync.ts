@@ -219,8 +219,8 @@ export async function syncVehicleKnowledge(
     throw new Error('No se pudo resolver el documento de KB del vehículo')
   }
 
-  const { key: embeddingsApiKey } = await loadEmbeddingsKey(admin, accountId)
-  await ingestDocument(admin, accountId, { embeddingsApiKey }, documentId, content)
+  const { key: embeddingsApiKey, provider: embeddingsProvider } = await loadEmbeddingsKey(admin, accountId)
+  await ingestDocument(admin, accountId, { embeddingsApiKey, embeddingsProvider }, documentId, content)
 }
 
 /**

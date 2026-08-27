@@ -3,20 +3,44 @@ import { aiRequestTimeoutMs } from './defaults'
 import { providerHttpError, toNetworkError } from './providers/shared'
 
 // ============================================================
-// Embeddings (OpenAI-compatible).
+// Embeddings para la busqueda semantica del knowledge base: se embebe
+// cada trozo al indexar y la pregunta al recuperar.
 //
-// Used for the knowledge base's optional semantic-search path: embed
-// each chunk at ingest, and embed the query at retrieval. Anthropic has
-// no embeddings endpoint, so this is always OpenAI's — the account
-// supplies a (possibly separate) embeddings key. 1536-dim
-// text-embedding-3-small matches the `vector(1536)` column in
-// migration 030.
+// DOS PROVEEDORES, MISMAS 1536 DIMENSIONES, que es lo que exige la
+// columna `vector(1536)` de la migracion 030:
+//
+//   - OpenAI (text-embedding-3-small). Era el unico, y sigue siendo el
+//     camino para cuentas que responden con OpenAI, OpenRouter o
+//     Anthropic — este ultimo no tiene endpoint de embeddings propio.
+//   - Gemini (gemini-embedding-001), que acepta `outputDimensionality`
+//     y devuelve exactamente 1536. Importa porque le ahorra a una cuenta
+//     que ya responde con Gemini tener que abrir y pagar una segunda
+//     cuenta solo para esto: sirve la misma clave.
+//
+// Gemini va por su API nativa y no por su capa compatible con OpenAI,
+// aunque esa existiria. La razon es `taskType`: al embeber hay que decir
+// si el texto es un DOCUMENTO o una PREGUNTA, y la capa compatible no lo
+// expone. Medido sobre el inventario real, sin `taskType` la separacion
+// entre un vehiculo y un documento de politica irrelevante caia a 0.014
+// —todo se parecia a todo—; con el sube a 0.07.
 // ============================================================
 
 const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings'
+const GEMINI_EMBEDDINGS_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents'
 
 export const EMBEDDING_MODEL = 'text-embedding-3-small'
+export const GEMINI_EMBEDDING_MODEL = 'models/gemini-embedding-001'
 export const EMBEDDING_DIMENSIONS = 1536
+
+/** Quien embebe. Se deriva del proveedor de la cuenta, no se configura
+ *  aparte: pedirle al usuario que elija dos proveedores es una via mas
+ *  para dejarlos descuadrados. */
+export type EmbeddingsProvider = 'openai' | 'gemini'
+
+/** Un texto del knowledge base o una pregunta de cliente. Gemini embebe
+ *  distinto segun cual sea; OpenAI lo ignora. */
+export type EmbeddingKind = 'document' | 'query'
 
 // OpenAI accepts an array input; keep batches modest so a big re-index
 // stays under request-size limits and partial failures are cheap.
@@ -41,8 +65,12 @@ export function toVectorLiteral(embedding: number[]): string {
 export async function embedTexts(
   apiKey: string,
   inputs: string[],
+  opts: { provider?: EmbeddingsProvider; kind?: EmbeddingKind } = {},
 ): Promise<number[][]> {
   if (inputs.length === 0) return []
+  if ((opts.provider ?? 'openai') === 'gemini') {
+    return embedWithGemini(apiKey, inputs, opts.kind ?? 'document')
+  }
   const timeoutMs = aiRequestTimeoutMs()
   const out: number[][] = []
 
@@ -97,4 +125,85 @@ export async function embedTexts(
   }
 
   return out
+}
+
+/**
+ * Embeddings por la API nativa de Gemini.
+ *
+ * `outputDimensionality: 1536` recorta el vector para que entre en la
+ * columna que ya existe, sin migrar nada. El precio de recortarlo es que
+ * DEJA DE VENIR NORMALIZADO —Google normaliza solo en su tamaño nativo—,
+ * asi que se normaliza aqui. Con la distancia coseno de pgvector daria
+ * igual, pero un vector de norma 0,7 guardado junto a otros de norma 1
+ * es una trampa esperando a quien luego compare con producto interno.
+ */
+async function embedWithGemini(
+  apiKey: string,
+  inputs: string[],
+  kind: EmbeddingKind,
+): Promise<number[][]> {
+  const timeoutMs = aiRequestTimeoutMs()
+  const taskType = kind === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT'
+  const out: number[][] = []
+
+  for (let start = 0; start < inputs.length; start += BATCH_SIZE) {
+    const batch = inputs.slice(start, start + BATCH_SIZE)
+
+    let res: Response
+    try {
+      res = await fetch(GEMINI_EMBEDDINGS_URL, {
+        method: 'POST',
+        headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: batch.map((text) => ({
+            model: GEMINI_EMBEDDING_MODEL,
+            content: { parts: [{ text }] },
+            taskType,
+            outputDimensionality: EMBEDDING_DIMENSIONS,
+          })),
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+    } catch (err) {
+      throw toNetworkError(err)
+    }
+
+    if (!res.ok) throw await providerHttpError('Gemini embeddings', res)
+
+    const data = (await res.json().catch(() => null)) as
+      | { embeddings?: { values?: number[] }[] }
+      | null
+    const rows = data?.embeddings
+    // Gemini devuelve los vectores en el orden pedido y sin `index`, al
+    // contrario que OpenAI. Por eso lo unico que se puede comprobar es
+    // que vengan todos: si faltara uno, el desfase asignaria a cada
+    // trozo el vector del siguiente y la busqueda apuntaria a otro carro.
+    if (!rows || rows.length !== batch.length) {
+      throw new AiError('Embeddings response was malformed.', {
+        code: 'embeddings_malformed',
+      })
+    }
+
+    for (const row of rows) {
+      const v = row?.values
+      if (!Array.isArray(v) || v.length !== EMBEDDING_DIMENSIONS) {
+        throw new AiError('Embeddings response was malformed.', {
+          code: 'embeddings_malformed',
+        })
+      }
+      out.push(normalize(v))
+    }
+  }
+
+  return out
+}
+
+/** Vector unitario. Un vector de norma cero se devuelve tal cual: no hay
+ *  direccion que conservar y dividir por cero llenaria la fila de NaN. */
+function normalize(v: number[]): number[] {
+  let sum = 0
+  for (const x of v) sum += x * x
+  const norm = Math.sqrt(sum)
+  if (!Number.isFinite(norm) || norm === 0) return v
+  return v.map((x) => x / norm)
 }

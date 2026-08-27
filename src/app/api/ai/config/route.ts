@@ -8,6 +8,7 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
 import { validateAiCredentials } from '@/lib/ai/validate'
 import { embedTexts } from '@/lib/ai/embeddings'
+import { embeddingsProviderFor } from '@/lib/ai/config'
 import { AiError, AI_PROVIDERS, isAiProvider } from '@/lib/ai/types'
 
 function bad(message: string) {
@@ -167,6 +168,7 @@ export async function POST(request: Request) {
           autoReplyMaxPerConversation: maxPer,
           handoffAgentId: null,
           embeddingsApiKey: null,
+          embeddingsProvider: 'openai',
         })
       } catch (err) {
         if (err instanceof AiError) {
@@ -182,9 +184,13 @@ export async function POST(request: Request) {
 
     // Validate a new embeddings key before storing (a cheap 1-input
     // embed), same "verify before save" discipline as the chat key.
+    // Contra el proveedor que le va a tocar: validar una clave de Gemini
+    // contra OpenAI la rechazaria siendo buena.
     if (rawEmbeddingsKey) {
       try {
-        await embedTexts(rawEmbeddingsKey, ['ping'])
+        await embedTexts(rawEmbeddingsKey, ['ping'], {
+          provider: embeddingsProviderFor(provider),
+        })
       } catch (err) {
         if (err instanceof AiError) {
           return NextResponse.json(
