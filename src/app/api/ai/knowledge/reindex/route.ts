@@ -50,8 +50,43 @@ export async function POST() {
       )
     }
 
+    // REANUDABLE, y no por elegancia: el nivel gratuito de Gemini corta
+    // en 100 embeddings por minuto y este inventario tiene 140
+    // documentos. Como `ingestDocument` borra los vectores antes de
+    // rehacerlos, volver a pulsar el botón reprocesaba los 140 desde
+    // cero y moría siempre en el mismo punto — el trabajo hecho se
+    // perdía y la operación no convergía nunca. Saltando lo que ya está
+    // embebido, pulsar otra vez termina lo que faltó.
+    //
+    // Para forzar un reembebido completo (cambio de proveedor, vectores
+    // de otra dimensión) hay que vaciar los vectores primero:
+    //   UPDATE ai_knowledge_chunks SET embedding = NULL WHERE account_id = ...
+    const saltables = new Set<string>()
+    if (embeddingsApiKey) {
+      const [{ data: conChunks }, { data: sinVector }] = await Promise.all([
+        supabase.from('ai_knowledge_chunks').select('document_id').eq('account_id', accountId),
+        supabase
+          .from('ai_knowledge_chunks')
+          .select('document_id')
+          .eq('account_id', accountId)
+          .is('embedding', null),
+      ])
+      const pendientes = new Set((sinVector ?? []).map((r) => r.document_id as string))
+      for (const row of conChunks ?? []) {
+        const id = row.document_id as string
+        // Un documento a medio embeber se rehace entero: sus trozos
+        // tienen que salir todos del mismo modelo.
+        if (!pendientes.has(id)) saltables.add(id)
+      }
+    }
+
     let reindexed = 0
+    let skipped = 0
     for (const doc of docs ?? []) {
+      if (saltables.has(doc.id)) {
+        skipped += 1
+        continue
+      }
       try {
         await ingestDocument(supabase, accountId, { embeddingsApiKey, embeddingsProvider }, doc.id, doc.content)
         reindexed += 1
@@ -64,15 +99,18 @@ export async function POST() {
           {
             success: false,
             reindexed,
+            skipped,
             total: (docs ?? []).length,
-            error: `Reindexed ${reindexed}, then hit an error: ${message}`,
+            error:
+              `Reindexed ${reindexed} (${skipped} ya estaban), then hit an error: ${message}` +
+              '. Vuelve a pulsar Reindexar para continuar donde se quedó.',
           },
           { status: 200 },
         )
       }
     }
 
-    return NextResponse.json({ success: true, reindexed })
+    return NextResponse.json({ success: true, reindexed, skipped })
   } catch (err) {
     return toErrorResponse(err)
   }
