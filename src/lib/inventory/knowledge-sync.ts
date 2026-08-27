@@ -29,6 +29,8 @@ interface VehicleForKb {
   price: number
   mileage: number | null
   color: string | null
+  body_type: string | null
+  fuel_type: string | null
   transmission: string | null
   engine_displacement: string | null
   plate_city: string | null
@@ -65,6 +67,36 @@ const KB_TRANSMISSION: Record<string, string> = {
 const KB_CONDITION: Record<string, string> = { new: 'nuevo', used: 'usado' }
 
 /**
+ * Carrocería como la nombra el cliente, no como la nombra el enum.
+ *
+ * A las tres que en Colombia se llaman "camioneta" —SUV, pick-up y van,
+ * el mismo grupo que decide el recargo de la garantía en `specs.ts`— se
+ * les añade esa palabra al texto. Es la que la gente escribe: quien pide
+ * "una camioneta" no escribe "SUV", y la búsqueda del knowledge base es
+ * léxica, así que la palabra tiene que estar ahí para poder encontrarse.
+ */
+const KB_BODY: Record<string, string> = {
+  suv: 'SUV (camioneta)',
+  pickup: 'pick-up (camioneta)',
+  van: 'van (camioneta)',
+  sedan: 'sedán',
+  hatchback: 'hatchback',
+  coupe: 'coupé',
+  wagon: 'station wagon',
+  convertible: 'convertible',
+  other: 'otra',
+}
+
+const KB_FUEL: Record<string, string> = {
+  gasoline: 'gasolina',
+  diesel: 'diésel',
+  hybrid: 'híbrido',
+  electric: 'eléctrico',
+  lpg: 'gas',
+  other: 'otro',
+}
+
+/**
  * Título + cuerpo en texto plano para el documento del KB del vehículo.
  *
  * SOLO LLEVA LO QUE SE LE DIRÍA A UN CLIENTE. `internal_notes` queda
@@ -90,6 +122,8 @@ export function formatVehicleForKb(
   parts.push(`Precio: ${v.price}.`)
   if (v.mileage != null) parts.push(`Kilometraje: ${v.mileage} km.`)
   if (v.color) parts.push(`Color: ${v.color}.`)
+  if (v.body_type) parts.push(`Carrocería: ${KB_BODY[v.body_type] ?? v.body_type}.`)
+  if (v.fuel_type) parts.push(`Combustible: ${KB_FUEL[v.fuel_type] ?? v.fuel_type}.`)
   if (v.transmission) {
     parts.push(`Transmisión: ${KB_TRANSMISSION[v.transmission] ?? v.transmission}.`)
   }
@@ -129,7 +163,7 @@ export async function syncVehicleKnowledge(
   const { data: v, error } = await admin
     .from('inventory_vehicles')
     .select(
-      'id, public_ref, brand, model, year, price, mileage, color, transmission, engine_displacement, plate_city, condition, features, status, kb_document_id',
+      'id, public_ref, brand, model, year, price, mileage, color, body_type, fuel_type, transmission, engine_displacement, plate_city, condition, features, status, kb_document_id',
     )
     .eq('account_id', accountId)
     .eq('id', vehicleId)

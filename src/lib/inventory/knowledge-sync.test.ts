@@ -24,6 +24,8 @@ const base = {
   price: 59_000_000,
   mileage: 90_500,
   color: 'MACHINE GRAY',
+  body_type: 'sedan',
+  fuel_type: 'gasoline',
   transmission: 'automatic',
   engine_displacement: '1.5',
   plate_city: 'BARRANQUILLA',
@@ -42,6 +44,22 @@ describe('formatVehicleForKb', () => {
     expect(content).toContain('Motor: 1.5')
     expect(content).toContain('Placa de BARRANQUILLA')
     expect(content).toContain('Estado: usado')
+  })
+
+  // "camioneta" es la palabra que escribe el cliente colombiano; "SUV"
+  // no la escribe casi nadie. La busqueda es lexica, asi que tiene que
+  // estar en el texto para poder encontrarse.
+  it('nombra camioneta a la SUV, la pick-up y la van', () => {
+    for (const body of ['suv', 'pickup', 'van']) {
+      expect(formatVehicleForKb({ ...base, body_type: body }).content).toContain('camioneta')
+    }
+    expect(formatVehicleForKb({ ...base, body_type: 'sedan' }).content).not.toContain('camioneta')
+  })
+
+  it('traduce carroceria y combustible', () => {
+    const out = formatVehicleForKb({ ...base, body_type: 'hatchback', fuel_type: 'hybrid' }).content
+    expect(out).toContain('Carrocería: hatchback')
+    expect(out).toContain('Combustible: híbrido')
   })
 
   it('traduce los códigos de specs en vez de volcar el enum', () => {
@@ -64,6 +82,8 @@ describe('formatVehicleForKb', () => {
       public_ref: null,
       mileage: null,
       color: null,
+      body_type: null,
+      fuel_type: null,
       transmission: null,
       engine_displacement: null,
       plate_city: null,
