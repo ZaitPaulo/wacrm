@@ -229,6 +229,43 @@ describe('dispatchInboundToAiReply — handoff', () => {
     expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
   })
 
+  // Pasó en producción el 2026-08-26: la cuota gratuita de Gemini se agotó
+  // a mitad de una conversación y el cliente escribió "¿cómo continuamos?"
+  // y "me interesa ese carro" sin recibir NADA. El error quedaba solo en
+  // el log; la conversación seguía sin asignar y con el bot encendido, o
+  // sea indistinguible de una atendida. Un silencio es la peor respuesta
+  // posible para alguien que ya eligió el carro.
+  it('traspasa a un humano cuando el proveedor falla, en vez de callar', async () => {
+    h.generateReply.mockRejectedValue(new Error('Gemini rate limit reached'))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    // El cliente recibe el aviso de que va un asesor.
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toMatch(/agent|asesor/i)
+    // Y el hilo queda fuera del bot, con la nota diciendo que fue técnico.
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(h.state.updatePayload?.ai_handoff_summary).toContain('no pudo responder')
+  })
+
+  it('el traspaso de emergencia también respeta al asesor configurado', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
+    h.generateReply.mockRejectedValue(new Error('boom'))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'agent-7' })
+  })
+
+  // El contrato de esta funcion es no lanzar nunca: el webhook tiene que
+  // devolverle 200 a Meta pase lo que pase.
+  it('no lanza aunque el propio traspaso de emergencia falle', async () => {
+    h.generateReply.mockRejectedValue(new Error('boom'))
+    h.engineSendText.mockRejectedValue(new Error('meta caida'))
+
+    await expect(dispatchInboundToAiReply(ARGS)).resolves.toBeUndefined()
+  })
+
   it('routes to the configured handoff agent on handoff', async () => {
     h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
     h.generateReply.mockResolvedValue({ text: '', handoff: true })

@@ -12,6 +12,13 @@ import { engineSendText } from '@/lib/flows/meta-send'
 import { notifyCustomerOfHandoff } from '@/lib/handoff/notify-customer'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
+/** Lo que se lee de la conversacion antes de decidir si contestar. */
+interface ConversationState {
+  assigned_agent_id: string | null
+  ai_autoreply_disabled: boolean
+  ai_reply_count: number
+}
+
 interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
   accountId: string
@@ -71,18 +78,30 @@ export async function dispatchInboundToAiReply(
     inboundCreatedAt,
   } = args
 
+  // Declarados fuera del try porque el catch los necesita: sin ellos no
+  // puede traspasar la conversacion, que es justo lo que hay que hacer
+  // cuando algo revienta a mitad de camino.
+  let dbCtx: ReturnType<typeof supabaseAdmin> | null = null
+  let configCtx: Awaited<ReturnType<typeof loadAiConfig>> = null
+  let convCtx: ConversationState | null = null
+  let messagesCtx: Awaited<ReturnType<typeof buildConversationContext>> = []
+
   try {
     const db = supabaseAdmin()
+    dbCtx = db
 
     const config = await loadAiConfig(db, accountId)
     if (!config || !config.autoReplyEnabled) return
+    configCtx = config
 
-    const { data: conv, error: convErr } = await db
+    const { data: convRow, error: convErr } = await db
       .from('conversations')
       .select('assigned_agent_id, ai_autoreply_disabled, ai_reply_count')
       .eq('id', conversationId)
       .maybeSingle()
-    if (convErr || !conv) return
+    if (convErr || !convRow) return
+    const conv = convRow as ConversationState
+    convCtx = conv
     if (conv.assigned_agent_id) return // a human owns this thread
     if (conv.ai_autoreply_disabled) return // handed off / turned off here
     // Cheap early-out; the authoritative cap check is the atomic claim
@@ -134,6 +153,7 @@ export async function dispatchInboundToAiReply(
 
     const messages = await buildConversationContext(db, conversationId)
     if (messages.length === 0) return
+    messagesCtx = messages
 
     // Account-wide throttle on the shared BYO key. The per-conversation
     // cap bounds one thread; this bounds a burst across many threads (a
@@ -193,28 +213,18 @@ export async function dispatchInboundToAiReply(
       // and (c) leave a short internal note so whoever picks it up has
       // context. Assigning fires the `on_conversation_assigned` trigger,
       // which notifies the agent.
-      const summary = buildHandoffSummary({
-        messages,
-        replyCount: conv.ai_reply_count ?? 0,
-      })
-      const update: Record<string, unknown> = {
-        ai_autoreply_disabled: true,
-        ai_handoff_summary: summary,
-      }
-      // Only set the assignee when a target is configured AND the thread
-      // isn't already owned — never stomp an existing human assignment.
-      if (config.handoffAgentId && !conv.assigned_agent_id) {
-        update.assigned_agent_id = config.handoffAgentId
-      }
-      await db.from('conversations').update(update).eq('id', conversationId)
-      // Until this landed the assistant simply stopped replying: the
-      // agent got notified, the customer got silence mid-conversation
-      // and no way to tell "someone is coming" from "it broke".
-      await notifyCustomerOfHandoff({
+      await handOffToHuman({
+        db,
         accountId,
-        userId: configOwnerUserId,
         conversationId,
         contactId,
+        configOwnerUserId,
+        handoffAgentId: config.handoffAgentId,
+        assignedAgentId: conv.assigned_agent_id,
+        summary: buildHandoffSummary({
+          messages,
+          replyCount: conv.ai_reply_count ?? 0,
+        }),
       })
       return
     }
@@ -229,5 +239,85 @@ export async function dispatchInboundToAiReply(
     })
   } catch (err) {
     console.error('[ai auto-reply] dispatch failed:', err)
+
+    // EL SILENCIO ES LA PEOR RESPUESTA. Si la generacion revienta —el
+    // proveedor sin cuota, una caida, un timeout— hasta aqui el cliente
+    // se quedaba esperando y la conversacion seguia sin asignar y con el
+    // bot encendido, o sea indistinguible de una atendida. Paso en
+    // produccion el 2026-08-26: dos "como continuamos?" y "me interesa
+    // ese carro" sin respuesta, con el rate limit de Gemini en el log y
+    // nada visible en el CRM.
+    //
+    // Se recorre el mismo camino que cuando el modelo pide traspaso: el
+    // cliente recibe que va un asesor y el chat aparece asignado. La nota
+    // interna dice que fue un fallo tecnico, para que quien lo tome sepa
+    // que el bot no llego a leer el ultimo mensaje.
+    //
+    // Solo si se llego a saber contra que conversacion se trabajaba: un
+    // fallo antes de eso no tiene a quien traspasar.
+    if (dbCtx && convCtx && !convCtx.assigned_agent_id && !convCtx.ai_autoreply_disabled) {
+      try {
+        await handOffToHuman({
+          db: dbCtx,
+          accountId,
+          conversationId,
+          contactId,
+          configOwnerUserId,
+          handoffAgentId: configCtx?.handoffAgentId ?? null,
+          assignedAgentId: convCtx.assigned_agent_id,
+          summary:
+            '⚠️ La IA no pudo responder (fallo del proveedor). El último mensaje del cliente quedó sin leer por el bot.' +
+            (messagesCtx.length > 0
+              ? ' ' + buildHandoffSummary({ messages: messagesCtx, replyCount: convCtx.ai_reply_count ?? 0 })
+              : ''),
+        })
+      } catch (handoffErr) {
+        // Ultimo recurso fallido. Se registra y se sale: esta funcion no
+        // puede lanzar, o se lleva por delante el 200 que espera Meta.
+        console.error('[ai auto-reply] emergency handoff failed:', handoffErr)
+      }
+    }
   }
+}
+
+/**
+ * Saca la conversacion del bot y se la da a una persona.
+ *
+ * Hace las tres cosas juntas porque por separado ninguna sirve: (a) apaga
+ * la autorespuesta en este hilo —pegajoso hasta que alguien la reactive—,
+ * (b) lo asigna al asesor configurado, y null lo deja en la cola
+ * compartida, y (c) deja una nota interna con contexto. Asignar dispara
+ * `on_conversation_assigned`, que avisa al asesor.
+ *
+ * Y avisa al cliente. Antes de que eso existiera el asistente
+ * simplemente dejaba de responder: el asesor se enteraba, el cliente no,
+ * y no habia forma de distinguir "ya va alguien" de "esto se rompio".
+ */
+async function handOffToHuman(args: {
+  db: ReturnType<typeof supabaseAdmin>
+  accountId: string
+  conversationId: string
+  contactId: string
+  configOwnerUserId: string
+  handoffAgentId: string | null
+  assignedAgentId: string | null
+  summary: string
+}): Promise<void> {
+  const update: Record<string, unknown> = {
+    ai_autoreply_disabled: true,
+    ai_handoff_summary: args.summary,
+  }
+  // Solo se pone dueño si hay uno configurado Y el hilo no tiene ya el
+  // suyo: nunca se pisa una asignacion humana existente.
+  if (args.handoffAgentId && !args.assignedAgentId) {
+    update.assigned_agent_id = args.handoffAgentId
+  }
+  await args.db.from('conversations').update(update).eq('id', args.conversationId)
+
+  await notifyCustomerOfHandoff({
+    accountId: args.accountId,
+    userId: args.configOwnerUserId,
+    conversationId: args.conversationId,
+    contactId: args.contactId,
+  })
 }
