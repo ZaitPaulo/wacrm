@@ -521,9 +521,14 @@ export function AiConfig() {
           accountId={accountId}
           canEdit={canEdit}
           hasEmbeddingsKey={
-            embeddingsKeyEdited
+            (embeddingsKeyEdited
               ? embeddingsKey.trim().length > 0
-              : hasStoredEmbeddingsKey
+              : hasStoredEmbeddingsKey) ||
+            // Con Gemini la clave del chat embebe igual, así que hay
+            // búsqueda semántica sin haber llenado el campo de arriba.
+            // Sin esta rama el botón de reindexar queda escondido justo
+            // para las cuentas que no necesitan una segunda credencial.
+            (provider === 'gemini' && (keyEdited ? apiKey.trim().length > 0 : hasStoredKey))
           }
         />
 
