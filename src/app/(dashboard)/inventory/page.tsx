@@ -482,6 +482,10 @@ export default function InventoryPage() {
               <TableHead>{t('table.vehicle')}</TableHead>
               <TableHead>{t('table.year')}</TableHead>
               <TableHead>{t('table.plate')}</TableHead>
+              {/* El kilometraje va pegado a la placa por pedido del
+                  cliente: es el dato que más pesa al comparar dos
+                  vehículos del mismo modelo. */}
+              <TableHead className="text-right">{t('table.mileage')}</TableHead>
               {/* Ciudad de matrícula y ficha técnica: lo que un asesor
                   necesita responder sin abrir el vehículo. Se ocultan
                   bajo lg para que la tabla siga siendo legible en
@@ -492,7 +496,6 @@ export default function InventoryPage() {
               <TableHead className="hidden text-right xl:table-cell">
                 {t('table.warrantyPrice')}
               </TableHead>
-              <TableHead className="text-right">{t('table.mileage')}</TableHead>
               <TableHead>{t('table.status')}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -528,6 +531,9 @@ export default function InventoryPage() {
                   </TableCell>
                   <TableCell>{v.year}</TableCell>
                   <TableCell>{v.license_plate ?? '—'}</TableCell>
+                  <TableCell className="text-right">
+                    {v.mileage != null ? `${formatNumber(v.mileage)} km` : '—'}
+                  </TableCell>
                   <TableCell className="hidden whitespace-normal lg:table-cell">
                     {v.plate_city ?? '—'}
                   </TableCell>
@@ -539,9 +545,6 @@ export default function InventoryPage() {
                     {v.warranty_price != null
                       ? formatPrice(v.warranty_price, currency)
                       : '—'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {v.mileage != null ? `${formatNumber(v.mileage)} km` : '—'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={STATUS_META[v.status].variant}>
