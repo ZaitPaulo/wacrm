@@ -458,7 +458,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Car className="h-6 w-6" />
@@ -512,16 +512,26 @@ export default function InventoryPage() {
               </TableRow>
             ) : (
               vehicles.map((v) => (
-                <TableRow key={v.id}>
-                  <TableCell className="font-medium">
+                <TableRow
+                  key={v.id}
+                  // Abrir la ficha para editarla es lo que un asesor hace
+                  // todo el día, así que la fila entera dispara la edición
+                  // en vez de obligar a apuntarle al menú de tres puntos.
+                  className={canEdit ? 'cursor-pointer' : undefined}
+                  onClick={canEdit ? () => openEdit(v) : undefined}
+                >
+                  {/* Las columnas de texto libre envuelven en vez de forzar
+                      ancho: así la tabla se encoge hasta caber en la pantalla
+                      y la columna de acciones nunca queda fuera de vista. */}
+                  <TableCell className="font-medium whitespace-normal">
                     {v.brand} {v.model}
                   </TableCell>
                   <TableCell>{v.year}</TableCell>
                   <TableCell>{v.license_plate ?? '—'}</TableCell>
-                  <TableCell className="hidden lg:table-cell">
+                  <TableCell className="hidden whitespace-normal lg:table-cell">
                     {v.plate_city ?? '—'}
                   </TableCell>
-                  <TableCell className="text-muted-foreground hidden lg:table-cell">
+                  <TableCell className="text-muted-foreground hidden whitespace-normal lg:table-cell">
                     {specSummary(v, t) || '—'}
                   </TableCell>
                   <TableCell className="text-right">{formatPrice(v.price, currency)}</TableCell>
@@ -538,7 +548,7 @@ export default function InventoryPage() {
                       {t(`status.${v.status}`)}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     {canEdit && (
                       <DropdownMenu>
                         <DropdownMenuTrigger
