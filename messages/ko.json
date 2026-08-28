@@ -2082,6 +2082,10 @@
     "vehicleCount": "차량 {count}대",
     "addVehicle": "차량 추가",
     "empty": "아직 차량이 없습니다.",
+    "searchPlaceholder": "차량, 연식, 번호판 또는 등록지로 검색…",
+    "clearSearch": "검색 지우기",
+    "noMatches": "검색과 일치하는 차량이 없습니다.",
+    "vehicleCountFiltered": "차량 {total}대 중 {count}대",
     "table": {
       "vehicle": "차량",
       "year": "연식",

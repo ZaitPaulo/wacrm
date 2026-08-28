@@ -46,7 +46,11 @@ import {
   Loader2,
   MoreHorizontal,
   X,
+  Search,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useCan } from '@/hooks/use-can';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -65,6 +69,12 @@ import {
   MEDIA_MAX_BYTES_BY_KIND,
 } from '@/lib/storage/upload-media';
 import { compressImage } from '@/lib/storage/compress-image';
+import {
+  compareSortValues,
+  matchesSearch,
+  normalize,
+  searchTerms,
+} from '@/lib/inventory/table-sort';
 
 // Sólo la variante visual vive acá; la etiqueta sale del catálogo, por
 // clave, para que el orden del selector siga siendo el de este objeto.
@@ -151,10 +161,7 @@ const EMPTY_DRAFT: VehicleDraft = {
  * justifican una columna cada una. Se omite en silencio lo que falte, de
  * modo que un vehículo con solo transmisión muestra "AT" y no "AT · —".
  */
-function specSummary(
-  v: InventoryVehicle,
-  t: (key: string) => string,
-): string {
+function specSummary(v: InventoryVehicle, t: (key: string) => string): string {
   const parts: string[] = [];
   if (v.transmission) {
     parts.push(labelOf(t, TRANSMISSIONS, v.transmission));
@@ -166,6 +173,133 @@ function specSummary(
 /** Fecha de hoy como YYYY-MM-DD, para prellenar los inputs de fecha. */
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** Columnas por las que se puede ordenar la tabla. */
+type SortKey =
+  | 'vehicle'
+  | 'year'
+  | 'plate'
+  | 'mileage'
+  | 'plateCity'
+  | 'spec'
+  | 'price'
+  | 'warrantyPrice'
+  | 'status';
+
+interface SortState {
+  key: SortKey;
+  dir: 'asc' | 'desc';
+}
+
+/**
+ * El valor por el que se ordena cada columna.
+ *
+ * Devuelve número o texto según la columna, y `null` para lo que está
+ * vacío: esos van SIEMPRE al final, suba o baje el orden, porque un
+ * kilometraje desconocido no es "cero kilómetros".
+ */
+function sortValue(
+  v: InventoryVehicle,
+  key: SortKey,
+  t: (key: string) => string
+): string | number | null {
+  switch (key) {
+    case 'vehicle':
+      return normalize(`${v.brand} ${v.model}`);
+    case 'year':
+      return v.year;
+    case 'plate':
+      return v.license_plate ? normalize(v.license_plate) : null;
+    case 'mileage':
+      return v.mileage;
+    case 'plateCity':
+      return v.plate_city ? normalize(v.plate_city) : null;
+    case 'spec':
+      return normalize(specSummary(v, t)) || null;
+    case 'price':
+      return v.price;
+    case 'warrantyPrice':
+      return v.warranty_price;
+    case 'status':
+      return normalize(t(`status.${v.status}`));
+  }
+}
+
+/**
+ * Cabecera de columna que ordena al hacerle clic.
+ *
+ * El botón ocupa toda la celda para que el blanco alrededor del texto
+ * también sirva: apuntarle a una palabra de tres letras con el mouse es
+ * una molestia que se repite todo el día.
+ */
+function SortableHead({
+  column,
+  label,
+  sort,
+  onSort,
+  align = 'left',
+  className,
+}: {
+  column: SortKey;
+  label: string;
+  sort: SortState | null;
+  onSort: (key: SortKey) => void;
+  align?: 'left' | 'right';
+  className?: string;
+}) {
+  const active = sort?.key === column;
+  const Arrow = active && sort.dir === 'desc' ? ChevronDown : ChevronUp;
+  return (
+    <TableHead
+      aria-sort={
+        active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'
+      }
+      className={cn('p-0', className)}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn(
+          'group hover:text-foreground flex h-10 w-full items-center gap-1 px-2 transition-colors',
+          align === 'right' ? 'justify-end' : 'justify-start'
+        )}
+      >
+        {label}
+        {/* La flecha ocupa sitio siempre, aunque esté invisible: si
+            apareciera sólo al ordenar, la columna se movería sola. */}
+        <Arrow
+          className={cn(
+            'size-3.5 shrink-0 transition-opacity',
+            active ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'
+          )}
+        />
+      </button>
+    </TableHead>
+  );
+}
+
+/**
+ * Los campos contra los que busca el buscador.
+ *
+ * A propósito solo lo que la tabla muestra: si una fila aparece por algo
+ * que no está a la vista, el resultado parece un error.
+ */
+function searchHaystack(
+  v: InventoryVehicle,
+  t: (key: string) => string
+): string {
+  return normalize(
+    [
+      v.brand,
+      v.model,
+      String(v.year),
+      v.license_plate ?? '',
+      v.plate_city ?? '',
+      specSummary(v, t),
+      t(`status.${v.status}`),
+    ].join(' ')
+  );
 }
 
 // features (JSONB) <-> texto "Clave: Valor" por línea.
@@ -223,7 +357,9 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
     // `acquisition` llega vacío tanto si no hay costo cargado como si el
     // usuario no tiene permiso para verlo: la RLS no distingue, y está bien.
     purchase_cost:
-      v.acquisition?.purchase_cost != null ? String(v.acquisition.purchase_cost) : '',
+      v.acquisition?.purchase_cost != null
+        ? String(v.acquisition.purchase_cost)
+        : '',
     purchase_date: v.acquisition?.purchase_date ?? '',
     sold_price: v.sold_price != null ? String(v.sold_price) : '',
     sold_at: v.sold_at ? v.sold_at.slice(0, 10) : '',
@@ -254,6 +390,11 @@ export default function InventoryPage() {
   // /documents.
   const [contacts, setContacts] = useState<{ id: string; name: string }[]>([]);
 
+  const [search, setSearch] = useState('');
+  // Sin orden elegido se respeta el que trae la API (editado más
+  // reciente primero), que es lo útil justo después de tocar un vehículo.
+  const [sort, setSort] = useState<SortState | null>(null);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryVehicle | null>(null);
   const [draft, setDraft] = useState<VehicleDraft>(EMPTY_DRAFT);
@@ -265,10 +406,43 @@ export default function InventoryPage() {
     () =>
       suggestedWarrantyPrice(
         draft.price.trim() === '' ? null : Number(draft.price),
-        draft.body_type || null,
+        draft.body_type || null
       ),
-    [draft.price, draft.body_type],
+    [draft.price, draft.body_type]
   );
+  /**
+   * Lo que se pinta: primero filtrado, después ordenado.
+   *
+   * Todo el inventario ya vino en una sola respuesta, así que buscar y
+   * ordenar acá es instantáneo y no cuesta un viaje al servidor por cada
+   * tecla.
+   */
+  const visible = useMemo(() => {
+    const terms = searchTerms(search);
+    const filtered = terms.length
+      ? vehicles.filter((v) => matchesSearch(searchHaystack(v, t), terms))
+      : vehicles;
+
+    if (!sort) return filtered;
+
+    return [...filtered].sort((a, b) =>
+      compareSortValues(
+        sortValue(a, sort.key, t),
+        sortValue(b, sort.key, t),
+        sort.dir
+      )
+    );
+  }, [vehicles, search, sort, t]);
+
+  /** Un clic ordena ascendente; el siguiente sobre la misma columna invierte. */
+  function toggleSort(key: SortKey) {
+    setSort((current) =>
+      current?.key === key
+        ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'asc' }
+    );
+  }
+
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -290,12 +464,17 @@ export default function InventoryPage() {
           toast.error(t('toasts.imageTooLarge', { name: file.name }));
           continue;
         }
-        const { publicUrl } = await uploadAccountMedia('showcase-media', optimized);
+        const { publicUrl } = await uploadAccountMedia(
+          'showcase-media',
+          optimized
+        );
         urls.push(publicUrl);
       }
       setDraft((d) => ({ ...d, images: [...d.images, ...urls] }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('toasts.uploadFailed'));
+      toast.error(
+        err instanceof Error ? err.message : t('toasts.uploadFailed')
+      );
     } finally {
       setUploadingImages(false);
     }
@@ -333,7 +512,10 @@ export default function InventoryPage() {
       .order('name')
       .then(({ data, error }) => {
         if (error) {
-          console.warn('[inventory] no se pudieron cargar los contactos:', error);
+          console.warn(
+            '[inventory] no se pudieron cargar los contactos:',
+            error
+          );
           return;
         }
         setContacts((data ?? []) as { id: string; name: string }[]);
@@ -387,7 +569,9 @@ export default function InventoryPage() {
         engine_displacement: draft.engine_displacement.trim() || null,
         plate_city: draft.plate_city.trim() || null,
         warranty_price:
-          draft.warranty_price.trim() === '' ? null : Number(draft.warranty_price),
+          draft.warranty_price.trim() === ''
+            ? null
+            : Number(draft.warranty_price),
         soat_expires_at: draft.soat_expires_at || null,
         tecnomecanica_expires_at: draft.tecnomecanica_expires_at || null,
         has_lien: draft.has_lien,
@@ -424,7 +608,7 @@ export default function InventoryPage() {
           method: editing ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        },
+        }
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Error al guardar');
@@ -451,20 +635,31 @@ export default function InventoryPage() {
       toast.success(t('toasts.deleted'));
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('toasts.deleteFailed'));
+      toast.error(
+        err instanceof Error ? err.message : t('toasts.deleteFailed')
+      );
     } finally {
       setDeletingId(null);
     }
   }
 
   return (
-    <div className="space-y-6">
+    // Alto completo y en columna: así la tabla se queda con lo que sobra
+    // y scrollea por dentro, que es lo que permite dejar la cabecera
+    // fija. Con la página entera scrolleando, `sticky` no tiene contra
+    // qué pegarse.
+    <div className="flex h-full flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Car className="h-6 w-6" />
           <h1 className="text-2xl font-semibold">{t('title')}</h1>
           <span className="text-muted-foreground text-sm">
-            {t('vehicleCount', { count: vehicles.length })}
+            {search.trim()
+              ? t('vehicleCountFiltered', {
+                  count: visible.length,
+                  total: vehicles.length,
+                })
+              : t('vehicleCount', { count: vehicles.length })}
           </span>
         </div>
         {canEdit && (
@@ -475,28 +670,102 @@ export default function InventoryPage() {
         )}
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
+      <div className="relative w-full max-w-sm">
+        <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('searchPlaceholder')}
+          className="bg-card border-border text-foreground placeholder:text-muted-foreground pr-8 pl-8"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch('')}
+            aria-label={t('clearSearch')}
+            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border">
+        <Table containerClassName="min-h-0 flex-1">
+          {/* La cabecera se queda pegada arriba mientras el cuerpo
+              scrollea. El fondo opaco es obligatorio —si no, las filas
+              se ven pasar por debajo del texto— y la línea inferior va
+              como sombra interior porque un `border` sobre un `th`
+              pegajoso se pierde al scrollear. */}
+          <TableHeader className="[&_th]:bg-background [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:shadow-[inset_0_-1px_0_var(--border)] [&_tr]:border-b-0">
             <TableRow>
-              <TableHead>{t('table.vehicle')}</TableHead>
-              <TableHead>{t('table.year')}</TableHead>
-              <TableHead>{t('table.plate')}</TableHead>
+              <SortableHead
+                column="vehicle"
+                label={t('table.vehicle')}
+                sort={sort}
+                onSort={toggleSort}
+              />
+              <SortableHead
+                column="year"
+                label={t('table.year')}
+                sort={sort}
+                onSort={toggleSort}
+              />
+              <SortableHead
+                column="plate"
+                label={t('table.plate')}
+                sort={sort}
+                onSort={toggleSort}
+              />
               {/* El kilometraje va pegado a la placa por pedido del
                   cliente: es el dato que más pesa al comparar dos
                   vehículos del mismo modelo. */}
-              <TableHead className="text-right">{t('table.mileage')}</TableHead>
+              <SortableHead
+                column="mileage"
+                label={t('table.mileage')}
+                sort={sort}
+                onSort={toggleSort}
+                align="right"
+              />
               {/* Ciudad de matrícula y ficha técnica: lo que un asesor
                   necesita responder sin abrir el vehículo. Se ocultan
                   bajo lg para que la tabla siga siendo legible en
                   pantallas angostas. */}
-              <TableHead className="hidden lg:table-cell">{t('table.plateCity')}</TableHead>
-              <TableHead className="hidden lg:table-cell">{t('table.spec')}</TableHead>
-              <TableHead className="text-right">{t('table.price')}</TableHead>
-              <TableHead className="hidden text-right xl:table-cell">
-                {t('table.warrantyPrice')}
-              </TableHead>
-              <TableHead>{t('table.status')}</TableHead>
+              <SortableHead
+                column="plateCity"
+                label={t('table.plateCity')}
+                sort={sort}
+                onSort={toggleSort}
+                className="hidden lg:table-cell"
+              />
+              <SortableHead
+                column="spec"
+                label={t('table.spec')}
+                sort={sort}
+                onSort={toggleSort}
+                className="hidden lg:table-cell"
+              />
+              <SortableHead
+                column="price"
+                label={t('table.price')}
+                sort={sort}
+                onSort={toggleSort}
+                align="right"
+              />
+              <SortableHead
+                column="warrantyPrice"
+                label={t('table.warrantyPrice')}
+                sort={sort}
+                onSort={toggleSort}
+                align="right"
+                className="hidden xl:table-cell"
+              />
+              <SortableHead
+                column="status"
+                label={t('table.status')}
+                sort={sort}
+                onSort={toggleSort}
+              />
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -509,12 +778,24 @@ export default function InventoryPage() {
               </TableRow>
             ) : vehicles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-muted-foreground h-24 text-center">
+                <TableCell
+                  colSpan={10}
+                  className="text-muted-foreground h-24 text-center"
+                >
                   {t('empty')}
                 </TableCell>
               </TableRow>
+            ) : visible.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={10}
+                  className="text-muted-foreground h-24 text-center"
+                >
+                  {t('noMatches')}
+                </TableCell>
+              </TableRow>
             ) : (
-              vehicles.map((v) => (
+              visible.map((v) => (
                 <TableRow
                   key={v.id}
                   // Abrir la ficha para editarla es lo que un asesor hace
@@ -540,7 +821,9 @@ export default function InventoryPage() {
                   <TableCell className="text-muted-foreground hidden whitespace-normal lg:table-cell">
                     {specSummary(v, t) || '—'}
                   </TableCell>
-                  <TableCell className="text-right">{formatPrice(v.price, currency)}</TableCell>
+                  <TableCell className="text-right">
+                    {formatPrice(v.price, currency)}
+                  </TableCell>
                   <TableCell className="text-muted-foreground hidden text-right xl:table-cell">
                     {v.warranty_price != null
                       ? formatPrice(v.warranty_price, currency)
@@ -595,10 +878,10 @@ export default function InventoryPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editing ? t('dialog.editTitle') : t('dialog.createTitle')}</DialogTitle>
-            <DialogDescription>
-              {t('dialog.description')}
-            </DialogDescription>
+            <DialogTitle>
+              {editing ? t('dialog.editTitle') : t('dialog.createTitle')}
+            </DialogTitle>
+            <DialogDescription>{t('dialog.description')}</DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -662,19 +945,21 @@ export default function InventoryPage() {
                 id="mileage"
                 type="number"
                 value={draft.mileage}
-                onChange={(e) => setDraft({ ...draft, mileage: e.target.value })}
+                onChange={(e) =>
+                  setDraft({ ...draft, mileage: e.target.value })
+                }
               />
             </div>
 
             {/* Compra — sólo admin+. Aunque alguien fuerce este bloque, la
                 RLS de vehicle_acquisitions rechaza la escritura. */}
             {canViewMargins && (
-              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4 sm:col-span-2">
+              <div className="border-border bg-muted/30 space-y-3 rounded-lg border p-4 sm:col-span-2">
                 <div>
-                  <p className="text-sm font-medium text-foreground">
+                  <p className="text-foreground text-sm font-medium">
                     {t('purchase.title')}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     {t('purchase.hint')}
                   </p>
                 </div>
@@ -710,10 +995,12 @@ export default function InventoryPage() {
             {draft.status === 'sold' && (
               <div className="space-y-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 sm:col-span-2">
                 <div>
-                  <p className="text-sm font-medium text-foreground">
+                  <p className="text-foreground text-sm font-medium">
                     {t('sale.title')}
                   </p>
-                  <p className="text-xs text-muted-foreground">{t('sale.hint')}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {t('sale.hint')}
+                  </p>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="space-y-2">
@@ -742,7 +1029,9 @@ export default function InventoryPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sold_to_contact_id">{t('sale.buyer')}</Label>
+                    <Label htmlFor="sold_to_contact_id">
+                      {t('sale.buyer')}
+                    </Label>
                     <Select
                       value={draft.sold_to_contact_id || 'none'}
                       onValueChange={(value) =>
@@ -759,7 +1048,9 @@ export default function InventoryPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">{t('sale.noBuyer')}</SelectItem>
+                        <SelectItem value="none">
+                          {t('sale.noBuyer')}
+                        </SelectItem>
                         {contacts.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
@@ -776,14 +1067,18 @@ export default function InventoryPage() {
               <Input
                 id="license_plate"
                 value={draft.license_plate}
-                onChange={(e) => setDraft({ ...draft, license_plate: e.target.value })}
+                onChange={(e) =>
+                  setDraft({ ...draft, license_plate: e.target.value })
+                }
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="transmission">{t('fields.transmission')}</Label>
               <Select
                 value={draft.transmission}
-                onValueChange={(v) => setDraft({ ...draft, transmission: v ?? '' })}
+                onValueChange={(v) =>
+                  setDraft({ ...draft, transmission: v ?? '' })
+                }
               >
                 <SelectTrigger id="transmission">
                   <SelectValue placeholder={t('fields.selectPlaceholder')} />
@@ -801,7 +1096,9 @@ export default function InventoryPage() {
               <Label htmlFor="fuel_type">{t('fields.fuelType')}</Label>
               <Select
                 value={draft.fuel_type}
-                onValueChange={(v) => setDraft({ ...draft, fuel_type: v ?? '' })}
+                onValueChange={(v) =>
+                  setDraft({ ...draft, fuel_type: v ?? '' })
+                }
               >
                 <SelectTrigger id="fuel_type">
                   <SelectValue placeholder="Selecciona…" />
@@ -819,7 +1116,9 @@ export default function InventoryPage() {
               <Label htmlFor="body_type">{t('fields.bodyType')}</Label>
               <Select
                 value={draft.body_type}
-                onValueChange={(v) => setDraft({ ...draft, body_type: v ?? '' })}
+                onValueChange={(v) =>
+                  setDraft({ ...draft, body_type: v ?? '' })
+                }
               >
                 <SelectTrigger id="body_type">
                   <SelectValue placeholder="Selecciona…" />
@@ -837,7 +1136,9 @@ export default function InventoryPage() {
               <Label htmlFor="condition">{t('fields.condition')}</Label>
               <Select
                 value={draft.condition}
-                onValueChange={(v) => setDraft({ ...draft, condition: v ?? 'used' })}
+                onValueChange={(v) =>
+                  setDraft({ ...draft, condition: v ?? 'used' })
+                }
               >
                 <SelectTrigger id="condition">
                   <SelectValue />
@@ -876,11 +1177,15 @@ export default function InventoryPage() {
                 id="plate_city"
                 placeholder={t('fields.plateCityPlaceholder')}
                 value={draft.plate_city}
-                onChange={(e) => setDraft({ ...draft, plate_city: e.target.value })}
+                onChange={(e) =>
+                  setDraft({ ...draft, plate_city: e.target.value })
+                }
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="warranty_price">{t('fields.warrantyPrice')}</Label>
+              <Label htmlFor="warranty_price">
+                {t('fields.warrantyPrice')}
+              </Label>
               <div className="flex gap-2">
                 <Input
                   id="warranty_price"
@@ -928,13 +1233,18 @@ export default function InventoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tecnomecanica_expires_at">{t('fields.tecno')}</Label>
+              <Label htmlFor="tecnomecanica_expires_at">
+                {t('fields.tecno')}
+              </Label>
               <Input
                 id="tecnomecanica_expires_at"
                 type="date"
                 value={draft.tecnomecanica_expires_at}
                 onChange={(e) =>
-                  setDraft({ ...draft, tecnomecanica_expires_at: e.target.value })
+                  setDraft({
+                    ...draft,
+                    tecnomecanica_expires_at: e.target.value,
+                  })
                 }
               />
             </div>
@@ -954,7 +1264,9 @@ export default function InventoryPage() {
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <Label htmlFor="accepts_trade_in">{t('fields.acceptsTradeIn')}</Label>
+                  <Label htmlFor="accepts_trade_in">
+                    {t('fields.acceptsTradeIn')}
+                  </Label>
                   <p className="text-muted-foreground text-xs">
                     {t('fields.acceptsTradeInHint')}
                   </p>
@@ -962,7 +1274,9 @@ export default function InventoryPage() {
                 <Switch
                   id="accepts_trade_in"
                   checked={draft.accepts_trade_in}
-                  onCheckedChange={(v) => setDraft({ ...draft, accepts_trade_in: v })}
+                  onCheckedChange={(v) =>
+                    setDraft({ ...draft, accepts_trade_in: v })
+                  }
                 />
               </div>
               <div className="flex items-center justify-between gap-4">
@@ -986,7 +1300,9 @@ export default function InventoryPage() {
                 rows={4}
                 placeholder={t('fields.featuresPlaceholder')}
                 value={draft.featuresText}
-                onChange={(e) => setDraft({ ...draft, featuresText: e.target.value })}
+                onChange={(e) =>
+                  setDraft({ ...draft, featuresText: e.target.value })
+                }
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -1002,7 +1318,7 @@ export default function InventoryPage() {
                     <button
                       type="button"
                       onClick={() => removeImage(i)}
-                      className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white"
+                      className="absolute top-0.5 right-0.5 rounded-full bg-black/60 p-0.5 text-white"
                       title={t('images.remove')}
                     >
                       <X className="size-3" />
@@ -1041,18 +1357,26 @@ export default function InventoryPage() {
               </p>
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="internal_notes">{t('fields.internalNotes')}</Label>
+              <Label htmlFor="internal_notes">
+                {t('fields.internalNotes')}
+              </Label>
               <Textarea
                 id="internal_notes"
                 rows={2}
                 value={draft.internal_notes}
-                onChange={(e) => setDraft({ ...draft, internal_notes: e.target.value })}
+                onChange={(e) =>
+                  setDraft({ ...draft, internal_notes: e.target.value })
+                }
               />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+            <Button
+              variant="outline"
+              onClick={() => setDialogOpen(false)}
+              disabled={saving}
+            >
               {t('dialog.cancel')}
             </Button>
             <Button onClick={save} disabled={saving}>

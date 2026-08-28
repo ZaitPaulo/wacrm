@@ -2075,6 +2075,10 @@
     "vehicleCount": "{count} {count, plural, =1 {vehículo} other {vehículos}}",
     "addVehicle": "Agregar vehículo",
     "empty": "Sin vehículos todavía.",
+    "searchPlaceholder": "Buscar por vehículo, año, placa o matrícula…",
+    "clearSearch": "Limpiar búsqueda",
+    "noMatches": "Ningún vehículo coincide con la búsqueda.",
+    "vehicleCountFiltered": "{count} de {total} {total, plural, =1 {vehículo} other {vehículos}}",
     "table": {
       "vehicle": "Vehículo",
       "year": "Año",
