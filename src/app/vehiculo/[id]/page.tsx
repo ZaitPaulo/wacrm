@@ -35,30 +35,45 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   }
   const { account, vehicle: v } = data
   const name = account.public_name?.trim() || account.name
-  const title = `${v.brand} ${v.model} ${v.year} — ${formatPrice(v.price, account.default_currency)} | ${name}`
+  const vehicleName = `${v.brand} ${v.model} ${v.year}`
+  const price = formatPrice(v.price, account.default_currency)
+  // Dos títulos a propósito, porque compiten en sitios distintos.
+  //
+  // El de compartir abre con el nombre del negocio, por pedido del
+  // cliente: en la tarjeta de WhatsApp es lo primero que se lee y es lo
+  // que da confianza para abrir el enlace.
+  //
+  // El de la pestaña y los buscadores abre con el vehículo y deja el
+  // negocio al final: ahí lo que compite es el modelo, y 134 fichas
+  // empezando con la misma palabra se estorban entre sí.
+  const shareTitle = `${name} | ${vehicleName} — ${price}`
+  const pageTitle = `${vehicleName} — ${price} | ${name}`
   const t = await getTranslations('Inventory')
-  const parts = [`${v.brand} ${v.model} ${v.year}`]
-  if (v.mileage != null) parts.push(`${formatNumber(v.mileage)} km`)
-  if (v.transmission) parts.push(labelOf(t, TRANSMISSIONS, v.transmission))
-  if (v.fuel_type) parts.push(labelOf(t, FUEL_TYPES, v.fuel_type))
-  const description = `${parts.join(' · ')}. Disponible en ${name}. Contáctanos por WhatsApp.`
+  const specs: string[] = []
+  if (v.mileage != null) specs.push(`${formatNumber(v.mileage)} km`)
+  if (v.transmission) specs.push(labelOf(t, TRANSMISSIONS, v.transmission))
+  if (v.fuel_type) specs.push(labelOf(t, FUEL_TYPES, v.fuel_type))
+  const description =
+    `${name} — ${vehicleName}, ${price}.` +
+    (specs.length ? ` ${specs.join(' · ')}.` : '') +
+    ' Contáctanos por WhatsApp.'
 
   return {
     metadataBase: new URL(base),
-    title: { absolute: title },
+    title: { absolute: pageTitle },
     description,
     robots: { index: true, follow: true },
     alternates: { canonical: `/vehiculo/${v.id}` },
     // og:image lo aporta vehiculo/[id]/opengraph-image.tsx (generada).
     openGraph: {
-      title,
+      title: shareTitle,
       description,
       url: `${base}/vehiculo/${v.id}`,
       type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
-      title,
+      title: shareTitle,
       description,
     },
   }
