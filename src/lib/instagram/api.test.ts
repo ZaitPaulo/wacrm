@@ -32,6 +32,7 @@ describe('publishImagePost', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValueOnce(ok({ id: 'container-1', status_code: 'FINISHED' }))
       .mockResolvedValueOnce(ok({ id: 'post-1' }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -42,7 +43,8 @@ describe('publishImagePost', () => {
     });
 
     expect(postId).toBe('post-1');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Crear, comprobar que está listo, publicar.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
 
     // El contenedor único lleva el texto y NO se marca como hijo.
     const firstBody = JSON.parse(fetchMock.mock.calls[0][1].body);
@@ -57,6 +59,7 @@ describe('publishImagePost', () => {
       .mockResolvedValueOnce(ok({ id: 'child-1' }))
       .mockResolvedValueOnce(ok({ id: 'child-2' }))
       .mockResolvedValueOnce(ok({ id: 'parent-1' }))
+      .mockResolvedValueOnce(ok({ id: 'parent-1', status_code: 'FINISHED' }))
       .mockResolvedValueOnce(ok({ id: 'post-2' }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -70,7 +73,8 @@ describe('publishImagePost', () => {
     });
 
     expect(postId).toBe('post-2');
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // Dos hijos, el padre, la comprobación de estado y la publicación.
+    expect(fetchMock).toHaveBeenCalledTimes(5);
 
     const childBody = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(childBody.is_carousel_item).toBe('true');
@@ -83,7 +87,9 @@ describe('publishImagePost', () => {
   });
 
   it('recorta al máximo de Instagram en vez de fallar', async () => {
-    const fetchMock = vi.fn().mockImplementation(() => ok({ id: 'x' }));
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => ok({ id: 'x', status_code: 'FINISHED' }));
     vi.stubGlobal('fetch', fetchMock);
 
     const imageUrls = Array.from(
@@ -92,8 +98,79 @@ describe('publishImagePost', () => {
     );
     await publishImagePost({ ...AUTH, imageUrls, caption: 'Muchas' });
 
-    // 10 hijos + 1 padre + 1 publicación.
-    expect(fetchMock).toHaveBeenCalledTimes(12);
+    // 10 hijos + 1 padre + 1 comprobación de estado + 1 publicación.
+    expect(fetchMock).toHaveBeenCalledTimes(13);
+  });
+
+  it('espera a que Instagram termine de procesar antes de publicar', async () => {
+    // El contenedor no está listo en cuanto Instagram devuelve su id.
+    // Publicarlo antes de tiempo devuelve "Media ID is not available", que
+    // fue exactamente lo que impidió la primera publicación real.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValueOnce(
+        ok({ id: 'container-1', status_code: 'IN_PROGRESS' })
+      )
+      .mockResolvedValueOnce(ok({ id: 'container-1', status_code: 'FINISHED' }))
+      .mockResolvedValueOnce(ok({ id: 'post-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const postId = await publishImagePost({
+      ...AUTH,
+      imageUrls: ['https://cdn.example.com/a.jpg'],
+      caption: 'x',
+      poll: { intervalMs: 0 },
+    });
+
+    expect(postId).toBe('post-1');
+    // La consulta de estado es un GET al contenedor, no un POST.
+    expect(fetchMock.mock.calls[1][0]).toContain('status_code');
+    expect(fetchMock.mock.calls[1][1]?.method).toBeUndefined();
+    // Y publicar es lo ÚLTIMO que ocurre.
+    expect(fetchMock.mock.calls[3][0]).toContain('media_publish');
+  });
+
+  it('no publica un contenedor que sigue procesándose, y lo dice', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValue(ok({ id: 'container-1', status_code: 'IN_PROGRESS' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const err = await publishImagePost({
+      ...AUTH,
+      imageUrls: ['https://cdn.example.com/a.jpg'],
+      caption: 'x',
+      poll: { intervalMs: 0, timeoutMs: 0 },
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(InstagramError);
+    // Contenido, no credenciales: la cuenta está bien, hay que reintentar.
+    expect((err as InstagramError).kind).toBe('content');
+    expect((err as Error).message).toMatch(/procesando/i);
+    // Nada se publicó.
+    expect(
+      fetchMock.mock.calls.some((c) => String(c[0]).includes('media_publish'))
+    ).toBe(false);
+  });
+
+  it('no publica un contenedor que Instagram no pudo procesar', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValueOnce(ok({ id: 'container-1', status_code: 'ERROR' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const err = await publishImagePost({
+      ...AUTH,
+      imageUrls: ['https://cdn.example.com/a.jpg'],
+      caption: 'x',
+      poll: { intervalMs: 0 },
+    }).catch((e: unknown) => e);
+
+    expect((err as InstagramError).kind).toBe('content');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('rechaza publicar sin imágenes', async () => {
@@ -104,7 +181,9 @@ describe('publishImagePost', () => {
   });
 
   it('usa el host de Instagram Login, no el de Facebook', async () => {
-    const fetchMock = vi.fn().mockImplementation(() => ok({ id: 'x' }));
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => ok({ id: 'x', status_code: 'FINISHED' }));
     vi.stubGlobal('fetch', fetchMock);
 
     await publishImagePost({
@@ -164,6 +243,30 @@ describe('clasificación de errores', () => {
     }).catch((e: unknown) => e);
 
     expect((err as InstagramError).kind).toBe('content');
+  });
+
+  it('no manda a reconectar por un contenedor que no estaba listo', async () => {
+    // Meta devuelve "Media ID is not available" con type OAuthException
+    // aunque el token esté perfecto. Leerlo como credencial mandaba a
+    // desconectar una cuenta que funciona — justo lo que el módulo
+    // promete no hacer.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        metaError(400, {
+          message: 'Media ID is not available',
+          code: 9007,
+          type: 'OAuthException',
+        })
+      )
+    );
+
+    const err = await getAccountInfo({ accessToken: 'buena' }).catch(
+      (e: unknown) => e
+    );
+
+    expect((err as InstagramError).kind).toBe('content');
+    expect((err as InstagramError).code).toBe(9007);
   });
 
   it('trata un 401 sin cuerpo útil como problema de credenciales', async () => {

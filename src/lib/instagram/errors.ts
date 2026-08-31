@@ -130,8 +130,13 @@ export async function instagramErrorFromResponse(
   // El status manda cuando Meta ni siquiera devolvió un error tipado:
   // un 401 es una credencial rechazada aunque no venga cuerpo.
   const byStatus = response.status === 401;
-  const byType = type === 'OAuthException';
   const byCode = code !== null && isCredentialCode(code);
+  // `OAuthException` NO significa por sí solo "credencial rechazada":
+  // Meta la usa también para errores de publicación con el token
+  // perfecto — "Media ID is not available" (9007) llega así, y leerlo
+  // como credencial mandaba a reconectar una cuenta que funciona. Solo
+  // cuenta cuando el código acompaña, o cuando no vino ninguno.
+  const byType = type === 'OAuthException' && (code === null || byCode);
 
   const kind: InstagramErrorKind =
     byStatus || byType || byCode ? 'credentials' : 'content';

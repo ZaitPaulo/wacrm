@@ -221,6 +221,95 @@ export async function createCarouselContainer(
 }
 
 /**
+ * Cada cuánto se le pregunta a Instagram si ya terminó de procesar.
+ *
+ * Meta sugiere una consulta por minuto durante cinco minutos, pero esa
+ * cadencia está pensada para vídeo: acá solo hay fotos, que terminan en
+ * segundos, y del otro lado hay una persona esperando a que su clic
+ * haga algo. Tres segundos la deja publicar enseguida sin acercarse al
+ * límite de peticiones por token.
+ */
+const CONTAINER_POLL_INTERVAL_MS = 3_000;
+
+/**
+ * Cuánto se espera en total antes de rendirse.
+ *
+ * Rendirse NO es un fallo definitivo: el contenedor sigue vivo del lado
+ * de Meta y la publicación se reintenta. Es preferible a dejar colgada
+ * la petición del navegador varios minutos.
+ */
+const CONTAINER_READY_TIMEOUT_MS = 90_000;
+
+interface ContainerStatusResponse {
+  status_code?: string;
+}
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Espera a que un contenedor esté listo para publicarse.
+ *
+ * Instagram devuelve el id del contenedor ANTES de haberlo procesado, y
+ * publicar uno a medio hacer se rechaza con "Media ID is not available"
+ * —un mensaje que además viene marcado como OAuthException, así que sin
+ * esto el sistema culpaba a las credenciales de un problema de tiempo.
+ *
+ * Los estados los define Meta: FINISHED, IN_PROGRESS, ERROR, EXPIRED y
+ * PUBLISHED. Solo IN_PROGRESS justifica volver a preguntar.
+ */
+export async function waitForContainerReady(
+  args: IgAuthArgs & {
+    containerId: string;
+    intervalMs?: number;
+    timeoutMs?: number;
+  }
+): Promise<void> {
+  const {
+    accessToken,
+    containerId,
+    intervalMs = CONTAINER_POLL_INTERVAL_MS,
+    timeoutMs = CONTAINER_READY_TIMEOUT_MS,
+  } = args;
+
+  const deadline = Date.now() + timeoutMs;
+
+  // Siempre se pregunta al menos una vez: una foto suele estar lista de
+  // entrada, y así el caso normal no paga ninguna espera.
+  for (;;) {
+    const data = await igGet<ContainerStatusResponse>(
+      `${containerId}?fields=status_code`,
+      accessToken
+    );
+    const status = data.status_code;
+
+    // Un estado que no reconocemos se deja pasar en vez de bloquear la
+    // publicación: Meta ha renombrado sus valores antes, y plantarse
+    // sería convertir un renombre en "no se puede publicar nunca".
+    if (status !== 'IN_PROGRESS') {
+      if (status === 'ERROR') {
+        throw contentError(
+          'Instagram no pudo procesar las fotos de esta publicación'
+        );
+      }
+      if (status === 'EXPIRED') {
+        throw contentError(
+          'Instagram descartó la publicación por antigüedad; hay que rearmarla'
+        );
+      }
+      return;
+    }
+
+    if (Date.now() + intervalMs >= deadline) {
+      throw contentError(
+        'Instagram sigue procesando las fotos; reintenta en un momento'
+      );
+    }
+    await sleep(intervalMs);
+  }
+}
+
+/**
  * Publica un contenedor ya creado. Devuelve el id de la publicación,
  * que es la ÚNICA prueba de que esto salió: se guarda siempre, y ante
  * una respuesta perdida se compara contra Instagram en vez de
@@ -257,9 +346,14 @@ export async function publishContainer(
  * fila de la cola según `kind`.
  */
 export async function publishImagePost(
-  args: IgAuthArgs & { imageUrls: string[]; caption: string }
+  args: IgAuthArgs & {
+    imageUrls: string[];
+    caption: string;
+    /** Solo para las pruebas: acorta la espera del procesado. */
+    poll?: { intervalMs?: number; timeoutMs?: number };
+  }
 ): Promise<string> {
-  const { igUserId, accessToken, imageUrls, caption } = args;
+  const { igUserId, accessToken, imageUrls, caption, poll } = args;
 
   if (imageUrls.length === 0) {
     throw contentError('No hay imágenes para publicar');
@@ -267,13 +361,19 @@ export async function publishImagePost(
 
   const auth = { igUserId, accessToken };
 
+  /** Nada se publica sin que Instagram haya terminado de procesarlo. */
+  const publishWhenReady = async (creationId: string) => {
+    await waitForContainerReady({ ...auth, containerId: creationId, ...poll });
+    return publishContainer({ ...auth, creationId });
+  };
+
   if (imageUrls.length === 1) {
     const containerId = await createImageContainer({
       ...auth,
       imageUrl: imageUrls[0],
       caption,
     });
-    return publishContainer({ ...auth, creationId: containerId });
+    return publishWhenReady(containerId);
   }
 
   // Los hijos se crean en serie y no en paralelo: Instagram limita las
@@ -295,7 +395,7 @@ export async function publishImagePost(
     childrenIds,
     caption,
   });
-  return publishContainer({ ...auth, creationId: parentId });
+  return publishWhenReady(parentId);
 }
 
 // ============================================================
