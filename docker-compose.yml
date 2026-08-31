@@ -26,13 +26,20 @@ services:
     ports:
       - '${HOST_PORT:-3000}:3000'
     restart: unless-stopped
+    # The body is drained before exiting, and that is not a detail: `/` is
+    # `force-dynamic`, so every probe streams a fresh render. Exiting on the
+    # response headers tore the socket down mid-stream, and Next then wrote
+    # into an already-closed TransformStream — "controller[kState].
+    # transformAlgorithm is not a function", once every few probes, forever.
+    # It never hurt a user (the client was gone), but it drowned the log:
+    # 1332 entries in 72h on the server, and nothing else.
     healthcheck:
       test:
         [
           'CMD',
           'node',
           '-e',
-          "fetch('http://localhost:3000').then((r)=>process.exit(r.ok||r.status<500?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://localhost:3000').then(async(r)=>{await r.arrayBuffer();process.exit(r.ok||r.status<500?0:1)}).catch(()=>process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
