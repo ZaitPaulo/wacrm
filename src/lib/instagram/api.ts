@@ -314,6 +314,10 @@ export async function waitForContainerReady(
  * que es la ÚNICA prueba de que esto salió: se guarda siempre, y ante
  * una respuesta perdida se compara contra Instagram en vez de
  * reintentar.
+ *
+ * PRECONDICIÓN: el contenedor tiene que estar en `FINISHED`. Llamarla
+ * sin pasar antes por `waitForContainerReady` devuelve "Media ID is not
+ * available", que además viene disfrazado de error de credenciales.
  */
 export async function publishContainer(
   args: IgAuthArgs & { creationId: string }
@@ -341,9 +345,20 @@ export async function publishContainer(
  * hijo es un rechazo esperando. Con una foto se publica la imagen
  * suelta, que además se ve mejor en el feed.
  *
+ * Entre crear y publicar SIEMPRE se espera a que Instagram termine de
+ * procesar el contenedor (`waitForContainerReady`): devolver su id no
+ * significa que esté listo, y publicarlo antes se rechaza. Es el paso
+ * que faltaba y por el que ninguna publicación salió hasta el
+ * 2026-08-31.
+ *
  * Devuelve el id de la publicación. Todo lo que puede fallar sale como
  * `InstagramError` clasificado; quien llama decide qué hacer con la
  * fila de la cola según `kind`.
+ *
+ * @param imageUrls Fotos ya publicables (JPEG y accesibles por Meta), en
+ *   el orden que define el encuadre del carrusel. Se recorta al tope.
+ * @param caption Texto de la publicación; en un carrusel va en el padre.
+ * @param poll Acorta la espera del procesado. Solo para las pruebas.
  */
 export async function publishImagePost(
   args: IgAuthArgs & {
