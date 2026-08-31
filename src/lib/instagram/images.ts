@@ -100,8 +100,17 @@ async function convertAndUpload(args: {
     throw contentError(`No se pudo convertir la imagen: ${sourceUrl}`);
   }
 
+  // sharp asigna sus salidas en un pool de memoria COMPARTIDA: el
+  // `.buffer` de lo que devuelve es un SharedArrayBuffer de 16 MB, no un
+  // ArrayBuffer. `fetch` —y con él la subida de supabase-js— rechaza ese
+  // cuerpo de plano ("ArrayBuffer: SharedArrayBuffer is not allowed"), así
+  // que subirlo tal cual falla SIEMPRE, no de vez en cuando. Copiarlo lo
+  // devuelve a un ArrayBuffer normal del tamaño exacto de la foto, que es
+  // además una porción minúscula del pool.
+  const body = new Uint8Array(jpeg);
+
   const path = convertedObjectPath(accountId, sourceUrl);
-  const { error } = await db.storage.from(SHOWCASE_BUCKET).upload(path, jpeg, {
+  const { error } = await db.storage.from(SHOWCASE_BUCKET).upload(path, body, {
     contentType: 'image/jpeg',
     cacheControl: '3600',
     // La ruta es determinista: reintentar sobreescribe su propia copia

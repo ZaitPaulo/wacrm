@@ -1,3 +1,4 @@
+import { isSharedArrayBuffer } from 'node:util/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // sharp es un módulo nativo y acá no interesa qué píxeles produce, sino
@@ -116,6 +117,37 @@ describe('ensurePublishableImages', () => {
       expect(url).toContain('https://bucket.example.com/');
       expect(url.endsWith('.jpg')).toBe(true);
     }
+  });
+
+  it('sube bytes que fetch acepte, aunque sharp los entregue compartidos', async () => {
+    // sharp asigna sus salidas en un pool de memoria COMPARTIDA: su
+    // toBuffer() real devuelve un Buffer cuyo `.buffer` es un
+    // SharedArrayBuffer de 16 MB (comprobado en producción con sharp
+    // 0.35 sobre Node 20). undici rechaza ese cuerpo con "ArrayBuffer:
+    // SharedArrayBuffer is not allowed", así que la subida fallaba
+    // SIEMPRE y ninguna publicación llegó nunca a Instagram.
+    const pool = new Uint8Array(new SharedArrayBuffer(64));
+    pool.set([0xff, 0xd8, 0xff, 0xe0]);
+    // El cast reproduce la mentira de los tipos de sharp, que es parte
+    // del bug: prometen Buffer<ArrayBuffer> y en runtime entregan uno
+    // respaldado por memoria compartida, así que TypeScript nunca pudo
+    // avisar de nada.
+    toBuffer.mockResolvedValueOnce(
+      Buffer.from(pool.buffer, 0, 4) as unknown as Buffer<ArrayBuffer>
+    );
+
+    const { db, upload } = fakeDb();
+
+    await ensurePublishableImages({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      db: db as any,
+      accountId: ACCOUNT_ID,
+      imageUrls: ['https://cdn.example.com/a.webp'],
+    });
+
+    const [, body] = upload.mock.calls[0];
+    expect(isSharedArrayBuffer(body.buffer)).toBe(false);
+    expect([...body]).toEqual([0xff, 0xd8, 0xff, 0xe0]);
   });
 
   it('sube como image/jpeg y sobreescribe su propia copia', async () => {
