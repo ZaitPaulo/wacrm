@@ -2110,7 +2110,7 @@
     },
     "fields": {
       "brand": "Marca *",
-      "model": "Modelo *",
+      "model": "Línea *",
       "year": "Año *",
       "status": "Estado",
       "price": "Precio",
