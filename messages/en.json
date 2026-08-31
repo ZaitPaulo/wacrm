@@ -2217,12 +2217,28 @@
     "confirmRevertSale": "This vehicle is marked as sold. Changing its status will clear the price, date and buyer. Continue?"
   },
   "InstagramPost": {
-    "price": "Price: {value}",
-    "mileage": "Mileage: {value} km",
-    "plateCity": "Registered in {value}",
-    "acceptsTradeIn": "We take trade-ins",
-    "contact": "Write to us: {channel}",
-    "contactGeneric": "Message us for more information"
+    "title": "{vehicle} 🚗",
+    "modelYear": "MODEL {value}",
+    "mileage": "{value} KM",
+    "transmission": {
+      "manual": "MANUAL",
+      "automatic": "AUTOMATIC",
+      "cvt": "AUTOMATIC (CVT)"
+    },
+    "engine": "ENGINE {value}",
+    "plateCity": "REGISTERED IN {value}",
+    "soat": "🚩 INSURANCE: {value}",
+    "tecno": "🚩 INSPECTION: {value}",
+    "notAvailable": "NA",
+    "monthsShort": "JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC",
+    "salePrice": "PRICE: {value}",
+    "warrantyPrice": "PRICE WITH WARRANTY: {value}",
+    "separator": "..................................................",
+    "financing": "UP TO 100% ✅FINANCING AVAILABLE!",
+    "cta": "Book your visit today. GET IN TOUCH...",
+    "contact": "📞 {channel}",
+    "contactGeneric": "Message us for more information",
+    "hashtags": "#CarsForSale #UsedCars #CarDealership"
   },
   "Documents": {
     "title": "Documents",

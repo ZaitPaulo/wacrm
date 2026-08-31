@@ -2210,12 +2210,28 @@
     "confirmRevertSale": "Este vehículo figura como vendido. Si cambias el estado se borrarán el precio, la fecha y el comprador. ¿Continuar?"
   },
   "InstagramPost": {
-    "price": "Precio: {value}",
-    "mileage": "Kilometraje: {value} km",
-    "plateCity": "Matriculado en {value}",
-    "acceptsTradeIn": "Recibimos tu usado",
-    "contact": "Escríbenos: {channel}",
-    "contactGeneric": "Escríbenos para más información"
+    "title": "{vehicle} 🚗",
+    "modelYear": "MODELO {value}",
+    "mileage": "{value}KM",
+    "transmission": {
+      "manual": "MECÁNICO",
+      "automatic": "AUTOMÁTICO",
+      "cvt": "AUTOMÁTICO (CVT)"
+    },
+    "engine": "MOTOR {value}",
+    "plateCity": "PLACAS DE {value}",
+    "soat": "🚩 SOAT: {value}",
+    "tecno": "🚩 TECNO: {value}",
+    "notAvailable": "NA",
+    "monthsShort": "ENE,FEB,MAR,ABR,MAY,JUN,JUL,AGO,SEP,OCT,NOV,DIC",
+    "salePrice": "PRECIO DE VENTA: {value}",
+    "warrantyPrice": "PRECIO CON GARANTIA: {value}",
+    "separator": "..................................................",
+    "financing": "¡PUEDES LLEVARTELO hasta con el 100% ✅FINANCIADO!",
+    "cta": "¡Agenda tu cita ya! CONTACTANOS...",
+    "contact": "📞 {channel}",
+    "contactGeneric": "Escríbenos para más información",
+    "hashtags": "#CarrosBarranquilla #CarrosEnVenta #CarrosUsados\n#Vehiculosbarranquilla"
   },
   "Documents": {
     "title": "Documentos",

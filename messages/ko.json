@@ -2217,12 +2217,28 @@
     "confirmRevertSale": "판매 완료로 등록된 차량입니다. 상태를 변경하면 판매가, 판매일, 구매자 정보가 삭제됩니다. 계속하시겠습니까?"
   },
   "InstagramPost": {
-    "price": "가격: {value}",
-    "mileage": "주행거리: {value} km",
-    "plateCity": "등록지: {value}",
-    "acceptsTradeIn": "중고차 매입 가능",
-    "contact": "문의: {channel}",
-    "contactGeneric": "자세한 내용은 문의해 주세요"
+    "title": "{vehicle} 🚗",
+    "modelYear": "MODEL {value}",
+    "mileage": "{value} KM",
+    "transmission": {
+      "manual": "MANUAL",
+      "automatic": "AUTOMATIC",
+      "cvt": "AUTOMATIC (CVT)"
+    },
+    "engine": "ENGINE {value}",
+    "plateCity": "REGISTERED IN {value}",
+    "soat": "🚩 INSURANCE: {value}",
+    "tecno": "🚩 INSPECTION: {value}",
+    "notAvailable": "NA",
+    "monthsShort": "JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC",
+    "salePrice": "PRICE: {value}",
+    "warrantyPrice": "PRICE WITH WARRANTY: {value}",
+    "separator": "..................................................",
+    "financing": "UP TO 100% ✅FINANCING AVAILABLE!",
+    "cta": "Book your visit today. GET IN TOUCH...",
+    "contact": "📞 {channel}",
+    "contactGeneric": "Message us for more information",
+    "hashtags": "#CarsForSale #UsedCars #CarDealership"
   },
   "Documents": {
     "title": "문서",

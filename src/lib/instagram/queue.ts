@@ -2,7 +2,11 @@ import { getTranslations } from 'next-intl/server';
 import { supabaseAdmin } from '@/lib/ai/admin-client';
 
 import { composeVehiclePost } from './compose';
-import type { AccountForCaption, VehicleForCaption } from './caption';
+import {
+  buildVehicleCaption,
+  type AccountForCaption,
+  type VehicleForCaption,
+} from './caption';
 
 // ============================================================
 // Encolado: un vehículo disponible deja un borrador pendiente.
@@ -26,12 +30,13 @@ const NETWORK = 'instagram';
 
 /** Columnas que necesita la composición, y ninguna más. */
 const VEHICLE_COLUMNS =
-  'id, status, images, brand, model, year, price, mileage, transmission, ' +
-  'fuel_type, body_type, condition, engine_displacement, plate_city, ' +
-  'accepts_trade_in';
+  'id, status, images, brand, model, year, price, warranty_price, mileage, ' +
+  'transmission, engine_displacement, plate_city, soat_expires_at, ' +
+  'tecnomecanica_expires_at';
 
 const ACCOUNT_COLUMNS =
-  'default_currency, public_whatsapp, public_phone, public_email';
+  'default_currency, public_name, public_address, public_whatsapp, ' +
+  'public_phone, public_email';
 
 interface VehicleRow extends VehicleForCaption {
   id: string;
@@ -78,14 +83,12 @@ export async function syncVehiclePost(
   if (!account) return;
 
   const t = await getTranslations('InstagramPost');
-  const tSpecs = await getTranslations('Inventory');
 
   const composed = composeVehiclePost({
     vehicle,
     account,
     images: vehicle.images,
     t: (key, values) => t(key, values),
-    tSpecs: (key) => tSpecs(key),
   });
 
   // Sin imágenes no hay nada que publicar. Si además había un pendiente
@@ -176,4 +179,81 @@ async function removePending(
     .eq('network', NETWORK)
     .eq('status', 'pending');
   if (error) throw error;
+}
+
+/**
+ * Vuelve a armar los borradores pendientes contra la ficha actual.
+ *
+ * `syncVehiclePost` solo corre cuando alguien guarda un vehículo. Con
+ * eso alcanza mientras lo que cambia es el vehículo, pero no cuando
+ * cambia la PLANTILLA del texto o un dato público del negocio —la
+ * dirección, el teléfono—: ahí los pendientes se quedarían con el texto
+ * viejo hasta que alguien tocara cada vehículo a mano, uno por uno.
+ *
+ * Se llama al abrir la cola, que es el único momento en que esos
+ * borradores le importan a alguien. Solo escribe lo que de verdad
+ * cambió, así que en estado estable no hace ninguna escritura.
+ *
+ * NO toca lo que una persona editó: ese texto es trabajo suyo y
+ * pisarlo sería perderlo sin avisar. Es la misma regla que aplica
+ * `syncVehiclePost`.
+ */
+export async function refreshPendingCaptions(accountId: string): Promise<void> {
+  const admin = supabaseAdmin();
+
+  const { data: pending, error: pendErr } = await admin
+    .from('social_posts')
+    .select('id, vehicle_id, proposed_caption')
+    .eq('account_id', accountId)
+    .eq('network', NETWORK)
+    .eq('status', 'pending')
+    .is('edited_caption', null)
+    .returns<
+      { id: string; vehicle_id: string; proposed_caption: string }[]
+    >();
+  if (pendErr) throw pendErr;
+  if (!pending || pending.length === 0) return;
+
+  const { data: account, error: accErr } = await admin
+    .from('accounts')
+    .select(ACCOUNT_COLUMNS)
+    .eq('id', accountId)
+    .maybeSingle<AccountForCaption>();
+  if (accErr) throw accErr;
+  if (!account) return;
+
+  const { data: vehicles, error: vehErr } = await admin
+    .from('inventory_vehicles')
+    .select(VEHICLE_COLUMNS)
+    .eq('account_id', accountId)
+    .in(
+      'id',
+      pending.map((p) => p.vehicle_id)
+    )
+    .returns<VehicleRow[]>();
+  if (vehErr) throw vehErr;
+
+  const byId = new Map((vehicles ?? []).map((v) => [v.id, v]));
+  const t = await getTranslations('InstagramPost');
+
+  for (const post of pending) {
+    const vehicle = byId.get(post.vehicle_id);
+    // Un pendiente sin vehículo no se limpia acá: de eso se encarga
+    // `syncVehiclePost`, y esta función solo reescribe texto.
+    if (!vehicle) continue;
+
+    const caption = buildVehicleCaption({
+      vehicle,
+      account,
+      t: (key, values) => t(key, values),
+    });
+    if (caption === post.proposed_caption) continue;
+
+    const { error: upErr } = await admin
+      .from('social_posts')
+      .update({ proposed_caption: caption })
+      .eq('account_id', accountId)
+      .eq('id', post.id);
+    if (upErr) throw upErr;
+  }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireRole, toErrorResponse } from '@/lib/auth/account';
 import { getPublishingLimit } from '@/lib/instagram/api';
 import { loadInstagramConfig } from '@/lib/instagram/config';
+import { refreshPendingCaptions } from '@/lib/instagram/queue';
 
 /**
  * GET /api/instagram/queue  (admin+)
@@ -30,6 +31,18 @@ interface QueueRow {
 export async function GET() {
   try {
     const { supabase, accountId } = await requireRole('admin');
+
+    // Los borradores se rearman contra la ficha actual ANTES de
+    // leerlos: el texto propuesto se congela al encolar, así que un
+    // cambio de plantilla o de los datos del negocio no llegaría solo.
+    // Que falle no puede tumbar la pantalla — se ve la cola con el
+    // texto que había, que es peor que refrescado pero mucho mejor que
+    // nada.
+    try {
+      await refreshPendingCaptions(accountId);
+    } catch (err) {
+      console.error('[instagram/queue GET] refresh error:', err);
+    }
 
     const { data: posts, error } = await supabase
       .from('social_posts')
