@@ -8,7 +8,7 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit
 import { buildVehiclePayload } from '@/lib/inventory/payload'
 import { persistAcquisition } from '@/lib/inventory/acquisitions'
 import { syncVehicleKnowledge } from '@/lib/inventory/knowledge-sync'
-import { syncVehiclePost } from '@/lib/instagram/queue'
+import { syncVehiclePost } from '@/lib/social/queue'
 
 // Lista nominal a propósito (nunca `*`): mantiene bajo control qué sale
 // hacia el cliente cuando se agregan columnas.

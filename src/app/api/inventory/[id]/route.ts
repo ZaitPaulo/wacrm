@@ -7,7 +7,7 @@ import {
   syncVehicleKnowledge,
   deleteVehicleKnowledge,
 } from '@/lib/inventory/knowledge-sync'
-import { syncVehiclePost } from '@/lib/instagram/queue'
+import { syncVehiclePost } from '@/lib/social/queue'
 
 type Params = { params: Promise<{ id: string }> }
 

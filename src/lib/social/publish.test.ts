@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { claimPublishLock, releasePublishLock } from './publish';
-import { InstagramError } from './errors';
+import { SocialPublishError } from './errors';
 
 // ============================================================
 // Candado — el mutex que impide la doble publicación.
@@ -109,8 +109,8 @@ const api = vi.hoisted(() => ({
 const configMod = vi.hoisted(() => ({ loadInstagramConfig: vi.fn() }));
 const imagesMod = vi.hoisted(() => ({ ensurePublishableImages: vi.fn() }));
 
-vi.mock('./api', () => api);
-vi.mock('./config', () => configMod);
+vi.mock('./instagram/api', () => api);
+vi.mock('./instagram/config', () => configMod);
 vi.mock('./images', () => imagesMod);
 
 const { approveAndPublish } = await import('./publish');
@@ -135,6 +135,7 @@ function fakeDb(opts: FakeDbOptions) {
     post = {
       id: 'post-1',
       vehicle_id: 'veh-1',
+      network: 'instagram',
       status: 'pending',
       proposed_caption: 'propuesto',
       edited_caption: null,
@@ -219,6 +220,7 @@ describe('approveAndPublish — camino feliz', () => {
       post: {
         id: 'post-1',
         vehicle_id: 'veh-1',
+        network: 'instagram',
         status: 'pending',
         proposed_caption: 'propuesto',
         edited_caption: 'lo que escribió la persona',
@@ -241,6 +243,7 @@ describe('approveAndPublish — lo que impide publicar', () => {
 
     expect(await approveAndPublish({ db, ...ARGS })).toEqual({
       status: 'no_connection',
+      network: 'instagram',
     });
     expect(api.publishImagePost).not.toHaveBeenCalled();
   });
@@ -275,6 +278,7 @@ describe('approveAndPublish — lo que impide publicar', () => {
     expect(await approveAndPublish({ db, ...ARGS })).toEqual({
       status: 'quota_exhausted',
       remaining: 0,
+      network: 'instagram',
     });
     expect(api.publishImagePost).not.toHaveBeenCalled();
   });
@@ -285,6 +289,7 @@ describe('approveAndPublish — lo que impide publicar', () => {
 
     expect(await approveAndPublish({ db, ...ARGS })).toEqual({
       status: 'quota_unknown',
+      network: 'instagram',
     });
     expect(api.publishImagePost).not.toHaveBeenCalled();
   });
@@ -368,7 +373,7 @@ describe('approveAndPublish — revalidación', () => {
 describe('approveAndPublish — fallos', () => {
   it('registra un token vencido como problema de credenciales', async () => {
     api.publishImagePost.mockRejectedValue(
-      new InstagramError('Session has expired', 'credentials', {
+      new SocialPublishError('Session has expired', 'credentials', {
         code: 190,
         answered: true,
         step: 'container',
@@ -385,7 +390,7 @@ describe('approveAndPublish — fallos', () => {
 
   it('registra una imagen rechazada como problema de contenido', async () => {
     api.publishImagePost.mockRejectedValue(
-      new InstagramError('Invalid image format', 'content', {
+      new SocialPublishError('Invalid image format', 'content', {
         code: 36003,
         answered: true,
         step: 'container',
@@ -401,7 +406,7 @@ describe('approveAndPublish — fallos', () => {
 
   it('trata un fallo de conversión como contenido, no como conexión', async () => {
     imagesMod.ensurePublishableImages.mockRejectedValue(
-      new InstagramError('No se pudo convertir la imagen', 'content')
+      new SocialPublishError('No se pudo convertir la imagen', 'content')
     );
     const { db } = fakeDb({});
 
@@ -416,7 +421,7 @@ describe('approveAndPublish — fallos', () => {
     // La petición de media_publish se fue y no volvió nada: pudo haber
     // publicado. Reintentar duplicaría algo que no se puede retirar.
     api.publishImagePost.mockRejectedValue(
-      new InstagramError('Instagram no respondió (publish)', 'content', {
+      new SocialPublishError('Instagram no respondió (publish)', 'content', {
         answered: false,
         step: 'publish',
       })
@@ -435,7 +440,7 @@ describe('approveAndPublish — fallos', () => {
     // Sin respuesta pero ANTES de publicar: no salió nada, y eso sí se
     // puede reintentar sin riesgo de duplicar.
     api.publishImagePost.mockRejectedValue(
-      new InstagramError('Instagram no respondió (container)', 'content', {
+      new SocialPublishError('Instagram no respondió (container)', 'content', {
         answered: false,
         step: 'container',
       })

@@ -1,16 +1,20 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { getPublishingLimit, publishImagePost } from './api';
-import { loadInstagramConfig } from './config';
 import { ensurePublishableImages } from './images';
-import { InstagramError, isOutcomeUnknown } from './errors';
+import { SocialPublishError, isOutcomeUnknown } from './errors';
+import { networkAdapter, type SocialNetwork } from './networks';
 
 // ============================================================
 // Aprobar y publicar.
 //
-// Es el único camino por el que algo sale a Instagram, y siempre lo
+// Es el único camino por el que algo sale a una red, y siempre lo
 // dispara una persona. No hay cron, automatización ni regla que llame
 // a esto.
+//
+// LA RED SALE DE LA FILA, no de un import. Cada fila de social_posts
+// tiene su `network`, y de ahí salen las credenciales, los límites y el
+// cliente con el que se habla. Aprobar una fila no toca la otra: son
+// publicaciones distintas a destinos distintos (decisión 1).
 //
 // El orden de los pasos no es arbitrario — cada uno evita gastar el
 // siguiente:
@@ -21,6 +25,10 @@ import { InstagramError, isOutcomeUnknown } from './errors';
 //                         no observa)
 //   4. imágenes a JPEG   (trabajo caro, solo si todo lo anterior pasó)
 //   5. envío
+//
+// El paso 1 SE SALTEA en las redes que no informan tope (decisión 8).
+// No es lo mismo que no poder leerlo: sin tope se publica con
+// normalidad, con tope ilegible no se aprueba.
 // ============================================================
 
 /**
@@ -37,17 +45,25 @@ export type PublishOutcome =
   | { status: 'published'; externalPostId: string }
   | { status: 'locked' }
   | { status: 'not_pending' }
-  | { status: 'no_connection' }
-  | { status: 'quota_exhausted'; remaining: number }
-  | { status: 'quota_unknown' }
+  | { status: 'no_connection'; network: SocialNetwork }
+  | { status: 'quota_exhausted'; remaining: number; network: SocialNetwork }
+  | { status: 'quota_unknown'; network: SocialNetwork }
   | { status: 'vehicle_unavailable' }
   | { status: 'vehicle_missing' }
-  | { status: 'failed'; kind: 'credentials' | 'content'; reason: string }
-  | { status: 'needs_review'; reason: string };
+  | {
+      status: 'failed';
+      kind: 'credentials' | 'content';
+      reason: string;
+      network: SocialNetwork;
+    }
+  | { status: 'needs_review'; reason: string; network: SocialNetwork }
+  | { status: 'unknown_network'; network: string };
 
 interface PostRow {
   id: string;
   vehicle_id: string;
+  /** A qué red va. Es lo que resuelve todo lo demás. */
+  network: string;
   status: string;
   proposed_caption: string;
   edited_caption: string | null;
@@ -85,7 +101,7 @@ export async function claimPublishLock(
     .select('id');
 
   if (error) {
-    console.error('[instagram publish] claim failed:', error.message);
+    console.error('[social publish] claim failed:', error.message);
     return false;
   }
   return Array.isArray(data) && data.length > 0;
@@ -101,7 +117,7 @@ export async function releasePublishLock(
     .update({ publish_locked_at: null })
     .eq('id', postId);
   if (error) {
-    console.error('[instagram publish] release failed:', error.message);
+    console.error('[social publish] release failed:', error.message);
   }
 }
 
@@ -123,7 +139,8 @@ export async function approveAndPublish(args: {
   const { data: post, error: postErr } = await db
     .from('social_posts')
     .select(
-      'id, vehicle_id, status, proposed_caption, edited_caption, image_urls'
+      'id, vehicle_id, network, status, proposed_caption, edited_caption, ' +
+        'image_urls'
     )
     .eq('account_id', accountId)
     .eq('id', postId)
@@ -132,27 +149,42 @@ export async function approveAndPublish(args: {
   if (!post) return { status: 'not_pending' };
   if (post.status !== 'pending') return { status: 'not_pending' };
 
-  const config = await loadInstagramConfig(db, accountId);
-  if (!config) return { status: 'no_connection' };
-
-  // 1. Margen. Se pregunta ANTES de tomar el candado: si no queda, la
-  // publicación sigue pendiente y disponible para mañana, sin haber
-  // quedado trabada por un candado que nadie va a soltar.
-  let remaining: number;
-  try {
-    remaining = (
-      await getPublishingLimit({
-        igUserId: config.igUserId,
-        accessToken: config.accessToken,
-      })
-    ).remaining;
-  } catch (err) {
-    console.error('[instagram publish] quota check failed:', err);
-    // No poder verificar el margen impide aprobar. Publicar a ciegas
-    // no es una alternativa: el rechazo de Meta gastaría el intento.
-    return { status: 'quota_unknown' };
+  const adapter = networkAdapter(post.network);
+  if (!adapter) {
+    // La fila apunta a una red que el sistema no maneja. Puede pasar
+    // volviendo atrás una versión que sí la manejaba; no se publica a
+    // ciegas con el cliente de otra red.
+    console.error('[social publish] red desconocida:', post.network);
+    return { status: 'unknown_network', network: post.network };
   }
-  if (remaining <= 0) return { status: 'quota_exhausted', remaining };
+
+  const network = await adapter.connect(db, accountId);
+  if (!network) return { status: 'no_connection', network: adapter.network };
+
+  // 1. Margen, SOLO en las redes que informan uno. Se pregunta ANTES de
+  // tomar el candado: si no queda, la publicación sigue pendiente y
+  // disponible para mañana, sin haber quedado trabada por un candado
+  // que nadie va a soltar.
+  //
+  // Una red sin tope no pasa por acá y publica con normalidad. No es lo
+  // mismo que no poder leerlo: eso sí impide aprobar (decisión 8).
+  if (network.quota) {
+    let remaining: number;
+    try {
+      remaining = (await network.quota()).remaining;
+    } catch (err) {
+      console.error(
+        `[social publish] quota check failed (${adapter.network}):`,
+        err
+      );
+      // No poder verificar el margen impide aprobar. Publicar a ciegas
+      // no es una alternativa: el rechazo de Meta gastaría el intento.
+      return { status: 'quota_unknown', network: adapter.network };
+    }
+    if (remaining <= 0) {
+      return { status: 'quota_exhausted', remaining, network: adapter.network };
+    }
+  }
 
   // 2. Candado, antes de hablar con Meta.
   if (!(await claimPublishLock(db, accountId, postId))) {
@@ -180,8 +212,10 @@ export async function approveAndPublish(args: {
       return { status: 'vehicle_unavailable' };
     }
 
-    // 4. Imágenes en el formato que Instagram acepta. Verifica de paso
-    // que sigan estando: una URL caída falla acá, antes del envío.
+    // 4. Imágenes en el formato publicable. Verifica de paso que sigan
+    // estando: una URL caída falla acá, antes del envío. La copia
+    // convertida se comparte entre redes (decisión 9), así que la
+    // segunda publicación del mismo vehículo no vuelve a convertir.
     const imageUrls = await ensurePublishableImages({
       db,
       accountId,
@@ -190,12 +224,7 @@ export async function approveAndPublish(args: {
 
     // 5. Envío. El texto editado gana sobre el propuesto.
     const caption = post.edited_caption ?? post.proposed_caption;
-    const externalPostId = await publishImagePost({
-      igUserId: config.igUserId,
-      accessToken: config.accessToken,
-      imageUrls,
-      caption,
-    });
+    const externalPostId = await network.publish({ imageUrls, caption });
 
     await db
       .from('social_posts')
@@ -212,7 +241,7 @@ export async function approveAndPublish(args: {
 
     return { status: 'published', externalPostId };
   } catch (err) {
-    return recordFailure(db, postId, err);
+    return recordFailure(db, postId, adapter.network, err);
   } finally {
     // Si el camino feliz ya lo puso en null, esto no cambia nada. Si
     // algo lanzó antes de guardar, suelta el candado igual: una fila
@@ -233,12 +262,16 @@ export async function approveAndPublish(args: {
 async function recordFailure(
   db: SupabaseClient,
   postId: string,
+  network: SocialNetwork,
   err: unknown
 ): Promise<PublishOutcome> {
   const reason = err instanceof Error ? err.message : String(err);
 
   if (isOutcomeUnknown(err)) {
-    console.error('[instagram publish] desenlace desconocido:', reason);
+    console.error(
+      `[social publish] desenlace desconocido (${network}):`,
+      reason
+    );
     await db
       .from('social_posts')
       .update({
@@ -247,11 +280,11 @@ async function recordFailure(
         failure_reason: reason,
       })
       .eq('id', postId);
-    return { status: 'needs_review', reason };
+    return { status: 'needs_review', reason, network };
   }
 
-  const kind = err instanceof InstagramError ? err.kind : 'content';
-  console.error(`[instagram publish] falló (${kind}):`, reason);
+  const kind = err instanceof SocialPublishError ? err.kind : 'content';
+  console.error(`[social publish] falló ${network} (${kind}):`, reason);
 
   await db
     .from('social_posts')
@@ -263,5 +296,5 @@ async function recordFailure(
     })
     .eq('id', postId);
 
-  return { status: 'failed', kind, reason };
+  return { status: 'failed', kind, reason, network };
 }

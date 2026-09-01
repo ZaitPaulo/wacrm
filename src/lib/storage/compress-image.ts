@@ -10,7 +10,7 @@
 // Se convierte a WebP porque a igual calidad percibida pesa bastante
 // menos que JPEG y, a diferencia de él, conserva la transparencia (lo
 // que importa para el logo del negocio). Que las fotos queden en WebP
-// NO rompe la publicación en Instagram: `lib/instagram/images.ts` las
+// NO rompe la publicación en Instagram: `lib/social/images.ts` las
 // convierte a JPEG con sharp antes de publicar, y
 // `isPublishableImageUrl` ya clasifica un `.webp` como "hay que
 // convertir".

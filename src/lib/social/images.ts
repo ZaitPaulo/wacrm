@@ -1,5 +1,5 @@
 // ============================================================
-// Las fotos, en el formato que Instagram acepta.
+// Las fotos, en el formato publicable.
 //
 // El bucket `showcase-media` admite PNG, JPEG y WebP (migración 506).
 // Instagram publica JPEG y nada más. El desajuste es real y silencioso:
@@ -8,6 +8,14 @@
 //
 // Se convierte antes de publicar y la copia se deja en el mismo bucket
 // público, que es de donde Meta descarga (decisión 12 del design).
+//
+// SE CONVIERTE PARA TODAS LAS REDES, aunque Facebook acepte más
+// formatos. La ruta de la copia deriva del hash de la URL original, así
+// que las dos redes caen en el mismo objeto: publicar el mismo vehículo
+// en la segunda red reutiliza lo que dejó la primera, sin descargar ni
+// convertir de nuevo. Saltear la conversión en Facebook ahorraría
+// trabajo solo cuando esa red publica sola, y a cambio metería una
+// bifurcación donde hoy hay una sola regla (decisión 9).
 //
 // Corre en el servidor, con el cliente service-role que le pasa quien
 // llama — mismo trato que `logAiUsage`, y por lo mismo: acá no hay
@@ -39,7 +47,14 @@ const JPEG_QUALITY = 90;
  *
  * Deriva del hash de la URL original, así que la misma foto siempre cae
  * en la misma ruta. Eso hace la conversión idempotente: reintentar una
- * publicación no llena el bucket de copias, sobreescribe la suya.
+ * publicación no llena el bucket de copias, sobreescribe la suya — y
+ * publicar en la segunda red reutiliza la copia de la primera, porque
+ * la ruta NO lleva la red.
+ *
+ * El prefijo dice `social/` y no `instagram/`, que es lo que la copia
+ * de verdad es. Los objetos que quedaron bajo el prefijo viejo son
+ * copias derivadas y se regeneran solas en la siguiente publicación; no
+ * se migran.
  *
  * Respeta el prefijo `account-<uuid>/` que exige la RLS de escritura
  * del bucket. El service-role la saltea, pero desviarse de la
@@ -50,7 +65,7 @@ export function convertedObjectPath(
   sourceUrl: string
 ): string {
   const digest = createHash('sha256').update(sourceUrl).digest('hex');
-  return `account-${accountId}/instagram/${digest.slice(0, 32)}.jpg`;
+  return `account-${accountId}/social/${digest.slice(0, 32)}.jpg`;
 }
 
 /**
@@ -130,8 +145,8 @@ async function convertAndUpload(args: {
 }
 
 /**
- * Devuelve las URLs listas para mandarle a Instagram, convirtiendo solo
- * lo que haga falta.
+ * Devuelve las URLs listas para mandarle a la red, convirtiendo solo lo
+ * que haga falta.
  *
  * El ORDEN SE CONSERVA: Instagram recorta todo el carrusel según la
  * primera imagen, así que reordenar acá cambiaría el encuadre de la

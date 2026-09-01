@@ -2218,7 +2218,7 @@
     },
     "confirmRevertSale": "This vehicle is marked as sold. Changing its status will clear the price, date and buyer. Continue?"
   },
-  "InstagramPost": {
+  "SocialPost": {
     "title": "{vehicle} 🚗",
     "modelYear": "MODEL {value}",
     "mileage": "{value} KM",

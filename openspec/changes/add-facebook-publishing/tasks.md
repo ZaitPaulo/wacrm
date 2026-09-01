@@ -8,18 +8,18 @@
 
 ## 2. Refactorización a `src/lib/social/` — completa y verde antes de escribir nada de Facebook
 
-- [ ] 2.1 Mover `src/lib/instagram/` a `src/lib/social/`, dejando `api.ts` y `limits.ts` bajo `social/instagram/` y el resto en la raíz
-- [ ] 2.2 Mover las cinco suites de prueba junto a su código, cambiando únicamente los `import` — ninguna aserción se modifica
-- [ ] 2.3 Renombrar `InstagramError`, `InstagramErrorKind` e `InstagramStep` a nombres de red-agnósticos en `social/errors.ts`
-- [ ] 2.4 Crear `social/networks.ts` con el registro por red: cómo cargar su configuración, cómo publicar y cuáles son sus límites
-- [ ] 2.5 Parametrizar `validateCaption` para que reciba los límites de la red en vez de leer las constantes de Instagram
-- [ ] 2.6 Parametrizar `composeVehiclePost` para que reciba el máximo de imágenes de la red en vez de `MAX_CAROUSEL_ITEMS`
-- [ ] 2.7 Quitar `const NETWORK = 'instagram'` de `queue.ts` y pasar la red como parámetro en las cuatro consultas del módulo
-- [ ] 2.8 Hacer opcional por red el paso de verificación de tope en `approveAndPublish`, sin cambiar el comportamiento de Instagram
-- [ ] 2.9 Cambiar el prefijo de `convertedObjectPath` de `account-<uuid>/instagram/` a `account-<uuid>/social/`
-- [ ] 2.10 Mover `src/app/api/instagram/*` a `src/app/api/social/*` con la red como parte del recurso, actualizando el cliente de la pantalla
-- [ ] 2.11 Renombrar el namespace de traducción `InstagramPost` a uno de red-agnóstico en `messages/{es,en,ko}.json`
-- [ ] 2.12 Correr toda la suite y verificar que pasa sin cambios de expectativa; desplegar esta refactorización sola, antes de seguir
+- [x] 2.1 Mover `src/lib/instagram/` a `src/lib/social/`, dejando `api.ts` y `limits.ts` bajo `social/instagram/` y el resto en la raíz
+- [x] 2.2 Mover las cinco suites de prueba junto a su código, cambiando únicamente los `import` — ninguna aserción se modifica
+- [x] 2.3 Renombrar `InstagramError`, `InstagramErrorKind` e `InstagramStep` a nombres de red-agnósticos en `social/errors.ts`
+- [x] 2.4 Crear `social/networks.ts` con el registro por red: cómo cargar su configuración, cómo publicar y cuáles son sus límites
+- [x] 2.5 Parametrizar `validateCaption` para que reciba los límites de la red en vez de leer las constantes de Instagram
+- [x] 2.6 Parametrizar `composeVehiclePost` para que reciba el máximo de imágenes de la red en vez de `MAX_CAROUSEL_ITEMS`
+- [x] 2.7 Quitar `const NETWORK = 'instagram'` de `queue.ts` y pasar la red como parámetro en las cuatro consultas del módulo
+- [x] 2.8 Hacer opcional por red el paso de verificación de tope en `approveAndPublish`, sin cambiar el comportamiento de Instagram
+- [x] 2.9 Cambiar el prefijo de `convertedObjectPath` de `account-<uuid>/instagram/` a `account-<uuid>/social/`
+- [x] 2.10 Mover `src/app/api/instagram/*` a `src/app/api/social/*` con la red como parte del recurso, actualizando el cliente de la pantalla
+- [x] 2.11 Renombrar el namespace de traducción `InstagramPost` a uno de red-agnóstico en `messages/{es,en,ko}.json`
+- [x] 2.12 Correr toda la suite y verificar que pasa sin cambios de expectativa; desplegar esta refactorización sola, antes de seguir
 
 ## 3. Base de datos
 

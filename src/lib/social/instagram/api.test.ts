@@ -6,7 +6,7 @@ import {
   isPublishableAccountType,
   publishImagePost,
 } from './api';
-import { InstagramError } from './errors';
+import { SocialPublishError } from '../errors';
 
 const AUTH = { igUserId: 'ig-123', accessToken: 'token-abc' } as const;
 
@@ -145,9 +145,9 @@ describe('publishImagePost', () => {
       poll: { intervalMs: 0, timeoutMs: 0 },
     }).catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(InstagramError);
+    expect(err).toBeInstanceOf(SocialPublishError);
     // Contenido, no credenciales: la cuenta está bien, hay que reintentar.
-    expect((err as InstagramError).kind).toBe('content');
+    expect((err as SocialPublishError).kind).toBe('content');
     expect((err as Error).message).toMatch(/procesando/i);
     // Nada se publicó.
     expect(
@@ -169,7 +169,7 @@ describe('publishImagePost', () => {
       poll: { intervalMs: 0 },
     }).catch((e: unknown) => e);
 
-    expect((err as InstagramError).kind).toBe('content');
+    expect((err as SocialPublishError).kind).toBe('content');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -220,9 +220,9 @@ describe('clasificación de errores', () => {
       caption: 'x',
     }).catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(InstagramError);
-    expect((err as InstagramError).kind).toBe('credentials');
-    expect((err as InstagramError).code).toBe(190);
+    expect(err).toBeInstanceOf(SocialPublishError);
+    expect((err as SocialPublishError).kind).toBe('credentials');
+    expect((err as SocialPublishError).code).toBe(190);
   });
 
   it('trata una imagen rechazada como problema de contenido', async () => {
@@ -242,7 +242,7 @@ describe('clasificación de errores', () => {
       caption: 'x',
     }).catch((e: unknown) => e);
 
-    expect((err as InstagramError).kind).toBe('content');
+    expect((err as SocialPublishError).kind).toBe('content');
   });
 
   it('no manda a reconectar por un contenedor que no estaba listo', async () => {
@@ -265,8 +265,8 @@ describe('clasificación de errores', () => {
       (e: unknown) => e
     );
 
-    expect((err as InstagramError).kind).toBe('content');
-    expect((err as InstagramError).code).toBe(9007);
+    expect((err as SocialPublishError).kind).toBe('content');
+    expect((err as SocialPublishError).code).toBe(9007);
   });
 
   it('trata un 401 sin cuerpo útil como problema de credenciales', async () => {
@@ -279,7 +279,7 @@ describe('clasificación de errores', () => {
       (e: unknown) => e
     );
 
-    expect((err as InstagramError).kind).toBe('credentials');
+    expect((err as SocialPublishError).kind).toBe('credentials');
   });
 
   it('trata un permiso faltante como problema de credenciales', async () => {
@@ -297,7 +297,7 @@ describe('clasificación de errores', () => {
       (e: unknown) => e
     );
 
-    expect((err as InstagramError).kind).toBe('credentials');
+    expect((err as SocialPublishError).kind).toBe('credentials');
   });
 });
 

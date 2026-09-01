@@ -25,7 +25,7 @@ import { SettingsPanelHead } from './settings-panel-head';
 import { useCan } from '@/hooks/use-can';
 
 /**
- * Lo que `GET /api/instagram/connection` devuelve sobre la conexión.
+ * Lo que `GET /api/social/connection/instagram` devuelve sobre la conexión.
  *
  * NUNCA incluye el token: la ruta lo omite a propósito y esta pantalla
  * no tiene por qué verlo.
@@ -71,7 +71,7 @@ export function InstagramConfig() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/instagram/connection');
+        const res = await fetch('/api/social/connection/instagram');
         if (res.ok) setInfo(await res.json());
       } catch {
         // noop — se muestra como desconectado.
@@ -84,7 +84,7 @@ export function InstagramConfig() {
     if (!token.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/instagram/connection', {
+      const res = await fetch('/api/social/connection/instagram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ access_token: token.trim() }),
@@ -116,7 +116,7 @@ export function InstagramConfig() {
   async function disconnect() {
     setSaving(true);
     try {
-      const res = await fetch('/api/instagram/connection', {
+      const res = await fetch('/api/social/connection/instagram', {
         method: 'DELETE',
       });
       if (!res.ok) {

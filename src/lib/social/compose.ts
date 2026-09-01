@@ -6,7 +6,7 @@
 // publicación exista.
 // ============================================================
 
-import { MAX_CAROUSEL_ITEMS } from './limits';
+import type { NetworkLimits } from './limits';
 import { buildVehicleCaption, type BuildCaptionArgs } from './caption';
 
 /** Por qué un vehículo no puede publicarse. Queda registrado en la fila. */
@@ -19,15 +19,25 @@ export type ComposeResult =
 export interface ComposeArgs extends BuildCaptionArgs {
   /** `inventory_vehicles.images`, en el orden en que se cargaron. */
   images: string[] | null;
+  /**
+   * Los de la red a la que va esta publicación.
+   *
+   * Se reciben en vez de leerse de un módulo fijo porque el máximo de
+   * fotos no es el mismo en todas las redes: un vehículo de doce fotos
+   * se recorta para una y no para la otra, y componer con el máximo
+   * ajeno descartaría fotos que el destino real sí aceptaba.
+   */
+  limits: NetworkLimits;
 }
 
 /**
  * Arma el borrador de un vehículo.
  *
- * Sin imágenes no hay publicación: Instagram exige contenido visual y
- * no hay nada que armar. Se devuelve el motivo en vez de lanzar, porque
- * "este vehículo no se puede publicar todavía" es un resultado normal
- * del encolado y no un error — y si mañana le cargan fotos, se prepara.
+ * Sin imágenes no hay publicación: la publicación es una ficha visual
+ * del vehículo y no hay nada que armar. Se devuelve el motivo en vez de
+ * lanzar, porque "este vehículo no se puede publicar todavía" es un
+ * resultado normal del encolado y no un error — y si mañana le cargan
+ * fotos, se prepara.
  *
  * El orden de las imágenes importa más de lo que parece: Instagram
  * recorta todo el carrusel según la primera, así que se respeta el que
@@ -35,7 +45,7 @@ export interface ComposeArgs extends BuildCaptionArgs {
  * final.
  */
 export function composeVehiclePost(args: ComposeArgs): ComposeResult {
-  const { images, ...captionArgs } = args;
+  const { images, limits, ...captionArgs } = args;
 
   const imageUrls = (images ?? []).filter((url) => url.trim().length > 0);
   if (imageUrls.length === 0) {
@@ -45,6 +55,6 @@ export function composeVehiclePost(args: ComposeArgs): ComposeResult {
   return {
     ok: true,
     caption: buildVehicleCaption(captionArgs),
-    imageUrls: imageUrls.slice(0, MAX_CAROUSEL_ITEMS),
+    imageUrls: imageUrls.slice(0, limits.maxImages),
   };
 }

@@ -70,7 +70,7 @@ type Translator = (key: string, values?: Record<string, string>) => string;
 export interface BuildCaptionArgs {
   vehicle: VehicleForCaption;
   account: AccountForCaption;
-  /** Namespace de la publicación (`InstagramPost`). */
+  /** Namespace de la publicación (`SocialPost`). */
   t: Translator;
 }
 

@@ -10,12 +10,12 @@ import { generateReply } from '@/lib/ai/generate';
 import { logAiUsage } from '@/lib/ai/usage';
 import { supabaseAdmin } from '@/lib/ai/admin-client';
 import { AiError } from '@/lib/ai/types';
-import { CAPTION_MAX_CHARS, MAX_HASHTAGS } from '@/lib/instagram/limits';
+import { networkAdapter, type NetworkAdapter } from '@/lib/social/networks';
 
 type Params = { params: Promise<{ id: string }> };
 
 /**
- * POST /api/instagram/queue/[id]/rewrite  (admin+)
+ * POST /api/social/queue/[id]/rewrite  (admin+)
  *
  * Propone una reescritura del texto con la IA de la cuenta.
  *
@@ -27,14 +27,22 @@ type Params = { params: Promise<{ id: string }> };
  * y la pantalla simplemente no ofrece el botón: la cola funciona igual
  * sin esto.
  */
-function buildRewritePrompt(): string {
+function buildRewritePrompt(adapter: NetworkAdapter): string {
+  const { captionMaxChars, maxHashtags } = adapter.limits;
+  const red = adapter.network === 'facebook' ? 'Facebook' : 'Instagram';
+
   return [
-    'Reescribes textos para publicaciones de Instagram de una compraventa de vehículos.',
+    `Reescribes textos para publicaciones de ${red} de una compraventa de vehículos.`,
     'Recibes un texto ya armado con los datos reales del vehículo.',
     'Reglas:',
     `- No inventes ni cambies ningún dato: precio, año, kilometraje, ciudad y contacto quedan exactamente como están.`,
     '- No agregues datos que no estén en el texto original.',
-    `- Máximo ${CAPTION_MAX_CHARS} caracteres y ${MAX_HASHTAGS} etiquetas.`,
+    // El límite se le pide a la red de ESTA publicación. Pedirle a la IA
+    // que respete un tope ajeno produce un texto que después se rechaza
+    // al guardar, o uno recortado sin necesidad.
+    maxHashtags === null
+      ? `- Máximo ${captionMaxChars} caracteres.`
+      : `- Máximo ${captionMaxChars} caracteres y ${maxHashtags} etiquetas.`,
     '- Conserva el idioma del texto original.',
     '- Devuelve solo el texto final, sin comillas ni explicaciones.',
   ].join('\n');
@@ -45,13 +53,13 @@ export async function POST(request: Request, { params }: Params) {
     const { supabase, accountId, userId } = await requireRole('admin');
 
     const userLimit = checkRateLimit(
-      `ig-rewrite:${userId}`,
+      `social-rewrite:${userId}`,
       RATE_LIMITS.aiDraft
     );
     if (!userLimit.success) return rateLimitResponse(userLimit);
     // Tope también para el equipo entero sobre la key compartida.
     const accountLimit = checkRateLimit(
-      `ig-rewrite-acct:${accountId}`,
+      `social-rewrite-acct:${accountId}`,
       RATE_LIMITS.aiDraftAccount
     );
     if (!accountLimit.success) return rateLimitResponse(accountLimit);
@@ -68,13 +76,13 @@ export async function POST(request: Request, { params }: Params) {
     // publicado; la RLS ya acota a la cuenta.
     const { data: post, error } = await supabase
       .from('social_posts')
-      .select('id')
+      .select('id, network')
       .eq('account_id', accountId)
       .eq('id', id)
       .eq('status', 'pending')
-      .maybeSingle();
+      .maybeSingle<{ id: string; network: string }>();
     if (error) {
-      console.error('[instagram/rewrite] lookup error:', error);
+      console.error('[social/rewrite] lookup error:', error);
       return NextResponse.json(
         { error: 'No se pudo cargar la publicación' },
         { status: 500 }
@@ -87,8 +95,16 @@ export async function POST(request: Request, { params }: Params) {
       );
     }
 
+    const adapter = networkAdapter(post.network);
+    if (!adapter) {
+      return NextResponse.json(
+        { error: 'Esa publicación va a una red que el sistema ya no maneja' },
+        { status: 409 }
+      );
+    }
+
     const config = await loadAiConfig(supabase, accountId).catch((err) => {
-      console.error('[instagram/rewrite] loadAiConfig error:', err);
+      console.error('[social/rewrite] loadAiConfig error:', err);
       throw new AiError('Stored API key could not be decrypted.', {
         code: 'key_decrypt_failed',
         status: 400,
@@ -107,7 +123,7 @@ export async function POST(request: Request, { params }: Params) {
 
     const { text, usage } = await generateReply({
       config,
-      systemPrompt: buildRewritePrompt(),
+      systemPrompt: buildRewritePrompt(adapter),
       messages: [{ role: 'user', content: caption }],
     });
 
@@ -124,7 +140,7 @@ export async function POST(request: Request, { params }: Params) {
         usage,
       });
     } catch (logErr) {
-      console.error('[instagram/rewrite] usage log skipped:', logErr);
+      console.error('[social/rewrite] usage log skipped:', logErr);
     }
 
     return NextResponse.json({ caption: text.trim() });

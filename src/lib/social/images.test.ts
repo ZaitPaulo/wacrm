@@ -13,7 +13,7 @@ vi.mock('sharp', () => ({ default: sharpMock }));
 
 const { convertedObjectPath, ensurePublishableImages } =
   await import('./images');
-const { InstagramError } = await import('./errors');
+const { SocialPublishError } = await import('./errors');
 
 const ACCOUNT_ID = '11111111-2222-3333-4444-555555555555';
 
@@ -210,8 +210,8 @@ describe('un fallo de imagen nunca se reporta como problema de conexión', () =>
       imageUrls: ['https://cdn.example.com/a.png'],
     }).catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(InstagramError);
-    expect((err as InstanceType<typeof InstagramError>).kind).toBe('content');
+    expect(err).toBeInstanceOf(SocialPublishError);
+    expect((err as InstanceType<typeof SocialPublishError>).kind).toBe('content');
     expect((err as Error).message).toMatch(/no se pudo convertir/i);
   });
 
@@ -229,7 +229,7 @@ describe('un fallo de imagen nunca se reporta como problema de conexión', () =>
       imageUrls: ['https://cdn.example.com/a.png'],
     }).catch((e: unknown) => e);
 
-    expect((err as InstanceType<typeof InstagramError>).kind).toBe('content');
+    expect((err as InstanceType<typeof SocialPublishError>).kind).toBe('content');
     expect((err as Error).message).toMatch(/no se pudo descargar/i);
   });
 
@@ -243,6 +243,6 @@ describe('un fallo de imagen nunca se reporta como problema de conexión', () =>
       imageUrls: ['https://cdn.example.com/a.png'],
     }).catch((e: unknown) => e);
 
-    expect((err as InstanceType<typeof InstagramError>).kind).toBe('content');
+    expect((err as InstanceType<typeof SocialPublishError>).kind).toBe('content');
   });
 });

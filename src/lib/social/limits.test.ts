@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CAPTION_MAX_CHARS,
-  MAX_HASHTAGS,
   countHashtags,
   isPublishableImageUrl,
   validateCaption,
 } from './limits';
+import {
+  CAPTION_MAX_CHARS,
+  INSTAGRAM_LIMITS,
+  MAX_HASHTAGS,
+} from './instagram/limits';
 
 describe('isPublishableImageUrl', () => {
   it('acepta JPEG en sus dos extensiones', () => {
@@ -44,22 +47,22 @@ describe('countHashtags', () => {
 
 describe('validateCaption', () => {
   it('acepta un texto normal', () => {
-    expect(validateCaption('Mazda 3 2019, $45.000.000')).toBeNull();
+    expect(validateCaption('Mazda 3 2019, $45.000.000', INSTAGRAM_LIMITS)).toBeNull();
   });
 
   it('acepta un texto justo en el límite', () => {
-    expect(validateCaption('a'.repeat(CAPTION_MAX_CHARS))).toBeNull();
+    expect(validateCaption('a'.repeat(CAPTION_MAX_CHARS), INSTAGRAM_LIMITS)).toBeNull();
   });
 
   it('rechaza un texto que pasa el límite', () => {
-    expect(validateCaption('a'.repeat(CAPTION_MAX_CHARS + 1))).toBe('too_long');
+    expect(validateCaption('a'.repeat(CAPTION_MAX_CHARS + 1), INSTAGRAM_LIMITS)).toBe('too_long');
   });
 
   it('cuenta emojis como un carácter, igual que Meta', () => {
     // Un emoji fuera del plano básico ocupa 2 unidades UTF-16. Con
     // .length esto se pasaría del límite sin haberlo pasado de verdad.
     const caption = '🚗'.repeat(CAPTION_MAX_CHARS);
-    expect(validateCaption(caption)).toBeNull();
+    expect(validateCaption(caption, INSTAGRAM_LIMITS)).toBeNull();
   });
 
   it('rechaza demasiadas etiquetas', () => {
@@ -67,7 +70,7 @@ describe('validateCaption', () => {
       { length: MAX_HASHTAGS + 1 },
       (_, i) => `#t${i}`
     ).join(' ');
-    expect(validateCaption(caption)).toBe('too_many_hashtags');
+    expect(validateCaption(caption, INSTAGRAM_LIMITS)).toBe('too_many_hashtags');
   });
 
   it('acepta justo el máximo de etiquetas', () => {
@@ -75,6 +78,26 @@ describe('validateCaption', () => {
       { length: MAX_HASHTAGS },
       (_, i) => `#t${i}`
     ).join(' ');
-    expect(validateCaption(caption)).toBeNull();
+    expect(validateCaption(caption, INSTAGRAM_LIMITS)).toBeNull();
+  });
+});
+
+describe('validateCaption con una red que no limita etiquetas', () => {
+  // Facebook no pone un tope de etiquetas. Advertir por el de Instagram
+  // impediría publicar en Facebook un texto perfectamente válido.
+  const sinTope = { ...INSTAGRAM_LIMITS, maxHashtags: null };
+
+  it('acepta muchas más etiquetas de las que admite Instagram', () => {
+    const caption = Array.from(
+      { length: MAX_HASHTAGS * 3 },
+      (_, i) => `#t${i}`
+    ).join(' ');
+    expect(validateCaption(caption, sinTope)).toBeNull();
+  });
+
+  it('sigue midiendo el largo del texto', () => {
+    expect(
+      validateCaption('a'.repeat(CAPTION_MAX_CHARS + 1), sinTope)
+    ).toBe('too_long');
   });
 });

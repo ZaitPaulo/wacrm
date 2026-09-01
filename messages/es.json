@@ -2211,7 +2211,7 @@
     },
     "confirmRevertSale": "Este vehículo figura como vendido. Si cambias el estado se borrarán el precio, la fecha y el comprador. ¿Continuar?"
   },
-  "InstagramPost": {
+  "SocialPost": {
     "title": "{vehicle} 🚗",
     "modelYear": "MODELO {value}",
     "mileage": "{value}KM",

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { composeVehiclePost } from './compose';
 import { buildVehicleCaption, type VehicleForCaption } from './caption';
-import { MAX_CAROUSEL_ITEMS, validateCaption } from './limits';
+import { validateCaption } from './limits';
+import { INSTAGRAM_LIMITS, MAX_CAROUSEL_ITEMS } from './instagram/limits';
 import { formatPrice } from '@/lib/showcase/format';
 import esMessages from '../../../messages/es.json';
 
@@ -17,7 +18,7 @@ const t = (key: string, values?: Record<string, string>) => {
         node && typeof node === 'object'
           ? (node as Record<string, unknown>)[part]
           : undefined,
-      esMessages.InstagramPost
+      esMessages.SocialPost
     );
   let out = typeof found === 'string' ? found : key;
   for (const [k, v] of Object.entries(values ?? {})) {
@@ -116,7 +117,7 @@ describe('buildVehicleCaption — el formato que el negocio ya usaba', () => {
       account: ACCOUNT,
       t,
     });
-    expect(validateCaption(caption)).toBeNull();
+    expect(validateCaption(caption, INSTAGRAM_LIMITS)).toBeNull();
   });
 });
 
@@ -306,7 +307,12 @@ describe('el dato reservado nunca llega a la publicación', () => {
 });
 
 describe('composeVehiclePost', () => {
-  const base = { vehicle: FULL_VEHICLE, account: ACCOUNT, t };
+  const base = {
+    vehicle: FULL_VEHICLE,
+    account: ACCOUNT,
+    t,
+    limits: INSTAGRAM_LIMITS,
+  };
 
   it('devuelve el texto y las imágenes en orden', () => {
     const result = composeVehiclePost({ ...base, images: IMAGES });

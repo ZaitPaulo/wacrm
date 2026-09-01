@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/use-auth';
 import { formatPrice } from '@/lib/showcase/format';
-import { CAPTION_MAX_CHARS } from '@/lib/instagram/limits';
 
 /**
  * La cola de publicaciones de Instagram.
@@ -34,6 +33,8 @@ interface QueueVehicle {
 interface QueuePost {
   id: string;
   vehicle_id: string;
+  /** A qué red va. Dos filas del mismo vehículo difieren en esto. */
+  network: string;
   status: 'pending' | 'published' | 'discarded' | 'failed' | 'needs_review';
   proposed_caption: string;
   edited_caption: string | null;
@@ -54,10 +55,19 @@ interface Quota {
   durationSeconds: number;
 }
 
+/** El estado de una red conectada, como lo manda la API. */
+interface NetworkState {
+  network: string;
+  displayName: string | null;
+  /** `true` si esta red informa un tope por periodo. */
+  reportsQuota: boolean;
+  quota: Quota | null;
+  limits: { maxImages: number; captionMaxChars: number; maxHashtags: number | null };
+}
+
 interface QueueResponse {
   posts?: QueuePost[];
-  quota?: Quota | null;
-  connected?: boolean;
+  networks?: NetworkState[];
 }
 
 /**
@@ -66,7 +76,7 @@ interface QueueResponse {
  */
 async function fetchQueue(): Promise<QueueResponse | null> {
   try {
-    const res = await fetch('/api/instagram/queue');
+    const res = await fetch('/api/social/queue');
     if (!res.ok) return null;
     return (await res.json()) as QueueResponse;
   } catch {
@@ -79,8 +89,7 @@ export default function InstagramQueuePage() {
   const { defaultCurrency } = useAuth();
 
   const [posts, setPosts] = useState<QueuePost[]>([]);
-  const [quota, setQuota] = useState<Quota | null>(null);
-  const [connected, setConnected] = useState(false);
+  const [networks, setNetworks] = useState<NetworkState[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -89,8 +98,7 @@ export default function InstagramQueuePage() {
   // síncrona en su cuerpo, que es lo que la regla de hooks prohíbe.
   const apply = useCallback((json: QueueResponse) => {
     setPosts(json.posts ?? []);
-    setQuota(json.quota ?? null);
-    setConnected(!!json.connected);
+    setNetworks(json.networks ?? []);
   }, []);
 
   /** Recarga después de aprobar, descartar o editar. */
@@ -114,6 +122,27 @@ export default function InstagramQueuePage() {
 
   const pending = posts.filter((p) => p.status === 'pending');
   const history = posts.filter((p) => p.status !== 'pending');
+
+  // Conectado es "hay al menos una red". El estado de cada una se mira
+  // por separado: una red caída no puede bloquear la aprobación de la
+  // otra, que es la garantía de que son independientes.
+  const connected = networks.length > 0;
+  const networkOf = (post: QueuePost) =>
+    networks.find((n) => n.network === post.network) ?? null;
+
+  /**
+   * Si esta publicación se puede aprobar ahora mismo.
+   *
+   * Una red sin tope publica con normalidad; una CON tope que no se
+   * pudo leer no, porque publicar a ciegas gasta el intento. Los dos
+   * casos llegan como `quota: null` y solo `reportsQuota` los separa.
+   */
+  const canPublish = (post: QueuePost) => {
+    const net = networkOf(post);
+    if (!net) return false;
+    if (!net.reportsQuota) return true;
+    return (net.quota?.remaining ?? 0) > 0;
+  };
 
   if (loading) {
     return (
@@ -139,18 +168,25 @@ export default function InstagramQueuePage() {
         </div>
       )}
 
-      {/* El margen lo informa Instagram, no lo calculamos nosotros: es
-          el mismo número que después decide si se puede aprobar. */}
-      {connected && (
-        <div className="text-muted-foreground rounded-lg border p-4 text-sm">
-          {quota
-            ? t('quota', {
-                remaining: String(quota.remaining),
-                total: String(quota.total),
-              })
-            : t('quotaUnknown')}
-        </div>
-      )}
+      {/* El margen lo informa cada red, no lo calculamos nosotros: es
+          el mismo número que después decide si se puede aprobar. Solo se
+          muestra donde la red informa uno — inventarle un tope a la que
+          no lo tiene impediría aprobar sin motivo real. */}
+      {networks
+        .filter((net) => net.reportsQuota)
+        .map((net) => (
+          <div
+            key={net.network}
+            className="text-muted-foreground rounded-lg border p-4 text-sm"
+          >
+            {net.quota
+              ? t('quota', {
+                  remaining: String(net.quota.remaining),
+                  total: String(net.quota.total),
+                })
+              : t('quotaUnknown')}
+          </div>
+        ))}
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">
@@ -166,7 +202,8 @@ export default function InstagramQueuePage() {
               post={post}
               currency={defaultCurrency ?? 'USD'}
               busy={busyId === post.id}
-              canPublish={connected && (quota?.remaining ?? 0) > 0}
+              captionMaxChars={networkOf(post)?.limits.captionMaxChars ?? 0}
+              canPublish={canPublish(post)}
               onBusy={setBusyId}
               onDone={load}
             />
@@ -190,6 +227,7 @@ function PendingCard({
   post,
   currency,
   busy,
+  captionMaxChars,
   canPublish,
   onBusy,
   onDone,
@@ -197,6 +235,8 @@ function PendingCard({
   post: QueuePost;
   currency: string;
   busy: boolean;
+  /** El de la red de ESTA publicación, nunca el de otra. */
+  captionMaxChars: number;
   canPublish: boolean;
   onBusy: (id: string | null) => void;
   onDone: () => Promise<void>;
@@ -208,12 +248,12 @@ function PendingCard({
   const [dirty, setDirty] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(true);
 
-  const remainingChars = CAPTION_MAX_CHARS - [...caption].length;
+  const remainingChars = captionMaxChars - [...caption].length;
 
   async function saveCaption() {
     onBusy(post.id);
     try {
-      const res = await fetch(`/api/instagram/queue/${post.id}`, {
+      const res = await fetch(`/api/social/queue/${post.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caption }),
@@ -239,7 +279,7 @@ function PendingCard({
   async function rewrite() {
     onBusy(post.id);
     try {
-      const res = await fetch(`/api/instagram/queue/${post.id}/rewrite`, {
+      const res = await fetch(`/api/social/queue/${post.id}/rewrite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caption }),
@@ -261,7 +301,7 @@ function PendingCard({
   async function publish() {
     onBusy(post.id);
     try {
-      const res = await fetch(`/api/instagram/queue/${post.id}/approve`, {
+      const res = await fetch(`/api/social/queue/${post.id}/approve`, {
         method: 'POST',
       });
       const json = await res.json();
@@ -281,7 +321,7 @@ function PendingCard({
   async function discard() {
     onBusy(post.id);
     try {
-      const res = await fetch(`/api/instagram/queue/${post.id}`, {
+      const res = await fetch(`/api/social/queue/${post.id}`, {
         method: 'DELETE',
       });
       const json = await res.json();

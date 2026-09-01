@@ -13,12 +13,12 @@
  */
 
 import {
-  InstagramError,
+  SocialPublishError,
   contentError,
-  instagramErrorFromResponse,
+  metaErrorFromResponse,
   unansweredError,
-  type InstagramStep,
-} from './errors';
+  type PublishStep,
+} from '../errors';
 import { MAX_CAROUSEL_ITEMS } from './limits';
 
 const IG_API_VERSION = 'v25.0';
@@ -34,14 +34,14 @@ interface IgAuthArgs {
 /**
  * POST a la Graph API con el cuerpo como JSON.
  *
- * Todo error sale como `InstagramError` ya clasificado en credenciales
+ * Todo error sale como `SocialPublishError` ya clasificado en credenciales
  * o contenido: quien llama nunca tiene que interpretar códigos de Meta.
  */
 async function igPost<T>(
   path: string,
   accessToken: string,
   body: Record<string, string>,
-  step: InstagramStep = 'other'
+  step: PublishStep = 'other'
 ): Promise<T> {
   let response: Response;
   try {
@@ -59,7 +59,7 @@ async function igPost<T>(
     throw unansweredError(`Instagram no respondió (${step})`, step);
   }
   if (!response.ok) {
-    throw await instagramErrorFromResponse(
+    throw await metaErrorFromResponse(
       response,
       `Instagram API error: ${response.status}`,
       step
@@ -79,7 +79,7 @@ async function igGet<T>(path: string, accessToken: string): Promise<T> {
     throw unansweredError('Instagram no respondió', 'other');
   }
   if (!response.ok) {
-    throw await instagramErrorFromResponse(
+    throw await metaErrorFromResponse(
       response,
       `Instagram API error: ${response.status}`
     );
@@ -352,7 +352,7 @@ export async function publishContainer(
  * 2026-08-31.
  *
  * Devuelve el id de la publicación. Todo lo que puede fallar sale como
- * `InstagramError` clasificado; quien llama decide qué hacer con la
+ * `SocialPublishError` clasificado; quien llama decide qué hacer con la
  * fila de la cola según `kind`.
  *
  * @param imageUrls Fotos ya publicables (JPEG y accesibles por Meta), en
@@ -479,4 +479,4 @@ export async function getPublishingLimit(
   };
 }
 
-export { InstagramError };
+export { SocialPublishError };

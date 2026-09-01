@@ -6,12 +6,19 @@ import {
   RATE_LIMITS,
 } from '@/lib/rate-limit';
 import { encrypt } from '@/lib/whatsapp/encryption';
-import { getAccountInfo, isPublishableAccountType } from '@/lib/instagram/api';
-import { getConnectionInfo } from '@/lib/instagram/config';
-import { InstagramError } from '@/lib/instagram/errors';
+import { getAccountInfo, isPublishableAccountType } from '@/lib/social/instagram/api';
+import { getConnectionInfo } from '@/lib/social/instagram/config';
+import { SocialPublishError } from '@/lib/social/errors';
 
 /**
  * La conexión de Instagram de la cuenta.  (admin+)
+ *
+ * `/api/social/connection/instagram`, con la red como segmento literal
+ * y no dinámico: conectar Instagram y conectar Facebook NO son el mismo
+ * trámite. Instagram se resuelve pegando un token; Facebook exige
+ * además elegir en cuál de las páginas que administra el usuario se va
+ * a publicar. Forzar dos flujos distintos en un handler genérico
+ * escondería esa diferencia en vez de resolverla.
  *
  * El token se PEGA, no se obtiene por un redirect de OAuth. Es el mismo
  * trato que ya recibe WhatsApp en este proyecto, y evita montar el
@@ -61,7 +68,7 @@ export async function POST(request: Request) {
       info = await getAccountInfo({ accessToken });
     } catch (err) {
       const message =
-        err instanceof InstagramError
+        err instanceof SocialPublishError
           ? err.message
           : 'No se pudo verificar la cuenta de Instagram';
       return NextResponse.json({ error: message }, { status: 400 });
@@ -89,7 +96,7 @@ export async function POST(request: Request) {
       { onConflict: 'account_id' }
     );
     if (error) {
-      console.error('[instagram/connection POST] error:', error);
+      console.error('[social/connection/instagram POST] error:', error);
       return NextResponse.json(
         { error: 'No se pudo guardar la conexión' },
         { status: 500 }
@@ -119,7 +126,7 @@ export async function DELETE() {
       .delete()
       .eq('account_id', accountId);
     if (error) {
-      console.error('[instagram/connection DELETE] error:', error);
+      console.error('[social/connection/instagram DELETE] error:', error);
       return NextResponse.json(
         { error: 'No se pudo desconectar la cuenta' },
         { status: 500 }

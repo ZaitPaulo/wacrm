@@ -5,25 +5,26 @@ import {
   rateLimitResponse,
   RATE_LIMITS,
 } from '@/lib/rate-limit';
-import {
-  approveAndPublish,
-  type PublishOutcome,
-} from '@/lib/instagram/publish';
+import { approveAndPublish, type PublishOutcome } from '@/lib/social/publish';
+import type { SocialNetwork } from '@/lib/social/networks';
 
 type Params = { params: Promise<{ id: string }> };
 
 /**
- * POST /api/instagram/queue/[id]/approve  (admin+)
+ * POST /api/social/queue/[id]/approve  (admin+)
  *
- * ESTE ES EL ÚNICO CAMINO por el que algo sale a Instagram, y lo
- * dispara una persona. No hay cron, automatización ni regla que llegue
- * hasta acá.
+ * ESTE ES EL ÚNICO CAMINO por el que algo sale a una red, y lo dispara
+ * una persona. No hay cron, automatización ni regla que llegue hasta
+ * acá.
+ *
+ * Aprueba UNA publicación: la de la red de esta fila. La del mismo
+ * vehículo en la otra red es otra fila y otra decisión (decisión 1).
  */
 export async function POST(_request: Request, { params }: Params) {
   try {
     const { supabase, accountId, userId } = await requireRole('admin');
     const limit = checkRateLimit(
-      `ig-publish:${userId}`,
+      `social-publish:${userId}`,
       RATE_LIMITS.adminAction
     );
     if (!limit.success) return rateLimitResponse(limit);
@@ -40,6 +41,24 @@ export async function POST(_request: Request, { params }: Params) {
   } catch (err) {
     return toErrorResponse(err);
   }
+}
+
+/**
+ * El nombre de la red como lo lee una persona.
+ *
+ * TODO MENSAJE DE ERROR LA NOMBRA. Con dos conexiones activas, "vuelve
+ * a conectar la cuenta" es ambiguo: manda a tocar la que funcionaba, y
+ * quien intenta arreglar Facebook termina rompiendo Instagram.
+ */
+function label(network: SocialNetwork): string {
+  return network === 'facebook' ? 'Facebook' : 'Instagram';
+}
+
+/** Dónde se arregla la conexión de cada red, dicho tal cual se ve. */
+function connectionHint(network: SocialNetwork): string {
+  return network === 'facebook'
+    ? 'la página de Facebook en Ajustes'
+    : 'la cuenta de Instagram en Ajustes';
 }
 
 /**
@@ -69,11 +88,18 @@ function respond(outcome: PublishOutcome) {
         { status: 409 }
       );
 
+    case 'unknown_network':
+      return NextResponse.json(
+        {
+          error: `Esa publicación va a "${outcome.network}", una red que el sistema ya no maneja. Descártala.`,
+        },
+        { status: 409 }
+      );
+
     case 'no_connection':
       return NextResponse.json(
         {
-          error:
-            'No hay una cuenta de Instagram conectada. Conéctala en Ajustes antes de publicar.',
+          error: `No hay ${connectionHint(outcome.network)} conectada. Conéctala antes de publicar.`,
         },
         { status: 409 }
       );
@@ -81,8 +107,7 @@ function respond(outcome: PublishOutcome) {
     case 'quota_exhausted':
       return NextResponse.json(
         {
-          error:
-            'Se alcanzó el tope de publicaciones que Instagram permite en el periodo. La publicación sigue pendiente; vuelve a intentarlo más tarde.',
+          error: `Se alcanzó el tope de publicaciones que ${label(outcome.network)} permite en el periodo. La publicación sigue pendiente; vuelve a intentarlo más tarde.`,
         },
         { status: 429 }
       );
@@ -90,8 +115,7 @@ function respond(outcome: PublishOutcome) {
     case 'quota_unknown':
       return NextResponse.json(
         {
-          error:
-            'No se pudo verificar cuántas publicaciones quedan disponibles. No se publicó nada; inténtalo de nuevo en un momento.',
+          error: `No se pudo verificar cuántas publicaciones quedan disponibles en ${label(outcome.network)}. No se publicó nada; inténtalo de nuevo en un momento.`,
         },
         { status: 503 }
       );
@@ -117,8 +141,7 @@ function respond(outcome: PublishOutcome) {
     case 'needs_review':
       return NextResponse.json(
         {
-          error:
-            'Se perdió la respuesta de Instagram y no sabemos si la publicación salió. Revísalo en Instagram antes de volver a intentarlo — el sistema no reintenta solo para no publicar dos veces.',
+          error: `Se perdió la respuesta de ${label(outcome.network)} y no sabemos si la publicación salió. Revísalo en ${label(outcome.network)} antes de volver a intentarlo — el sistema no reintenta solo para no publicar dos veces.`,
         },
         { status: 502 }
       );
@@ -128,8 +151,8 @@ function respond(outcome: PublishOutcome) {
         {
           error:
             outcome.kind === 'credentials'
-              ? 'Instagram rechazó las credenciales. Vuelve a conectar la cuenta en Ajustes.'
-              : `Instagram rechazó la publicación: ${outcome.reason}`,
+              ? `${label(outcome.network)} rechazó las credenciales. Vuelve a conectar ${connectionHint(outcome.network)}.`
+              : `${label(outcome.network)} rechazó la publicación: ${outcome.reason}`,
         },
         { status: 502 }
       );
