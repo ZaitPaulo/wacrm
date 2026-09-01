@@ -1,10 +1,10 @@
 ## 1. Meta — arranca primero porque es calendario ajeno
 
-- [ ] 1.1 Verificar que el usuario de Meta del negocio figure como administrador de la página de Facebook de LoraMotors
-- [ ] 1.2 Confirmar contra la documentación vigente de Meta los permisos exactos que exige publicar en una página (hoy `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`) y anotar la fecha de verificación
-- [ ] 1.3 Agregar el producto Facebook Login al registro de la app en el panel de Meta
-- [ ] 1.4 Enviar los permisos a App Review con el caso de uso y el vídeo de demostración
-- [ ] 1.5 Obtener un token de prueba con la página del desarrollador, para no depender de la aprobación durante el desarrollo
+- [x] 1.1 Verificar que el usuario de Meta del negocio figure como administrador de la página de Facebook de LoraMotors — página `112969648369416`, confirmada porque `/me/accounts` la devuelve con token de publicación
+- [x] 1.2 Confirmar contra la documentación vigente de Meta los permisos exactos que exige publicar en una página — `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, verificados el 2026-09-01
+- [x] 1.3 Agregar el producto Facebook Login al registro de la app en el panel de Meta — resuelto agregando el caso de uso de páginas en la consola nueva, que es como se habilitan hoy esos permisos
+- [x] 1.4 ~~Enviar los permisos a App Review~~ **NO HACE FALTA.** El acceso estándar se aprueba solo y alcanza para los usuarios con un rol en la app; App Review es para el acceso avanzado, que sirve para actuar sobre páginas de terceros. Acá el CRM publica en la página del propio negocio y quien conecta es administrador de la app y de la página. Verificado el 2026-09-01: los tres permisos salieron `granted` sin revisión
+- [x] 1.5 Obtener un token de prueba — quedó mejor que eso: token real de la página de producción, sin vencimiento (`debug_token` informa `expires_at` nulo)
 
 ## 2. Refactorización a `src/lib/social/` — completa y verde antes de escribir nada de Facebook
 
