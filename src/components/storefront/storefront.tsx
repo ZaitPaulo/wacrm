@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { WhatsAppIcon } from './whatsapp-icon';
+import { ShareVehicleButton } from './share-vehicle-button';
 import type { ShowcaseVehicle } from '@/lib/showcase/format';
 import {
   whatsappHref,
@@ -85,10 +86,12 @@ function VehicleCard({
   v,
   whatsapp,
   currency,
+  baseUrl,
 }: {
   v: ShowcaseVehicle;
   whatsapp: string | null;
   currency: string;
+  baseUrl: string;
 }) {
   const t = useTranslations('Inventory');
   const s = useTranslations('Storefront');
@@ -155,17 +158,20 @@ function VehicleCard({
           <div className="text-2xl font-bold tabular-nums text-[#0d1c32]">
             {formatPrice(v.price, currency)}
           </div>
-          {whatsapp ? (
-            <a
-              href={whatsappHref(whatsapp, v)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="relative z-20 flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#20b358]"
-            >
-              <WhatsAppIcon className="size-[18px]" />
-              {s('interested')}
-            </a>
-          ) : null}
+          <div className="flex gap-2">
+            {whatsapp ? (
+              <a
+                href={whatsappHref(whatsapp, v)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative z-20 flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#20b358]"
+              >
+                <WhatsAppIcon className="size-[18px]" />
+                {s('interested')}
+              </a>
+            ) : null}
+            <ShareVehicleButton vehicle={v} currency={currency} baseUrl={baseUrl} />
+          </div>
         </div>
       </div>
 
@@ -186,12 +192,15 @@ export function Storefront({
   whatsapp,
   heroImage,
   currency,
+  baseUrl,
 }: {
   vehicles: ShowcaseVehicle[];
   whatsapp: string | null;
   heroImage: string | null;
   /** Moneda de la cuenta, para los precios y los tramos de presupuesto. */
   currency: string;
+  /** URL pública del sitio; el botón de compartir arma el link con ella. */
+  baseUrl: string;
 }) {
   const t = useTranslations('Inventory');
   const s = useTranslations('Storefront');
@@ -466,6 +475,7 @@ export function Storefront({
                       v={v}
                       whatsapp={whatsapp}
                       currency={currency}
+                      baseUrl={baseUrl}
                     />
                   ))}
                 </div>

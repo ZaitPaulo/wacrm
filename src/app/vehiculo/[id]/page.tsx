@@ -19,6 +19,7 @@ import {
   CONDITIONS,
 } from '@/lib/inventory/specs'
 import { formatRefTag } from '@/lib/inventory/public-ref'
+import { ShareVehicleButton } from '@/components/storefront/share-vehicle-button'
 import { Gallery } from '@/components/storefront/gallery'
 import { StoreNav } from '@/components/storefront/store-nav'
 import { StoreFooter } from '@/components/storefront/footer'
@@ -191,30 +192,41 @@ export default async function VehiclePage({ params }: Params) {
               <Stat label={s('condition')} value={labelOf(t, CONDITIONS, v.condition)} />
             </div>
 
-            {/* Acciones */}
-            {account.public_whatsapp && (
-              <div className="mt-2 flex flex-col gap-3">
-                <a
-                  href={whatsappHref(account.public_whatsapp, v)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-6 py-4 text-sm font-semibold uppercase tracking-wide text-white shadow-sm transition-colors hover:bg-[#20b358]"
-                >
-                  <WhatsAppIcon className="size-5" />
-                  {s('interested')}
-                </a>
-                {testDriveHref && (
+            {/* Acciones. Compartir queda fuera del condicional: no
+                necesita el número del negocio, sólo el link de la ficha,
+                así que sigue sirviendo aunque el WhatsApp no esté
+                configurado todavía. */}
+            <div className="mt-2 flex flex-col gap-3">
+              {account.public_whatsapp && (
+                <>
                   <a
-                    href={testDriveHref}
+                    href={whatsappHref(account.public_whatsapp, v)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-black px-6 py-4 text-sm font-semibold uppercase tracking-wide text-black transition-colors hover:bg-[#f2f4f6]"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-6 py-4 text-sm font-semibold uppercase tracking-wide text-white shadow-sm transition-colors hover:bg-[#20b358]"
                   >
-                    {s('bookTestDrive')}
+                    <WhatsAppIcon className="size-5" />
+                    {s('interested')}
                   </a>
-                )}
-              </div>
-            )}
+                  {testDriveHref && (
+                    <a
+                      href={testDriveHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-black px-6 py-4 text-sm font-semibold uppercase tracking-wide text-black transition-colors hover:bg-[#f2f4f6]"
+                    >
+                      {s('bookTestDrive')}
+                    </a>
+                  )}
+                </>
+              )}
+              <ShareVehicleButton
+                vehicle={v}
+                currency={account.default_currency}
+                baseUrl={base}
+                variant="detail"
+              />
+            </div>
           </div>
         </div>
 

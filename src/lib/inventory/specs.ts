@@ -50,7 +50,7 @@ export const CONDITIONS: SpecOption[] = [
 
 /** Traductor del namespace `Inventory`, en la forma que devuelven tanto
  *  `useTranslations` como `getTranslations`. */
-type SpecTranslator = (key: string) => string
+export type SpecTranslator = (key: string) => string
 
 /**
  * Etiqueta traducida de un valor. Devuelve el guion largo si el valor es

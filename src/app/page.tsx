@@ -121,6 +121,7 @@ export default async function StorefrontPage() {
           whatsapp={account.public_whatsapp}
           heroImage={heroImage}
           currency={account.default_currency}
+          baseUrl={base}
         />
       </main>
 

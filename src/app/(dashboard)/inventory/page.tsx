@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLinkItem,
 } from '@/components/ui/dropdown-menu';
 import {
   Select,
@@ -42,6 +43,7 @@ import {
   Car,
   Plus,
   Pencil,
+  Share2,
   Trash2,
   Loader2,
   MoreHorizontal,
@@ -55,6 +57,7 @@ import { useCan } from '@/hooks/use-can';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { formatPrice, formatNumber } from '@/lib/showcase/format';
+import { useVehicleShare } from '@/hooks/use-vehicle-share';
 import { useTranslations } from 'next-intl';
 import {
   TRANSMISSIONS,
@@ -87,6 +90,56 @@ const STATUS_META: Record<
   sold: { variant: 'outline' },
   hidden: { variant: 'secondary' },
 };
+
+/**
+ * Ítem "Compartir por WhatsApp" del menú de acciones.
+ *
+ * Es un componente aparte porque necesita el hook de compartir, y
+ * tenerlo acá evita llamarlo una vez por fila desde la tabla.
+ *
+ * Sólo los vehículos `available` viven en la vitrina pública
+ * (`getShowcaseVehicle` filtra por estado), así que compartir uno
+ * vendido u oculto mandaría al cliente a un 404. Por eso el ítem se
+ * deshabilita en vez de generar un link roto.
+ */
+function ShareVehicleItem({
+  vehicle,
+  currency,
+}: {
+  vehicle: InventoryVehicle;
+  currency: string;
+}) {
+  const t = useTranslations('Inventory');
+  const { shareHref, copyLink } = useVehicleShare({ currency });
+
+  if (vehicle.status !== 'available') {
+    return (
+      <DropdownMenuItem
+        disabled
+        // Un ítem deshabilitado trae `pointer-events-none`, y sin
+        // eventos de mouse el navegador nunca muestra el `title` que
+        // explica por qué no se puede compartir. Se los devolvemos.
+        className="data-disabled:pointer-events-auto data-disabled:cursor-not-allowed"
+        title={t('actions.shareOnlyAvailable')}
+      >
+        <Share2 className="mr-2 h-4 w-4" />
+        {t('actions.share')}
+      </DropdownMenuItem>
+    );
+  }
+
+  return (
+    <DropdownMenuLinkItem
+      href={shareHref(vehicle)}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => copyLink(vehicle)}
+    >
+      <Share2 className="mr-2 h-4 w-4" />
+      {t('actions.share')}
+    </DropdownMenuLinkItem>
+  );
+}
 
 interface VehicleDraft {
   brand: string;
@@ -834,29 +887,36 @@ export default function InventoryPage() {
                       {t(`status.${v.status}`)}
                     </Badge>
                   </TableCell>
+                  {/* El menú ya no está detrás de `canEdit`: compartir
+                      es una acción de sólo lectura y un rol viewer
+                      también necesita pasarle la ficha a un cliente.
+                      Editar y eliminar siguen gateadas. */}
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    {canEdit && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              disabled={deletingId === v.id}
-                            />
-                          }
-                        >
-                          {deletingId === v.id ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <MoreHorizontal className="size-4" />
-                          )}
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            disabled={deletingId === v.id}
+                          />
+                        }
+                      >
+                        {deletingId === v.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <MoreHorizontal className="size-4" />
+                        )}
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {canEdit && (
                           <DropdownMenuItem onClick={() => openEdit(v)}>
                             <Pencil className="mr-2 h-4 w-4" />
                             {t('actions.edit')}
                           </DropdownMenuItem>
+                        )}
+                        <ShareVehicleItem vehicle={v} currency={currency} />
+                        {canEdit && (
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => remove(v)}
@@ -864,9 +924,9 @@ export default function InventoryPage() {
                             <Trash2 className="mr-2 h-4 w-4" />
                             {t('actions.delete')}
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

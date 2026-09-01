@@ -2098,7 +2098,9 @@
     },
     "actions": {
       "edit": "Editar",
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "share": "Compartir por WhatsApp",
+      "shareOnlyAvailable": "Solo se pueden compartir vehículos disponibles"
     },
     "dialog": {
       "editTitle": "Editar vehículo",
@@ -2391,7 +2393,8 @@
     "checkEmailDesc": "Te enviamos un enlace a {email}. Revisa tu bandeja y sigue el enlace para poner una contraseña nueva."
   },
   "Common": {
-    "readOnly": "Solo lectura — tu rol no puede {reason}"
+    "readOnly": "Solo lectura — tu rol no puede {reason}",
+    "linkCopied": "Link copiado"
   },
   "Interactive": {
     "previewPlaceholder": "Cuerpo del mensaje…",
@@ -2426,6 +2429,7 @@
     "year": "Año",
     "mileage": "Kilometraje",
     "interested": "Me interesa",
+    "shareOnWhatsApp": "Compartir por WhatsApp",
     "filters": "Filtros",
     "brand": "Marca",
     "model": "Modelo",
