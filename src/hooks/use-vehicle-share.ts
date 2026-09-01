@@ -36,10 +36,28 @@ interface Options {
   baseUrl?: string;
 }
 
+/**
+ * Devuelve las dos piezas del botón de compartir: el enlace que abre
+ * WhatsApp con la ficha redactada (`shareHref`) y el manejador que copia
+ * el link al portapapeles (`copyLink`).
+ *
+ * Van juntas y no en un componente porque cada pantalla pinta su propio
+ * botón: la vitrina con su paleta propia, el CRM con los tokens del
+ * tema. Lo único que tienen que compartir es el mensaje.
+ *
+ * Ambas reciben el vehículo por parámetro en vez de fijarlo en el hook,
+ * para que una tabla de 136 filas llame al hook una vez y no una por
+ * fila.
+ *
+ * Uso:
+ *   const { shareHref, copyLink } = useVehicleShare({ currency });
+ *   <a href={shareHref(v)} onClick={() => copyLink(v)} target="_blank">
+ */
 export function useVehicleShare({ currency, baseUrl }: Options) {
   const t = useTranslations('Inventory');
   const c = useTranslations('Common');
 
+  /** URL pública de la ficha del vehículo. Base explícita si la hay. */
   const linkOf = useCallback(
     (vehicle: ShareableVehicle) =>
       vehicleShareUrl(baseUrl || publicBaseUrl(), vehicle.id),

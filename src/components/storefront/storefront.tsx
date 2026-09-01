@@ -91,6 +91,7 @@ function VehicleCard({
   v: ShowcaseVehicle;
   whatsapp: string | null;
   currency: string;
+  /** Base pública del sitio; con ella el botón de compartir arma el link. */
   baseUrl: string;
 }) {
   const t = useTranslations('Inventory');

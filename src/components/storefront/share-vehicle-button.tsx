@@ -17,10 +17,17 @@ export function ShareVehicleButton({
   baseUrl,
   variant = 'card',
 }: {
+  /** Vehículo que se comparte; de él sale el texto del mensaje. */
   vehicle: ShareableVehicle;
+  /** Moneda de la cuenta, para el precio del mensaje. */
   currency: string;
   /** Base pública del sitio, calculada en el servidor. Ver el hook. */
   baseUrl: string;
+  /**
+   * `card` = cuadrado con sólo el ícono, para ir al lado del CTA verde
+   * de la tarjeta. `detail` = ancho completo con texto, para la columna
+   * de acciones de la ficha.
+   */
   variant?: 'card' | 'detail';
 }) {
   const s = useTranslations('Storefront');
