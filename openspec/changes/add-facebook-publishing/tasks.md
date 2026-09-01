@@ -23,24 +23,24 @@
 
 ## 3. Base de datos
 
-- [ ] 3.1 Escribir la migración 513: tabla `facebook_config` (una por cuenta, `page_id`, token cifrado, `token_expires_at`, `status`, RLS de `admin`) con el mismo trato que `instagram_config`
-- [ ] 3.2 En la misma migración, ampliar el `CHECK` de `social_posts.network` a `('instagram', 'facebook')`
-- [ ] 3.3 Verificar que la migración es idempotente y que no modifica ninguna fila existente
+- [x] 3.1 Escribir la migración 513: tabla `facebook_config` (una por cuenta, `page_id`, token cifrado, `token_expires_at`, `status`, RLS de `admin`) con el mismo trato que `instagram_config`
+- [x] 3.2 En la misma migración, ampliar el `CHECK` de `social_posts.network` a `('instagram', 'facebook')`
+- [x] 3.3 Verificar que la migración es idempotente y que no modifica ninguna fila existente
 - [ ] 3.4 Aplicar la migración en el VPS de desarrollo y comprobar que la cola de Instagram sigue funcionando igual
 
 ## 4. Cliente de Facebook
 
-- [ ] 4.1 Escribir `social/facebook/limits.ts` con los límites de la red (máximo de fotos, máximo de caracteres) y la fecha de verificación contra la documentación
-- [ ] 4.2 Implementar `getPageInfo` y el listado de páginas administradas (`/me/accounts`), devolviendo también el token de cada página
-- [ ] 4.3 Implementar la publicación de una sola foto (`POST /{page-id}/photos` con `url` y `caption`)
-- [ ] 4.4 Implementar la publicación de varias fotos: subir cada una con `published=false` y agrupar en `POST /{page-id}/feed` con `attached_media`
-- [ ] 4.5 Clasificar los errores de Facebook en credenciales o contenido, y marcar el `step` que distingue "no se publicó nada" de "puede haberse publicado"
-- [ ] 4.6 Escribir las pruebas del cliente contra dobles, cubriendo el camino de una foto, el de varias y cada clasificación de error
-- [ ] 4.7 Registrar Facebook en `social/networks.ts`, declarando que no expone tope por periodo
+- [x] 4.1 Escribir `social/facebook/limits.ts` con los límites de la red (máximo de fotos, máximo de caracteres) y la fecha de verificación contra la documentación
+- [x] 4.2 Implementar `getPageInfo` y el listado de páginas administradas (`/me/accounts`), devolviendo también el token de cada página
+- [x] 4.3 Implementar la publicación de una sola foto (`POST /{page-id}/photos` con `url` y `caption`)
+- [x] 4.4 Implementar la publicación de varias fotos: subir cada una con `published=false` y agrupar en `POST /{page-id}/feed` con `attached_media`
+- [x] 4.5 Clasificar los errores de Facebook en credenciales o contenido, y marcar el `step` que distingue "no se publicó nada" de "puede haberse publicado"
+- [x] 4.6 Escribir las pruebas del cliente contra dobles, cubriendo el camino de una foto, el de varias y cada clasificación de error
+- [x] 4.7 Registrar Facebook en `social/networks.ts`, declarando que no expone tope por periodo
 
 ## 5. Conexión de la página
 
-- [ ] 5.1 Crear `social/facebook/config.ts` con la carga y descifrado de la conexión, siguiendo `loadInstagramConfig`
+- [x] 5.1 Crear `social/facebook/config.ts` con la carga y descifrado de la conexión, siguiendo `loadInstagramConfig`
 - [ ] 5.2 Implementar la ruta de conexión: recibir el token de usuario, listar las páginas administradas y devolverlas sin guardar nada
 - [ ] 5.3 Implementar el guardado: recibir la página elegida, guardar cifrado el token **de esa página** y su vencimiento
 - [ ] 5.4 Implementar el GET de estado y el DELETE de desconexión, sin exponer nunca el token
@@ -61,9 +61,9 @@
 
 ## 7. Publicación y aprobación
 
-- [ ] 7.1 Hacer que `approveAndPublish` resuelva la configuración y el cliente por la `network` de la fila
-- [ ] 7.2 Saltear la verificación de tope en Facebook y no mostrar margen para esa red en la cola
-- [ ] 7.3 Hacer que todo mensaje de fallo de credenciales nombre la red y apunte a la conexión correcta en Ajustes
+- [x] 7.1 Hacer que `approveAndPublish` resuelva la configuración y el cliente por la `network` de la fila
+- [x] 7.2 Saltear la verificación de tope en Facebook y no mostrar margen para esa red en la cola
+- [x] 7.3 Hacer que todo mensaje de fallo de credenciales nombre la red y apunte a la conexión correcta en Ajustes
 - [ ] 7.4 Verificar que el candado, la revalidación del vehículo y el paso a `needs_review` funcionan igual en Facebook
 - [ ] 7.5 Escribir las pruebas de publicación en Facebook: éxito, fallo de credenciales, fallo de contenido y desenlace desconocido
 - [ ] 7.6 Verificar que aprobar en una red no toca la fila de la otra

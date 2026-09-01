@@ -22,6 +22,9 @@ import type { NetworkLimits } from './limits';
 import { INSTAGRAM_LIMITS } from './instagram/limits';
 import { loadInstagramConfig } from './instagram/config';
 import { getPublishingLimit, publishImagePost } from './instagram/api';
+import { FACEBOOK_LIMITS } from './facebook/limits';
+import { loadFacebookConfig } from './facebook/config';
+import { publishPhotoPost } from './facebook/api';
 
 /**
  * El margen de publicaciones de una red en el periodo vigente.
@@ -129,14 +132,46 @@ const instagramAdapter: NetworkAdapter = {
 };
 
 /**
+ * Facebook.
+ *
+ * SIN `quota`, y no por olvido: la Graph API de páginas no expone nada
+ * equivalente a `content_publishing_limit`. Ponerle un tope inventado
+ * impediría aprobar sin motivo real, que es la dirección cara del error
+ * (decisión 8). Si Meta limita por volumen sin decirlo, se descubre por
+ * el rechazo y queda como fallo de contenido con su motivo.
+ */
+const facebookAdapter: NetworkAdapter = {
+  network: 'facebook',
+  limits: FACEBOOK_LIMITS,
+  async connect(db, accountId) {
+    const config = await loadFacebookConfig(db, accountId);
+    if (!config) return null;
+
+    const auth = {
+      pageId: config.pageId,
+      accessToken: config.accessToken,
+    };
+
+    return {
+      network: 'facebook',
+      // El nombre de la página, no su id: la cola tiene que poder decir
+      // a dónde va la publicación en términos que alguien reconozca.
+      displayName: config.pageName,
+      publish: ({ imageUrls, caption }) =>
+        publishPhotoPost({ ...auth, imageUrls, caption }),
+    };
+  },
+};
+
+/**
  * Las redes registradas, en el orden en que se muestran.
  *
  * Instagram primero porque es la que el negocio ya venía usando.
  */
 export const NETWORKS: Record<SocialNetwork, NetworkAdapter> = {
   instagram: instagramAdapter,
-  // facebook: se registra en el grupo 4 del change.
-} as Record<SocialNetwork, NetworkAdapter>;
+  facebook: facebookAdapter,
+};
 
 /** Las redes que existen, en orden. */
 export function allNetworks(): NetworkAdapter[] {
