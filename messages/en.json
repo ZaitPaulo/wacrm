@@ -40,7 +40,7 @@
     "menuProfile": "Profile",
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
-    "instagram": "Instagram",
+    "social": "Publishing",
     "pendingPosts": "{count} posts waiting for review"
   },
   "Header": {
@@ -1803,6 +1803,7 @@
       "members": "Team members",
       "api": "API keys",
       "instagram": "Instagram",
+      "facebook": "Facebook",
       "showcase": "Public showcase"
     },
     "groups": {
@@ -2075,6 +2076,49 @@
         "Press Connect. We check the account with Instagram before saving it."
       ],
       "expiryNote": "The token lasts 60 days. When it expires, publishing fails with a credentials notice: generate a new one and connect again."
+    },
+    "facebook": {
+      "title": "Facebook",
+      "description": "Connect the business Page so available vehicles are also prepared for publishing here.",
+      "loading": "Loading the connection…",
+      "connectedTo": "Publishing to",
+      "unknownPage": "Facebook Page",
+      "tokenLabel": "Access token",
+      "tokenPlaceholder": "Paste the Facebook access token",
+      "requirement": "It must be a token from a user who administers the Page. This is separate from Instagram: each network connects on its own.",
+      "listPages": "Show my Pages",
+      "pagesFailed": "Could not look up your Pages",
+      "choosePage": "Which Page publishes?",
+      "connect": "Connect",
+      "connected": "Facebook Page connected",
+      "connectFailed": "Could not connect the Page",
+      "disconnect": "Disconnect",
+      "disconnected": "Facebook Page disconnected",
+      "disconnectFailed": "Could not disconnect the Page",
+      "disconnectHint": "Disconnecting does not touch what is already published on Facebook, and does not affect Instagram. Pending posts for this network are withdrawn.",
+      "adminOnly": "Only an admin or the owner can change this connection.",
+      "setupTitle": "How to get the token",
+      "setupDesc": "Three steps in the Meta developer panel. It is in English even though the CRM is not.",
+      "step1": "Add Facebook Login to the app",
+      "step1Items": [
+        "Go to developers.facebook.com and open the same app you already use for Instagram.",
+        "Under \"Add product\", add \"Facebook Login\".",
+        "No new app is needed: the Instagram one works."
+      ],
+      "step2": "Request the Pages permissions",
+      "step2Items": [
+        "Under \"App review\", request pages_show_list, pages_read_engagement and pages_manage_posts.",
+        "Meta reviews these and it can take a while. Until approved they only work with the developer's own Page.",
+        "Check that your user is listed as an administrator of the business Page."
+      ],
+      "step3": "Generate the token and paste it here",
+      "step3Items": [
+        "In \"Graph API Explorer\", pick the app and generate a user token with those three permissions.",
+        "Copy it and paste it into the field on the left.",
+        "Press \"Show my Pages\": we list the ones you administer.",
+        "Pick the Page and press Connect. We store that Page's token, not yours."
+      ],
+      "reviewNote": "If connecting fails with a permissions error, it is almost always that Meta has not approved the three Pages permissions yet. The token itself may be perfectly fine."
     }
   },
   "Inventory": {
@@ -2495,19 +2539,18 @@
   "Handoff": {
     "customerNotice": "We have assigned a sales agent to you. They will be in touch very soon. 🙌"
   },
-  "InstagramQueue": {
-    "pageTitle": "Instagram queue",
-    "pageDesc": "Posts prepared from your available vehicles. Nothing is published until you approve it here.",
+  "SocialQueue": {
+    "pageTitle": "Publishing queue",
+    "pageDesc": "Posts prepared from your available vehicles. Nothing goes out until you approve it here.",
     "loading": "Loading the queue…",
-    "notConnected": "No Instagram account is connected. Connect one in Settings before publishing.",
-    "quota": "{remaining} of {total} posts left in this period",
-    "quotaUnknown": "Instagram did not report how many posts are left, so approving is on hold.",
+    "notConnected": "No network is connected. Connect Instagram or Facebook in Settings before publishing.",
+    "quota": "{network}: {remaining} of {total} posts left in this period",
+    "quotaUnknown": "{network} did not report how many posts are left, so approving is paused.",
     "pendingTitle": "Waiting for review ({count})",
     "noPending": "Nothing to review right now.",
     "historyTitle": "History",
     "vehicleGone": "Vehicle no longer exists",
     "vehicleNotAvailable": "This vehicle is no longer available, so it will not publish. Discard it or set the vehicle back to available.",
-    "alreadyPublished": "Already published on {date}",
     "firstImage": "Cover",
     "charsLeft": "{count} characters left",
     "saveText": "Save text",
@@ -2515,13 +2558,13 @@
     "saveFailed": "The text could not be saved",
     "saveBeforePublishing": "Save your changes before publishing",
     "publish": "Publish",
-    "published": "Published to Instagram",
+    "published": "Published on {network}",
     "publishFailed": "It could not be published",
     "discard": "Discard",
     "discarded": "Post discarded",
     "discardFailed": "It could not be discarded",
-    "failureCredentials": "Instagram rejected the credentials. Reconnect the account in Settings.",
-    "soldWithLivePost": "Sold — the post is still live on Instagram",
+    "failureCredentials": "{network} rejected the credentials. Reconnect that network in Settings.",
+    "soldWithLivePost": "Sold — the post is still live on {network}",
     "status": {
       "published": "Published",
       "discarded": "Discarded",
@@ -2531,7 +2574,14 @@
     },
     "rewrite": "Rewrite with AI",
     "rewritten": "Rewritten — review it before publishing",
-    "rewriteFailed": "The text could not be rewritten"
+    "rewriteFailed": "The text could not be rewritten",
+    "publishingTo": "Publishes to {target}",
+    "filterAll": "All networks",
+    "networkNames": {
+      "instagram": "Instagram",
+      "facebook": "Facebook"
+    },
+    "alreadyPublishedHere": "Already published on {network} on {date}"
   },
   "Brand": {
     "description": "WhatsApp CRM for vehicle dealerships."

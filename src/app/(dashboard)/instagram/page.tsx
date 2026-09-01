@@ -11,11 +11,19 @@ import { useAuth } from '@/hooks/use-auth';
 import { formatPrice } from '@/lib/showcase/format';
 
 /**
- * La cola de publicaciones de Instagram.
+ * La cola de publicaciones, de todas las redes.
  *
  * Acá se revisa lo que el sistema preparó y se decide qué sale. NADA
- * llega a Instagram sin que alguien apriete Publicar en esta pantalla:
- * el encolado solo deja borradores.
+ * llega a ninguna red sin que alguien apriete Publicar en esta
+ * pantalla: el encolado solo deja borradores.
+ *
+ * UN VEHÍCULO PUEDE APARECER DOS VECES, una por red, y son decisiones
+ * distintas: aprobar la de Instagram no publica en Facebook. Por eso
+ * cada tarjeta dice a dónde va y los estados nunca se colapsan en uno
+ * solo por vehículo — "salió en una y falló en la otra" tiene que
+ * poder verse.
+ *
+ * La URL sigue siendo /instagram para no romper enlaces guardados.
  *
  * Es de `admin` o superior — la RLS de `social_posts` ya lo impone, así
  * que un asesor que llegue por URL ve la cola vacía.
@@ -84,12 +92,14 @@ async function fetchQueue(): Promise<QueueResponse | null> {
   }
 }
 
-export default function InstagramQueuePage() {
-  const t = useTranslations('InstagramQueue');
+export default function SocialQueuePage() {
+  const t = useTranslations('SocialQueue');
   const { defaultCurrency } = useAuth();
 
   const [posts, setPosts] = useState<QueuePost[]>([]);
   const [networks, setNetworks] = useState<NetworkState[]>([]);
+  /** `null` = todas. Filtrar es lo que hace usable una cola del doble. */
+  const [filter, setFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -120,8 +130,9 @@ export default function InstagramQueuePage() {
     };
   }, [apply]);
 
-  const pending = posts.filter((p) => p.status === 'pending');
-  const history = posts.filter((p) => p.status !== 'pending');
+  const visible = filter ? posts.filter((p) => p.network === filter) : posts;
+  const pending = visible.filter((p) => p.status === 'pending');
+  const history = visible.filter((p) => p.status !== 'pending');
 
   // Conectado es "hay al menos una red". El estado de cada una se mira
   // por separado: una red caída no puede bloquear la aprobación de la
@@ -143,6 +154,10 @@ export default function InstagramQueuePage() {
     if (!net.reportsQuota) return true;
     return (net.quota?.remaining ?? 0) > 0;
   };
+
+  /** El nombre de la red como lo lee una persona. */
+  const nameOf = (network: string) =>
+    t.has(`networkNames.${network}`) ? t(`networkNames.${network}`) : network;
 
   if (loading) {
     return (
@@ -181,12 +196,30 @@ export default function InstagramQueuePage() {
           >
             {net.quota
               ? t('quota', {
+                  network: nameOf(net.network),
                   remaining: String(net.quota.remaining),
                   total: String(net.quota.total),
                 })
-              : t('quotaUnknown')}
+              : t('quotaUnknown', { network: nameOf(net.network) })}
           </div>
         ))}
+
+      {/* Filtro por red. Solo aparece con más de una conectada: con una
+          sola es un control que no filtra nada. */}
+      {networks.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {[null, ...networks.map((n) => n.network)].map((value) => (
+            <Button
+              key={value ?? 'all'}
+              size="sm"
+              variant={filter === value ? 'default' : 'outline'}
+              onClick={() => setFilter(value)}
+            >
+              {value === null ? t('filterAll') : nameOf(value)}
+            </Button>
+          ))}
+        </div>
+      )}
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">
@@ -203,6 +236,8 @@ export default function InstagramQueuePage() {
               currency={defaultCurrency ?? 'USD'}
               busy={busyId === post.id}
               captionMaxChars={networkOf(post)?.limits.captionMaxChars ?? 0}
+              networkName={nameOf(post.network)}
+              target={networkOf(post)?.displayName ?? null}
               canPublish={canPublish(post)}
               onBusy={setBusyId}
               onDone={load}
@@ -215,7 +250,11 @@ export default function InstagramQueuePage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">{t('historyTitle')}</h2>
           {history.map((post) => (
-            <HistoryRow key={post.id} post={post} />
+            <HistoryRow
+              key={post.id}
+              post={post}
+              networkName={nameOf(post.network)}
+            />
           ))}
         </section>
       )}
@@ -228,6 +267,8 @@ function PendingCard({
   currency,
   busy,
   captionMaxChars,
+  networkName,
+  target,
   canPublish,
   onBusy,
   onDone,
@@ -237,11 +278,15 @@ function PendingCard({
   busy: boolean;
   /** El de la red de ESTA publicación, nunca el de otra. */
   captionMaxChars: number;
+  /** Instagram, Facebook. */
+  networkName: string;
+  /** A dónde exactamente: `@usuario` o el nombre de la página. */
+  target: string | null;
   canPublish: boolean;
   onBusy: (id: string | null) => void;
   onDone: () => Promise<void>;
 }) {
-  const t = useTranslations('InstagramQueue');
+  const t = useTranslations('SocialQueue');
   const [caption, setCaption] = useState(
     post.edited_caption ?? post.proposed_caption
   );
@@ -310,7 +355,7 @@ function PendingCard({
         // arregla el problema; no se reescribe acá.
         toast.error(json.error ?? t('publishFailed'));
       } else {
-        toast.success(t('published'));
+        toast.success(t('published', { network: networkName }));
       }
       await onDone();
     } finally {
@@ -352,6 +397,19 @@ function PendingCard({
               {formatPrice(vehicle.price, currency)}
             </p>
           )}
+          {/* A DÓNDE VA, arriba del todo. El mismo vehículo puede tener
+              otra tarjeta idéntica de la otra red justo al lado, y
+              aprobar la equivocada no se deshace. */}
+          <p className="text-muted-foreground mt-1 text-xs">
+            <span className="text-foreground border-border rounded-full border px-2 py-0.5 font-medium">
+              {networkName}
+            </span>
+            {target && (
+              <span className="ml-2">
+                {t('publishingTo', { target })}
+              </span>
+            )}
+          </p>
         </div>
 
         {/* Un vehículo que ya se publicó antes no se bloquea: se avisa.
@@ -359,7 +417,8 @@ function PendingCard({
             no se distingue — quien decide necesita el dato a la vista. */}
         {post.previously_published_at && (
           <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs">
-            {t('alreadyPublished', {
+            {t('alreadyPublishedHere', {
+              network: networkName,
               date: new Date(post.previously_published_at).toLocaleDateString(),
             })}
           </span>
@@ -459,8 +518,14 @@ function PendingCard({
  * esta fila lo señala para que alguien decida qué hacer con el aviso —
  * dejarlo como prueba social o retirarlo a mano.
  */
-function HistoryRow({ post }: { post: QueuePost }) {
-  const t = useTranslations('InstagramQueue');
+function HistoryRow({
+  post,
+  networkName,
+}: {
+  post: QueuePost;
+  networkName: string;
+}) {
+  const t = useTranslations('SocialQueue');
   const vehicle = post.vehicle;
   const soldWithLivePost =
     post.status === 'published' && vehicle?.status === 'sold';
@@ -473,13 +538,16 @@ function HistoryRow({ post }: { post: QueuePost }) {
             ? `${vehicle.brand} ${vehicle.model} ${vehicle.year}`
             : t('vehicleGone')}
         </span>
+        {/* La red va junto al estado y no en otra columna: dos filas del
+            mismo vehículo con distinto desenlace tienen que poder
+            leerse de un vistazo sin cruzar la mirada. */}
         <span className="text-muted-foreground ml-2">
-          {t(`status.${post.status}`)}
+          {networkName} · {t(`status.${post.status}`)}
         </span>
         {post.failure_reason && (
           <p className="text-muted-foreground">
             {post.failure_kind === 'credentials'
-              ? t('failureCredentials')
+              ? t('failureCredentials', { network: networkName })
               : post.failure_reason}
           </p>
         )}
@@ -487,7 +555,7 @@ function HistoryRow({ post }: { post: QueuePost }) {
 
       {soldWithLivePost && (
         <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs">
-          {t('soldWithLivePost')}
+          {t('soldWithLivePost', { network: networkName })}
         </span>
       )}
     </div>

@@ -46,7 +46,7 @@ app lo alcance por la red interna de Docker.**
 - El navegador habla **directo** con Supabase. `src/lib/supabase/client.ts`
   corre en el cliente, y el WebSocket de Realtime también.
 - Meta **descarga** las fotos de los vehículos desde las URLs públicas de
-  Storage para publicarlas en Instagram (`src/lib/instagram/images.ts`).
+  Storage para publicarlas en Instagram y Facebook (`src/lib/social/images.ts`).
 
 ---
 
@@ -402,7 +402,7 @@ sudo ss -tlnp | grep -E ':(5432|8000|3000)\s'
 
 Autoalojar mueve los datos a tu servidor, no elimina toda dependencia externa:
 
-- **Graph API de Meta** — WhatsApp e Instagram no se pueden autoalojar.
+- **Graph API de Meta** — WhatsApp, Instagram y Facebook no se pueden autoalojar.
 - **Proveedores de IA** — opcionales, y ya son *bring-your-own-key* por cuenta.
 - **DNS y Let's Encrypt** — el certificado se renueva solo, pero necesita que el
   dominio siga resolviendo a esta IP.

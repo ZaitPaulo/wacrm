@@ -16,7 +16,7 @@ import {
   Crown,
   FileText,
   GitBranch,
-  Camera,
+  Megaphone,
   LayoutDashboard,
   LogOut,
   MessageSquare,
@@ -106,7 +106,10 @@ const navItems: NavItem[] = [
   { href: "/notifications", labelKey: "notifications", icon: Bell },
   { href: "/contacts", labelKey: "contacts", icon: Users },
   { href: "/inventory", labelKey: "inventory", icon: Car },
-  { href: "/instagram", labelKey: "instagram", icon: Camera, adminOnly: true },
+  // La URL sigue siendo /instagram para no romper enlaces guardados,
+  // pero la cola ya no es de una sola red: el rótulo no puede nombrar
+  // a Instagram mientras lista publicaciones de Facebook.
+  { href: "/instagram", labelKey: "social", icon: Megaphone, adminOnly: true },
   { href: "/documents", labelKey: "documents", icon: FileText },
   { href: "/pipelines", labelKey: "pipelines", icon: GitBranch },
   { href: "/broadcasts", labelKey: "broadcasts", icon: Radio },

@@ -108,9 +108,13 @@ const api = vi.hoisted(() => ({
 }));
 const configMod = vi.hoisted(() => ({ loadInstagramConfig: vi.fn() }));
 const imagesMod = vi.hoisted(() => ({ ensurePublishableImages: vi.fn() }));
+const fbApi = vi.hoisted(() => ({ publishPhotoPost: vi.fn() }));
+const fbConfigMod = vi.hoisted(() => ({ loadFacebookConfig: vi.fn() }));
 
 vi.mock('./instagram/api', () => api);
 vi.mock('./instagram/config', () => configMod);
+vi.mock('./facebook/api', () => fbApi);
+vi.mock('./facebook/config', () => fbConfigMod);
 vi.mock('./images', () => imagesMod);
 
 const { approveAndPublish } = await import('./publish');
@@ -198,7 +202,26 @@ beforeEach(() => {
     async ({ imageUrls }: { imageUrls: string[] }) => imageUrls
   );
   api.publishImagePost.mockResolvedValue('ig-post-999');
+
+  fbConfigMod.loadFacebookConfig.mockResolvedValue({
+    pageId: 'page-1',
+    accessToken: 'page-tok',
+    pageName: 'LoraMotors',
+    tokenExpiresAt: null,
+  });
+  fbApi.publishPhotoPost.mockResolvedValue('fb-post-777');
 });
+
+/** Una fila que va a Facebook, no a Instagram. */
+const FB_POST = {
+  id: 'post-1',
+  vehicle_id: 'veh-1',
+  network: 'facebook',
+  status: 'pending',
+  proposed_caption: 'propuesto',
+  edited_caption: null,
+  image_urls: ['https://cdn.example.com/a.jpg'],
+};
 
 const ARGS = { accountId: 'acct-1', postId: 'post-1', userId: 'user-1' };
 
@@ -450,5 +473,172 @@ describe('approveAndPublish — fallos', () => {
     expect(await approveAndPublish({ db, ...ARGS })).toMatchObject({
       status: 'failed',
     });
+  });
+});
+
+
+// ============================================================
+// La misma mecánica, con una fila de Facebook.
+//
+// Lo que se prueba acá no es el cliente de Facebook —eso vive en
+// facebook/api.test.ts— sino que aprobar resuelva la red DESDE LA FILA:
+// mismo candado, misma revalidación, mismo trato del desenlace
+// desconocido, y sin tocar Instagram por el camino.
+// ============================================================
+describe('approveAndPublish — Facebook', () => {
+  it('publica por el cliente de Facebook y guarda su identificador', async () => {
+    const { db, written } = fakeDb({ post: FB_POST });
+
+    const out = await approveAndPublish({ db, ...ARGS });
+
+    expect(out).toEqual({ status: 'published', externalPostId: 'fb-post-777' });
+    expect(fbApi.publishPhotoPost).toHaveBeenCalledTimes(1);
+    // Instagram no se toca: son publicaciones independientes.
+    expect(api.publishImagePost).not.toHaveBeenCalled();
+
+    const published = written.find((w) => w.update?.status === 'published');
+    expect(published?.update?.external_post_id).toBe('fb-post-777');
+  });
+
+  it('NO consulta el tope: Facebook no informa ninguno', async () => {
+    // Consultarlo con el endpoint de Instagram devolvería el margen de
+    // la otra red, y bloquearía aprobar acá cuando aquella se agote.
+    const { db } = fakeDb({ post: FB_POST });
+    await approveAndPublish({ db, ...ARGS });
+
+    expect(api.getPublishingLimit).not.toHaveBeenCalled();
+  });
+
+  it('publica aunque Instagram haya agotado su tope', async () => {
+    // La consecuencia observable de lo anterior, y la garantía de que
+    // las redes no se arrastran: el tope de una no frena a la otra.
+    api.getPublishingLimit.mockResolvedValue({
+      used: 50,
+      total: 50,
+      durationSeconds: 86400,
+      remaining: 0,
+    });
+    const { db } = fakeDb({ post: FB_POST });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toMatchObject({
+      status: 'published',
+    });
+  });
+
+  it('no publica sin página conectada, y lo dice de Facebook', async () => {
+    fbConfigMod.loadFacebookConfig.mockResolvedValue(null);
+    const { db } = fakeDb({ post: FB_POST });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toEqual({
+      status: 'no_connection',
+      network: 'facebook',
+    });
+  });
+
+  it('sigue publicando en Facebook aunque Instagram esté desconectado', async () => {
+    configMod.loadInstagramConfig.mockResolvedValue(null);
+    const { db } = fakeDb({ post: FB_POST });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toMatchObject({
+      status: 'published',
+    });
+  });
+
+  it('registra un token de página vencido como credenciales de Facebook', async () => {
+    fbApi.publishPhotoPost.mockRejectedValue(
+      new SocialPublishError('Error validating access token', 'credentials')
+    );
+    const { db, written } = fakeDb({ post: FB_POST });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toMatchObject({
+      status: 'failed',
+      kind: 'credentials',
+      network: 'facebook',
+    });
+    const row = written.find((w) => w.update?.status === 'failed');
+    expect(row?.update?.failure_kind).toBe('credentials');
+  });
+
+  it('registra una foto rechazada como problema de contenido', async () => {
+    fbApi.publishPhotoPost.mockRejectedValue(
+      new SocialPublishError('Could not fetch the image', 'content')
+    );
+    const { db } = fakeDb({ post: FB_POST });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toMatchObject({
+      status: 'failed',
+      kind: 'content',
+      network: 'facebook',
+    });
+  });
+
+  it('manda a revisión manual cuando NO SE SABE si la entrada salió', async () => {
+    // La creación de la entrada de /feed se fue y no volvió nada. Una
+    // entrada de página se puede borrar por API, pero borrar no
+    // deshace: quien la vio, la vio. Así que no se reintenta.
+    fbApi.publishPhotoPost.mockRejectedValue(
+      new SocialPublishError('Facebook no respondió (publish)', 'content', {
+        answered: false,
+        step: 'publish',
+      })
+    );
+    const { db, written } = fakeDb({ post: FB_POST });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toMatchObject({
+      status: 'needs_review',
+      network: 'facebook',
+    });
+    expect(written.some((w) => w.update?.status === 'failed')).toBe(false);
+  });
+
+  it('marca fallida, no a revisión, si se cayó subiendo fotos sin publicar', async () => {
+    // Una foto con published=false no la vio nadie: reintentar no puede
+    // duplicar nada.
+    fbApi.publishPhotoPost.mockRejectedValue(
+      new SocialPublishError('Facebook no respondió (container)', 'content', {
+        answered: false,
+        step: 'container',
+      })
+    );
+    const { db } = fakeDb({ post: FB_POST });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toMatchObject({
+      status: 'failed',
+    });
+  });
+
+  it('revalida el vehículo igual que en Instagram', async () => {
+    const { db } = fakeDb({
+      post: FB_POST,
+      vehicle: { id: 'veh-1', status: 'sold' },
+    });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toEqual({
+      status: 'vehicle_unavailable',
+    });
+    expect(fbApi.publishPhotoPost).not.toHaveBeenCalled();
+  });
+
+  it('respeta el candado igual que en Instagram', async () => {
+    const { db } = fakeDb({ post: FB_POST, claimRows: [] });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toEqual({
+      status: 'locked',
+    });
+    expect(fbApi.publishPhotoPost).not.toHaveBeenCalled();
+  });
+});
+
+describe('una red que el sistema ya no maneja', () => {
+  it('no publica a ciegas con el cliente de otra red', async () => {
+    // Puede pasar volviendo atrás una versión que sí la manejaba.
+    const { db } = fakeDb({ post: { ...FB_POST, network: 'tiktok' } });
+
+    expect(await approveAndPublish({ db, ...ARGS })).toEqual({
+      status: 'unknown_network',
+      network: 'tiktok',
+    });
+    expect(api.publishImagePost).not.toHaveBeenCalled();
+    expect(fbApi.publishPhotoPost).not.toHaveBeenCalled();
   });
 });

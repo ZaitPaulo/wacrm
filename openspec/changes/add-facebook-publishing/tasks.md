@@ -41,51 +41,51 @@
 ## 5. Conexión de la página
 
 - [x] 5.1 Crear `social/facebook/config.ts` con la carga y descifrado de la conexión, siguiendo `loadInstagramConfig`
-- [ ] 5.2 Implementar la ruta de conexión: recibir el token de usuario, listar las páginas administradas y devolverlas sin guardar nada
-- [ ] 5.3 Implementar el guardado: recibir la página elegida, guardar cifrado el token **de esa página** y su vencimiento
-- [ ] 5.4 Implementar el GET de estado y el DELETE de desconexión, sin exponer nunca el token
-- [ ] 5.5 Rechazar la conexión cuando el token no da acceso a ninguna página, explicando el requisito
-- [ ] 5.6 Construir el panel de Ajustes de Facebook junto al de Instagram, con el paso de elegir página y preselección cuando hay una sola
-- [ ] 5.7 Mostrar el vencimiento de cada conexión por separado en Ajustes
-- [ ] 5.8 Agregar los textos a `messages/{es,en,ko}.json`
+- [x] 5.2 Implementar la ruta de conexión: recibir el token de usuario, listar las páginas administradas y devolverlas sin guardar nada
+- [x] 5.3 Implementar el guardado: recibir la página elegida, guardar cifrado el token **de esa página** y su vencimiento
+- [x] 5.4 Implementar el GET de estado y el DELETE de desconexión, sin exponer nunca el token
+- [x] 5.5 Rechazar la conexión cuando el token no da acceso a ninguna página, explicando el requisito
+- [x] 5.6 Construir el panel de Ajustes de Facebook junto al de Instagram, con el paso de elegir página y preselección cuando hay una sola
+- [x] 5.7 Mostrar el vencimiento de cada conexión por separado en Ajustes
+- [x] 5.8 Agregar los textos a `messages/{es,en,ko}.json`
 
 ## 6. Encolado y cola por red
 
-- [ ] 6.1 Hacer que `syncVehiclePost` recorra las redes conectadas de la cuenta y prepare un borrador por cada una
-- [ ] 6.2 Aislar el fallo de una red para que no impida preparar el borrador de la otra
-- [ ] 6.3 Hacer que `removePending` retire las pendientes de todas las redes cuando el vehículo deja de estar disponible
-- [ ] 6.4 Hacer que `refreshPendingCaptions` refresque las pendientes sin editar de todas las redes
-- [ ] 6.5 Calcular el antecedente de publicación por red, no por vehículo
-- [ ] 6.6 Verificar que conectar una red no encola retroactivamente el inventario ya cargado
-- [ ] 6.7 Escribir las pruebas del encolado con una red conectada, con dos, y con el fallo de una sola
+- [x] 6.1 Hacer que `syncVehiclePost` recorra las redes conectadas de la cuenta y prepare un borrador por cada una
+- [x] 6.2 Aislar el fallo de una red para que no impida preparar el borrador de la otra
+- [x] 6.3 Hacer que `removePending` retire las pendientes de todas las redes cuando el vehículo deja de estar disponible
+- [x] 6.4 Hacer que `refreshPendingCaptions` refresque las pendientes sin editar de todas las redes
+- [x] 6.5 Calcular el antecedente de publicación por red, no por vehículo
+- [x] 6.6 Verificar que conectar una red no encola retroactivamente el inventario ya cargado
+- [x] 6.7 Escribir las pruebas del encolado con una red conectada, con dos, y con el fallo de una sola
 
 ## 7. Publicación y aprobación
 
 - [x] 7.1 Hacer que `approveAndPublish` resuelva la configuración y el cliente por la `network` de la fila
 - [x] 7.2 Saltear la verificación de tope en Facebook y no mostrar margen para esa red en la cola
 - [x] 7.3 Hacer que todo mensaje de fallo de credenciales nombre la red y apunte a la conexión correcta en Ajustes
-- [ ] 7.4 Verificar que el candado, la revalidación del vehículo y el paso a `needs_review` funcionan igual en Facebook
-- [ ] 7.5 Escribir las pruebas de publicación en Facebook: éxito, fallo de credenciales, fallo de contenido y desenlace desconocido
-- [ ] 7.6 Verificar que aprobar en una red no toca la fila de la otra
+- [x] 7.4 Verificar que el candado, la revalidación del vehículo y el paso a `needs_review` funcionan igual en Facebook
+- [x] 7.5 Escribir las pruebas de publicación en Facebook: éxito, fallo de credenciales, fallo de contenido y desenlace desconocido
+- [x] 7.6 Verificar que aprobar en una red no toca la fila de la otra
 
 ## 8. Pantalla de la cola
 
-- [ ] 8.1 Mostrar la red de cada publicación de forma inequívoca en la tarjeta
-- [ ] 8.2 Agregar el filtro por red
-- [ ] 8.3 Mostrar estados distintos por red del mismo vehículo sin colapsarlos en uno solo
-- [ ] 8.4 Mostrar el tope solo para las redes que lo informan
-- [ ] 8.5 Mostrar en qué página de Facebook se va a publicar
-- [ ] 8.6 Aplicar los límites de la red correspondiente al editar el texto
-- [ ] 8.7 Nombrar las redes en el aviso de vehículo vendido con publicación viva
-- [ ] 8.8 Agregar los textos a `messages/{es,en,ko}.json`
+- [x] 8.1 Mostrar la red de cada publicación de forma inequívoca en la tarjeta
+- [x] 8.2 Agregar el filtro por red
+- [x] 8.3 Mostrar estados distintos por red del mismo vehículo sin colapsarlos en uno solo
+- [x] 8.4 Mostrar el tope solo para las redes que lo informan
+- [x] 8.5 Mostrar en qué página de Facebook se va a publicar
+- [x] 8.6 Aplicar los límites de la red correspondiente al editar el texto
+- [x] 8.7 Nombrar las redes en el aviso de vehículo vendido con publicación viva
+- [x] 8.8 Agregar los textos a `messages/{es,en,ko}.json`
 
 ## 9. Verificación
 
-- [ ] 9.1 Correr `npm run lint` y `npx tsc --noEmit` sin errores
-- [ ] 9.2 Correr toda la suite de pruebas
+- [x] 9.1 Correr `npm run lint` y `npx tsc --noEmit` sin errores
+- [x] 9.2 Correr toda la suite de pruebas
 - [ ] 9.3 Probar en desarrollo el ciclo completo de Instagram, confirmando que no cambió nada
 - [ ] 9.4 Publicar de prueba en Facebook un vehículo de una sola foto y verificar la entrada en la página
 - [ ] 9.5 Publicar de prueba en Facebook un vehículo de varias fotos y verificar que salen agrupadas en una sola entrada
 - [ ] 9.6 Probar el caso de las dos redes: aprobar una, dejar la otra pendiente, y confirmar que los estados son independientes
 - [ ] 9.7 Probar la desconexión de una red y confirmar que la otra sigue publicando
-- [ ] 9.8 Documentar en `docs/` cómo conectar la página, para el cliente
+- [x] 9.8 Documentar en `docs/` cómo conectar la página, para el cliente

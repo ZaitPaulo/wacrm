@@ -40,7 +40,7 @@
     "menuProfile": "Perfil",
     "menuSettings": "Ajustes",
     "menuSignOut": "Cerrar sesión",
-    "instagram": "Instagram",
+    "social": "Publicaciones",
     "pendingPosts": "{count} publicaciones esperando revisión"
   },
   "Header": {
@@ -1796,6 +1796,7 @@
       "members": "Equipo",
       "api": "Claves de API",
       "instagram": "Instagram",
+      "facebook": "Facebook",
       "showcase": "Vitrina pública"
     },
     "groups": {
@@ -2068,6 +2069,49 @@
         "Pulsa Conectar. Verificamos la cuenta contra Instagram antes de guardarla."
       ],
       "expiryNote": "El token dura 60 días. Cuando caduque, publicar falla con un aviso de credenciales: genera uno nuevo y vuelve a conectar."
+    },
+    "facebook": {
+      "title": "Facebook",
+      "description": "Conecta la página del negocio para que los vehículos disponibles se preparen para publicar también acá.",
+      "loading": "Cargando la conexión…",
+      "connectedTo": "Publicando en",
+      "unknownPage": "Página de Facebook",
+      "tokenLabel": "Token de acceso",
+      "tokenPlaceholder": "Pega el token de acceso de Facebook",
+      "requirement": "Tiene que ser un token de un usuario que administre la página. Es distinto del de Instagram: cada red se conecta por su lado.",
+      "listPages": "Ver mis páginas",
+      "pagesFailed": "No se pudieron consultar las páginas",
+      "choosePage": "¿En qué página se publica?",
+      "connect": "Conectar",
+      "connected": "Página de Facebook conectada",
+      "connectFailed": "No se pudo conectar la página",
+      "disconnect": "Desconectar",
+      "disconnected": "Página de Facebook desconectada",
+      "disconnectFailed": "No se pudo desconectar la página",
+      "disconnectHint": "Desconectar no toca lo ya publicado en Facebook ni afecta a Instagram. Las pendientes de esta red se retiran.",
+      "adminOnly": "Solo un administrador o el dueño puede cambiar esta conexión.",
+      "setupTitle": "Cómo obtener el token",
+      "setupDesc": "Tres pasos en el panel de desarrolladores de Meta. Está en inglés aunque el CRM no lo esté.",
+      "step1": "Agregar Facebook Login a la app",
+      "step1Items": [
+        "Entra a developers.facebook.com y abre la misma app que ya usas para Instagram.",
+        "En \"Add product\", agrega \"Facebook Login\".",
+        "No hace falta crear una app nueva: la de Instagram sirve."
+      ],
+      "step2": "Pedir los permisos de páginas",
+      "step2Items": [
+        "En \"App review\" solicita pages_show_list, pages_read_engagement y pages_manage_posts.",
+        "Meta los revisa y puede tardar. Hasta que los apruebe, solo funcionan con la página del desarrollador.",
+        "Verifica que tu usuario figure como administrador de la página del negocio."
+      ],
+      "step3": "Generar el token y pegarlo acá",
+      "step3Items": [
+        "En \"Graph API Explorer\" elige la app y genera un token de usuario con esos tres permisos.",
+        "Cópialo y pégalo en el campo de la izquierda.",
+        "Pulsa \"Ver mis páginas\": te mostramos las que administras.",
+        "Elige la página y pulsa Conectar. Guardamos el token de esa página, no el tuyo."
+      ],
+      "reviewNote": "Si la conexión falla con un aviso de permisos, casi siempre es que Meta todavía no aprobó los tres permisos de páginas. El token puede estar perfecto igual."
     }
   },
   "Inventory": {
@@ -2495,19 +2539,18 @@
   "Handoff": {
     "customerNotice": "Te asignamos un asesor comercial. Se comunicará contigo muy pronto. 🙌"
   },
-  "InstagramQueue": {
-    "pageTitle": "Cola de Instagram",
+  "SocialQueue": {
+    "pageTitle": "Cola de publicaciones",
     "pageDesc": "Publicaciones preparadas con tus vehículos disponibles. Nada sale hasta que lo apruebes acá.",
     "loading": "Cargando la cola…",
-    "notConnected": "No hay una cuenta de Instagram conectada. Conéctala en Ajustes antes de publicar.",
-    "quota": "Quedan {remaining} de {total} publicaciones en este periodo",
-    "quotaUnknown": "Instagram no informó cuántas publicaciones quedan, así que aprobar está en pausa.",
+    "notConnected": "No hay ninguna red conectada. Conecta Instagram o Facebook en Ajustes antes de publicar.",
+    "quota": "{network}: quedan {remaining} de {total} publicaciones en este periodo",
+    "quotaUnknown": "{network} no informó cuántas publicaciones quedan, así que aprobar está en pausa.",
     "pendingTitle": "Esperando revisión ({count})",
     "noPending": "No hay nada para revisar por ahora.",
     "historyTitle": "Historial",
     "vehicleGone": "El vehículo ya no existe",
     "vehicleNotAvailable": "Este vehículo ya no está disponible, así que no se va a publicar. Descártalo o vuelve a ponerlo como disponible.",
-    "alreadyPublished": "Ya se publicó el {date}",
     "firstImage": "Portada",
     "charsLeft": "Quedan {count} caracteres",
     "saveText": "Guardar texto",
@@ -2515,13 +2558,13 @@
     "saveFailed": "No se pudo guardar el texto",
     "saveBeforePublishing": "Guarda los cambios antes de publicar",
     "publish": "Publicar",
-    "published": "Publicado en Instagram",
+    "published": "Publicado en {network}",
     "publishFailed": "No se pudo publicar",
     "discard": "Descartar",
     "discarded": "Publicación descartada",
     "discardFailed": "No se pudo descartar",
-    "failureCredentials": "Instagram rechazó las credenciales. Vuelve a conectar la cuenta en Ajustes.",
-    "soldWithLivePost": "Vendido — la publicación sigue viva en Instagram",
+    "failureCredentials": "{network} rechazó las credenciales. Vuelve a conectar esa red en Ajustes.",
+    "soldWithLivePost": "Vendido — la publicación sigue viva en {network}",
     "status": {
       "published": "Publicada",
       "discarded": "Descartada",
@@ -2531,7 +2574,14 @@
     },
     "rewrite": "Reescribir con IA",
     "rewritten": "Reescrito — revísalo antes de publicar",
-    "rewriteFailed": "No se pudo reescribir el texto"
+    "rewriteFailed": "No se pudo reescribir el texto",
+    "publishingTo": "Publica en {target}",
+    "filterAll": "Todas las redes",
+    "networkNames": {
+      "instagram": "Instagram",
+      "facebook": "Facebook"
+    },
+    "alreadyPublishedHere": "Ya se publicó en {network} el {date}"
   },
   "Brand": {
     "description": "CRM de WhatsApp para la compraventa de vehículos."

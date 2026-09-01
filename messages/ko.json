@@ -40,7 +40,7 @@
     "menuProfile": "프로필",
     "menuSettings": "설정",
     "menuSignOut": "로그아웃",
-    "instagram": "Instagram",
+    "social": "게시",
     "pendingPosts": "검토 대기 게시물 {count}개"
   },
   "Header": {
@@ -1803,6 +1803,7 @@
       "members": "팀원",
       "api": "API 키",
       "instagram": "Instagram",
+      "facebook": "Facebook",
       "showcase": "공개 쇼케이스"
     },
     "groups": {
@@ -2075,6 +2076,49 @@
         "연결을 누릅니다. 저장하기 전에 Instagram에서 계정을 확인합니다."
       ],
       "expiryNote": "토큰은 60일간 유효합니다. 만료되면 게시가 인증 오류로 실패하므로, 새 토큰을 생성해 다시 연결하세요."
+    },
+    "facebook": {
+      "title": "Facebook",
+      "description": "판매 가능한 차량의 게시물을 여기에서도 준비할 수 있도록 비즈니스 페이지를 연결하세요.",
+      "loading": "연결 정보를 불러오는 중…",
+      "connectedTo": "게시 대상",
+      "unknownPage": "Facebook 페이지",
+      "tokenLabel": "액세스 토큰",
+      "tokenPlaceholder": "Facebook 액세스 토큰을 붙여넣으세요",
+      "requirement": "페이지를 관리하는 사용자의 토큰이어야 합니다. Instagram과는 별개로, 각 네트워크는 따로 연결됩니다.",
+      "listPages": "내 페이지 보기",
+      "pagesFailed": "페이지를 조회할 수 없습니다",
+      "choosePage": "어느 페이지에 게시하나요?",
+      "connect": "연결",
+      "connected": "Facebook 페이지가 연결되었습니다",
+      "connectFailed": "페이지를 연결할 수 없습니다",
+      "disconnect": "연결 해제",
+      "disconnected": "Facebook 페이지 연결이 해제되었습니다",
+      "disconnectFailed": "페이지 연결을 해제할 수 없습니다",
+      "disconnectHint": "연결을 해제해도 이미 게시된 내용은 그대로이며 Instagram에도 영향이 없습니다. 이 네트워크의 대기 중 게시물은 회수됩니다.",
+      "adminOnly": "관리자 또는 소유자만 이 연결을 변경할 수 있습니다.",
+      "setupTitle": "토큰을 받는 방법",
+      "setupDesc": "Meta 개발자 패널에서 세 단계로 진행합니다. 이 앱과 달리 해당 패널은 영어로 표시됩니다.",
+      "step1": "앱에 Facebook 로그인 추가",
+      "step1Items": [
+        "developers.facebook.com에서 Instagram에 이미 사용 중인 앱을 엽니다.",
+        "\"Add product\"에서 \"Facebook Login\"을 추가합니다.",
+        "새 앱은 필요 없습니다. Instagram용 앱을 그대로 사용합니다."
+      ],
+      "step2": "페이지 권한 요청",
+      "step2Items": [
+        "\"App review\"에서 pages_show_list, pages_read_engagement, pages_manage_posts를 요청합니다.",
+        "Meta의 검수에는 시간이 걸릴 수 있습니다. 승인 전에는 개발자 본인의 페이지에서만 동작합니다.",
+        "본인 계정이 비즈니스 페이지의 관리자로 등록되어 있는지 확인하세요."
+      ],
+      "step3": "토큰 생성 후 여기에 붙여넣기",
+      "step3Items": [
+        "\"Graph API Explorer\"에서 앱을 선택하고 위 세 권한이 포함된 사용자 토큰을 생성합니다.",
+        "복사해서 왼쪽 입력란에 붙여넣습니다.",
+        "\"내 페이지 보기\"를 누르면 관리 중인 페이지가 표시됩니다.",
+        "페이지를 선택하고 연결을 누릅니다. 사용자 토큰이 아니라 해당 페이지의 토큰을 저장합니다."
+      ],
+      "reviewNote": "권한 오류로 연결에 실패한다면 대부분 Meta가 아직 세 가지 페이지 권한을 승인하지 않은 경우입니다. 토큰 자체는 정상일 수 있습니다."
     }
   },
   "Inventory": {
@@ -2495,19 +2539,18 @@
   "Handoff": {
     "customerNotice": "담당 상담원을 배정했습니다. 곧 연락드리겠습니다. 🙌"
   },
-  "InstagramQueue": {
-    "pageTitle": "Instagram 대기열",
-    "pageDesc": "판매 가능한 차량으로 준비된 게시물입니다. 여기서 승인하기 전까지는 게시되지 않습니다.",
+  "SocialQueue": {
+    "pageTitle": "게시 대기열",
+    "pageDesc": "판매 가능한 차량으로 준비된 게시물입니다. 여기에서 승인하기 전에는 아무것도 게시되지 않습니다.",
     "loading": "대기열을 불러오는 중…",
-    "notConnected": "연결된 Instagram 계정이 없습니다. 게시하기 전에 설정에서 연결하세요.",
-    "quota": "이번 기간에 {total}개 중 {remaining}개 남음",
-    "quotaUnknown": "Instagram이 남은 게시 가능 수를 알려주지 않아 승인이 보류되었습니다.",
+    "notConnected": "연결된 네트워크가 없습니다. 게시하기 전에 설정에서 Instagram 또는 Facebook을 연결하세요.",
+    "quota": "{network}: 이번 기간에 {total}개 중 {remaining}개 남았습니다",
+    "quotaUnknown": "{network}이(가) 남은 게시 가능 수를 알려주지 않아 승인이 보류되었습니다.",
     "pendingTitle": "검토 대기 ({count})",
     "noPending": "지금은 검토할 항목이 없습니다.",
     "historyTitle": "기록",
     "vehicleGone": "차량이 더 이상 존재하지 않습니다",
     "vehicleNotAvailable": "이 차량은 더 이상 판매 가능 상태가 아니므로 게시되지 않습니다. 폐기하거나 차량을 다시 판매 가능으로 설정하세요.",
-    "alreadyPublished": "{date}에 이미 게시됨",
     "firstImage": "대표",
     "charsLeft": "{count}자 남음",
     "saveText": "문구 저장",
@@ -2515,13 +2558,13 @@
     "saveFailed": "문구를 저장하지 못했습니다",
     "saveBeforePublishing": "게시하기 전에 변경 사항을 저장하세요",
     "publish": "게시",
-    "published": "Instagram에 게시되었습니다",
+    "published": "{network}에 게시되었습니다",
     "publishFailed": "게시하지 못했습니다",
     "discard": "폐기",
     "discarded": "게시물을 폐기했습니다",
     "discardFailed": "폐기하지 못했습니다",
-    "failureCredentials": "Instagram이 인증 정보를 거부했습니다. 설정에서 계정을 다시 연결하세요.",
-    "soldWithLivePost": "판매됨 — 게시물은 Instagram에 남아 있습니다",
+    "failureCredentials": "{network}에서 인증을 거부했습니다. 설정에서 해당 네트워크를 다시 연결하세요.",
+    "soldWithLivePost": "판매됨 — {network}의 게시물은 아직 게시 중입니다",
     "status": {
       "published": "게시됨",
       "discarded": "폐기됨",
@@ -2531,7 +2574,14 @@
     },
     "rewrite": "AI로 다시 쓰기",
     "rewritten": "다시 작성됨 — 게시 전에 확인하세요",
-    "rewriteFailed": "문구를 다시 작성하지 못했습니다"
+    "rewriteFailed": "문구를 다시 작성하지 못했습니다",
+    "publishingTo": "{target}에 게시",
+    "filterAll": "모든 네트워크",
+    "networkNames": {
+      "instagram": "Instagram",
+      "facebook": "Facebook"
+    },
+    "alreadyPublishedHere": "{network}에 {date}에 이미 게시함"
   },
   "Brand": {
     "description": "자동차 매매를 위한 WhatsApp CRM."
