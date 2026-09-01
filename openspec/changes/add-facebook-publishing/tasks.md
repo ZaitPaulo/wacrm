@@ -1,0 +1,91 @@
+## 1. Meta — arranca primero porque es calendario ajeno
+
+- [ ] 1.1 Verificar que el usuario de Meta del negocio figure como administrador de la página de Facebook de LoraMotors
+- [ ] 1.2 Confirmar contra la documentación vigente de Meta los permisos exactos que exige publicar en una página (hoy `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`) y anotar la fecha de verificación
+- [ ] 1.3 Agregar el producto Facebook Login al registro de la app en el panel de Meta
+- [ ] 1.4 Enviar los permisos a App Review con el caso de uso y el vídeo de demostración
+- [ ] 1.5 Obtener un token de prueba con la página del desarrollador, para no depender de la aprobación durante el desarrollo
+
+## 2. Refactorización a `src/lib/social/` — completa y verde antes de escribir nada de Facebook
+
+- [ ] 2.1 Mover `src/lib/instagram/` a `src/lib/social/`, dejando `api.ts` y `limits.ts` bajo `social/instagram/` y el resto en la raíz
+- [ ] 2.2 Mover las cinco suites de prueba junto a su código, cambiando únicamente los `import` — ninguna aserción se modifica
+- [ ] 2.3 Renombrar `InstagramError`, `InstagramErrorKind` e `InstagramStep` a nombres de red-agnósticos en `social/errors.ts`
+- [ ] 2.4 Crear `social/networks.ts` con el registro por red: cómo cargar su configuración, cómo publicar y cuáles son sus límites
+- [ ] 2.5 Parametrizar `validateCaption` para que reciba los límites de la red en vez de leer las constantes de Instagram
+- [ ] 2.6 Parametrizar `composeVehiclePost` para que reciba el máximo de imágenes de la red en vez de `MAX_CAROUSEL_ITEMS`
+- [ ] 2.7 Quitar `const NETWORK = 'instagram'` de `queue.ts` y pasar la red como parámetro en las cuatro consultas del módulo
+- [ ] 2.8 Hacer opcional por red el paso de verificación de tope en `approveAndPublish`, sin cambiar el comportamiento de Instagram
+- [ ] 2.9 Cambiar el prefijo de `convertedObjectPath` de `account-<uuid>/instagram/` a `account-<uuid>/social/`
+- [ ] 2.10 Mover `src/app/api/instagram/*` a `src/app/api/social/*` con la red como parte del recurso, actualizando el cliente de la pantalla
+- [ ] 2.11 Renombrar el namespace de traducción `InstagramPost` a uno de red-agnóstico en `messages/{es,en,ko}.json`
+- [ ] 2.12 Correr toda la suite y verificar que pasa sin cambios de expectativa; desplegar esta refactorización sola, antes de seguir
+
+## 3. Base de datos
+
+- [ ] 3.1 Escribir la migración 513: tabla `facebook_config` (una por cuenta, `page_id`, token cifrado, `token_expires_at`, `status`, RLS de `admin`) con el mismo trato que `instagram_config`
+- [ ] 3.2 En la misma migración, ampliar el `CHECK` de `social_posts.network` a `('instagram', 'facebook')`
+- [ ] 3.3 Verificar que la migración es idempotente y que no modifica ninguna fila existente
+- [ ] 3.4 Aplicar la migración en el VPS de desarrollo y comprobar que la cola de Instagram sigue funcionando igual
+
+## 4. Cliente de Facebook
+
+- [ ] 4.1 Escribir `social/facebook/limits.ts` con los límites de la red (máximo de fotos, máximo de caracteres) y la fecha de verificación contra la documentación
+- [ ] 4.2 Implementar `getPageInfo` y el listado de páginas administradas (`/me/accounts`), devolviendo también el token de cada página
+- [ ] 4.3 Implementar la publicación de una sola foto (`POST /{page-id}/photos` con `url` y `caption`)
+- [ ] 4.4 Implementar la publicación de varias fotos: subir cada una con `published=false` y agrupar en `POST /{page-id}/feed` con `attached_media`
+- [ ] 4.5 Clasificar los errores de Facebook en credenciales o contenido, y marcar el `step` que distingue "no se publicó nada" de "puede haberse publicado"
+- [ ] 4.6 Escribir las pruebas del cliente contra dobles, cubriendo el camino de una foto, el de varias y cada clasificación de error
+- [ ] 4.7 Registrar Facebook en `social/networks.ts`, declarando que no expone tope por periodo
+
+## 5. Conexión de la página
+
+- [ ] 5.1 Crear `social/facebook/config.ts` con la carga y descifrado de la conexión, siguiendo `loadInstagramConfig`
+- [ ] 5.2 Implementar la ruta de conexión: recibir el token de usuario, listar las páginas administradas y devolverlas sin guardar nada
+- [ ] 5.3 Implementar el guardado: recibir la página elegida, guardar cifrado el token **de esa página** y su vencimiento
+- [ ] 5.4 Implementar el GET de estado y el DELETE de desconexión, sin exponer nunca el token
+- [ ] 5.5 Rechazar la conexión cuando el token no da acceso a ninguna página, explicando el requisito
+- [ ] 5.6 Construir el panel de Ajustes de Facebook junto al de Instagram, con el paso de elegir página y preselección cuando hay una sola
+- [ ] 5.7 Mostrar el vencimiento de cada conexión por separado en Ajustes
+- [ ] 5.8 Agregar los textos a `messages/{es,en,ko}.json`
+
+## 6. Encolado y cola por red
+
+- [ ] 6.1 Hacer que `syncVehiclePost` recorra las redes conectadas de la cuenta y prepare un borrador por cada una
+- [ ] 6.2 Aislar el fallo de una red para que no impida preparar el borrador de la otra
+- [ ] 6.3 Hacer que `removePending` retire las pendientes de todas las redes cuando el vehículo deja de estar disponible
+- [ ] 6.4 Hacer que `refreshPendingCaptions` refresque las pendientes sin editar de todas las redes
+- [ ] 6.5 Calcular el antecedente de publicación por red, no por vehículo
+- [ ] 6.6 Verificar que conectar una red no encola retroactivamente el inventario ya cargado
+- [ ] 6.7 Escribir las pruebas del encolado con una red conectada, con dos, y con el fallo de una sola
+
+## 7. Publicación y aprobación
+
+- [ ] 7.1 Hacer que `approveAndPublish` resuelva la configuración y el cliente por la `network` de la fila
+- [ ] 7.2 Saltear la verificación de tope en Facebook y no mostrar margen para esa red en la cola
+- [ ] 7.3 Hacer que todo mensaje de fallo de credenciales nombre la red y apunte a la conexión correcta en Ajustes
+- [ ] 7.4 Verificar que el candado, la revalidación del vehículo y el paso a `needs_review` funcionan igual en Facebook
+- [ ] 7.5 Escribir las pruebas de publicación en Facebook: éxito, fallo de credenciales, fallo de contenido y desenlace desconocido
+- [ ] 7.6 Verificar que aprobar en una red no toca la fila de la otra
+
+## 8. Pantalla de la cola
+
+- [ ] 8.1 Mostrar la red de cada publicación de forma inequívoca en la tarjeta
+- [ ] 8.2 Agregar el filtro por red
+- [ ] 8.3 Mostrar estados distintos por red del mismo vehículo sin colapsarlos en uno solo
+- [ ] 8.4 Mostrar el tope solo para las redes que lo informan
+- [ ] 8.5 Mostrar en qué página de Facebook se va a publicar
+- [ ] 8.6 Aplicar los límites de la red correspondiente al editar el texto
+- [ ] 8.7 Nombrar las redes en el aviso de vehículo vendido con publicación viva
+- [ ] 8.8 Agregar los textos a `messages/{es,en,ko}.json`
+
+## 9. Verificación
+
+- [ ] 9.1 Correr `npm run lint` y `npx tsc --noEmit` sin errores
+- [ ] 9.2 Correr toda la suite de pruebas
+- [ ] 9.3 Probar en desarrollo el ciclo completo de Instagram, confirmando que no cambió nada
+- [ ] 9.4 Publicar de prueba en Facebook un vehículo de una sola foto y verificar la entrada en la página
+- [ ] 9.5 Publicar de prueba en Facebook un vehículo de varias fotos y verificar que salen agrupadas en una sola entrada
+- [ ] 9.6 Probar el caso de las dos redes: aprobar una, dejar la otra pendiente, y confirmar que los estados son independientes
+- [ ] 9.7 Probar la desconexión de una red y confirmar que la otra sigue publicando
+- [ ] 9.8 Documentar en `docs/` cómo conectar la página, para el cliente
