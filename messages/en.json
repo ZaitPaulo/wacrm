@@ -2581,7 +2581,14 @@
       "instagram": "Instagram",
       "facebook": "Facebook"
     },
-    "alreadyPublishedHere": "Already published on {network} on {date}"
+    "alreadyPublishedHere": "Already published on {network} on {date}",
+    "publishAll": "Publish to all {count} networks",
+    "retry": "Retry",
+    "retryFromReview": "I checked it, retry",
+    "retried": "The {network} post is back in the queue",
+    "retryFailed": "Could not retry",
+    "reviewHint": "We do not know whether this post went out. Check it on {network} before retrying — the system never retries on its own, so it cannot publish twice.",
+    "onlyRetryLeft": "Nothing is pending for this vehicle. Retry the network that failed if you want to try again."
   },
   "Brand": {
     "description": "WhatsApp CRM for vehicle dealerships."

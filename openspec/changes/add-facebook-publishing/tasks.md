@@ -89,3 +89,16 @@
 - [ ] 9.6 Probar el caso de las dos redes: aprobar una, dejar la otra pendiente, y confirmar que los estados son independientes
 - [ ] 9.7 Probar la desconexión de una red y confirmar que la otra sigue publicando
 - [x] 9.8 Documentar en `docs/` cómo conectar la página, para el cliente
+
+## 10. Un botón por vehículo (pedido del cliente, 2026-09-01)
+
+- [x] 10.1 Ruta `POST /api/social/queue/[id]/retry`: devuelve a `pending` una fallida, solo si `external_post_id` está vacío
+- [x] 10.2 Rechazar el reintento con un mensaje propio cuando el índice único ya tiene otra pendiente de ese vehículo y esa red (23505)
+- [x] 10.3 Pruebas del reintento: fallida sin id, ya publicada, choque con pendiente existente, y desde `needs_review`
+- [x] 10.4 Agrupar la cola por vehículo, con una línea por red y su estado
+- [x] 10.5 Botón único que aprueba en serie todas las pendientes del vehículo e informa el desenlace de cada red
+- [x] 10.6 Botón de reintentar por red sobre las fallidas, con aviso distinto para `needs_review`
+- [x] 10.7 Un solo editor de texto por vehículo, que guarda en todas sus pendientes
+- [x] 10.8 Validar el texto contra el límite más estricto de las redes pendientes
+- [x] 10.9 Textos en `messages/{es,en,ko}.json`
+- [x] 10.10 Verificar: lint, tipos, suite completa

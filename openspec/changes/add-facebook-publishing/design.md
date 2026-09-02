@@ -41,6 +41,14 @@ Un vehículo disponible con ambas redes conectadas genera **dos** filas en `soci
 
 *El costo, asumido:* la cola tiene el doble de entradas y quien revisa aprueba dos veces el mismo vehículo. Es trabajo real. Se compensa parcialmente con la decisión 8.
 
+> **Corrección del 2026-09-01, tras verlo funcionando.** El cliente pidió un solo botón que publique en ambas redes, con el resultado de cada una a la vista y reintento por separado. Tenía razón, y la decisión estaba mal donde confundía el modelo de datos con la pantalla.
+>
+> **Las dos filas se quedan.** Todo el argumento de arriba sigue en pie y es justamente lo que hace posible lo que él pide: sin dos filas no hay dos `external_post_id`, ni dos candados, ni forma de reintentar una sola red.
+>
+> **Lo que cambia es la presentación** (ver decisión 15): la cola agrupa por vehículo y ofrece un botón que aprueba las pendientes de ese vehículo, una por una. Aprobar sigue siendo por fila; lo que se ahorra es el segundo clic, no la separación.
+>
+> Lo que asumí de más fue que dos filas obligaban a dos tarjetas. No: obligan a dos *estados*, que es distinto y es lo que hay que mostrar.
+
 ### 2. Dos conexiones separadas, no una sola de Meta
 
 `facebook_config` es una tabla nueva con la misma forma que `instagram_config`: una fila por cuenta, token cifrado con `encrypt()`, RLS de `admin` o superior, estado `connected`/`disconnected`. Se conecta desde su propio panel en Ajustes, con su propio token pegado a mano.
@@ -143,6 +151,30 @@ No hace falta ninguna columna nueva: `social_posts.network` ya está en la fila 
 ### 12. Aprueba `admin` o superior, igual que hoy
 
 Sin cambios respecto de la decisión 14 de `add-instagram-publishing`. Publicar en la página del negocio interviene su marca por el mismo motivo y con el mismo alcance.
+
+### 15. Un botón por vehículo, dos estados a la vista, reintento por red
+
+La cola agrupa las publicaciones por vehículo. Cada tarjeta muestra **una línea por red** con su estado —pendiente, publicada, fallida, en revisión— y ofrece:
+
+- **Publicar**, que aprueba todas las pendientes de ese vehículo, una por una y en serie.
+- **Reintentar**, por red, sobre las que fallaron.
+- **Descartar**, que retira las pendientes.
+
+*Por qué en serie y no en paralelo:* cada aprobación toma su propio candado y habla con una API distinta. En paralelo, un fallo de red en la primera dejaría a la segunda a mitad de camino sin que la pantalla pueda decir cuál quedó cómo. En serie, cada desenlace se conoce antes de empezar el siguiente.
+
+*Por qué el botón no promete un resultado único:* porque no lo hay. Al terminar informa **por red**, y la tarjeta queda mostrando qué salió y qué no. Un "publicado" a secas cuando una de las dos falló sería exactamente la mentira que la decisión 1 quiere evitar.
+
+*El texto es uno solo.* La tarjeta tiene un editor, no dos, y lo que se guarda va a las pendientes de ese vehículo en todas las redes. Se valida contra el **límite más estricto** de las redes involucradas —hoy el de Instagram—, porque un texto que no entra en una de las dos no sirve para el botón único. Editarlas por separado sigue siendo posible en los datos; simplemente no se ofrece, porque nadie lo pidió y duplicaría el trabajo de revisar.
+
+### 16. Reintentar es una acción humana, y nunca sobre algo que ya salió
+
+Una publicación fallida vuelve a `pending` solo si alguien lo pide, y **solo si `external_post_id` está vacío**. Con identificador, ya salió: no hay nada que reintentar y republicar duplicaría.
+
+*Lo que esto corrige:* hasta ahora una publicación fallida se iba al historial sin ninguna forma de recuperarla desde la interfaz. Un corte de red sacaba un vehículo de la cola para siempre y había que reponerlo con SQL. Es un agujero que ya dolía con una sola red.
+
+*El caso incómodo:* `needs_review` significa que no se sabe si salió. Se permite reintentar desde ahí —es la salida que el diseño siempre previó para una persona que fue a mirar—, pero el botón lo dice con todas las letras en vez de parecer un reintento cualquiera.
+
+*Choque con el índice único:* si mientras tanto se generó otra pendiente para ese vehículo y esa red, el `UPDATE` viola `idx_social_posts_one_pending`. No es un error a esconder: significa que ya hay un borrador fresco esperando, y eso es lo que hay que decir.
 
 ## Risks / Trade-offs
 

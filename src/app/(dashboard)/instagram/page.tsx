@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/use-auth';
 import { formatPrice } from '@/lib/showcase/format';
+import { strictestLimits, type NetworkLimits } from '@/lib/social/limits';
 
 /**
  * La cola de publicaciones, de todas las redes.
@@ -17,11 +18,15 @@ import { formatPrice } from '@/lib/showcase/format';
  * llega a ninguna red sin que alguien apriete Publicar en esta
  * pantalla: el encolado solo deja borradores.
  *
- * UN VEHÍCULO PUEDE APARECER DOS VECES, una por red, y son decisiones
- * distintas: aprobar la de Instagram no publica en Facebook. Por eso
- * cada tarjeta dice a dónde va y los estados nunca se colapsan en uno
- * solo por vehículo — "salió en una y falló en la otra" tiene que
- * poder verse.
+ * SE AGRUPA POR VEHÍCULO, y esa es la decisión de forma que manda. Un
+ * auto es UNA tarjeta con un texto y un botón, y dentro se ve una línea
+ * por red con su estado. El botón aprueba todas sus pendientes, de a
+ * una; cada envío conserva su candado y su registro, así que lo que se
+ * ahorra es el segundo clic, no la separación entre publicaciones.
+ *
+ * POR ESO EL BOTÓN NO PROMETE UN RESULTADO ÚNICO. Al terminar informa
+ * por red, y la tarjeta queda mostrando qué salió y qué no: "publicado"
+ * a secas cuando una de las dos falló sería mentira sobre la otra.
  *
  * La URL sigue siendo /instagram para no romper enlaces guardados.
  *
@@ -70,13 +75,28 @@ interface NetworkState {
   /** `true` si esta red informa un tope por periodo. */
   reportsQuota: boolean;
   quota: Quota | null;
-  limits: { maxImages: number; captionMaxChars: number; maxHashtags: number | null };
+  limits: NetworkLimits;
 }
 
 interface QueueResponse {
   posts?: QueuePost[];
   networks?: NetworkState[];
 }
+
+/** Un vehículo con todas sus publicaciones, que es la unidad de la pantalla. */
+interface VehicleGroup {
+  vehicleId: string;
+  vehicle: QueueVehicle | null;
+  posts: QueuePost[];
+  /** Las que todavía se pueden aprobar. */
+  pending: QueuePost[];
+  /** Las que fallaron o quedaron en duda: se pueden reintentar. */
+  retryable: QueuePost[];
+  createdAt: string;
+}
+
+/** Estados que mantienen un vehículo en la lista de trabajo. */
+const NEEDS_ATTENTION = new Set(['pending', 'failed', 'needs_review']);
 
 /**
  * Trae la cola. Devuelve `null` si algo falló, y entonces la pantalla
@@ -111,7 +131,7 @@ export default function SocialQueuePage() {
     setNetworks(json.networks ?? []);
   }, []);
 
-  /** Recarga después de aprobar, descartar o editar. */
+  /** Recarga después de aprobar, reintentar, descartar o editar. */
   const load = useCallback(async () => {
     const json = await fetchQueue();
     if (json) apply(json);
@@ -130,34 +150,63 @@ export default function SocialQueuePage() {
     };
   }, [apply]);
 
-  const visible = filter ? posts.filter((p) => p.network === filter) : posts;
-  const pending = visible.filter((p) => p.status === 'pending');
-  const history = visible.filter((p) => p.status !== 'pending');
-
-  // Conectado es "hay al menos una red". El estado de cada una se mira
-  // por separado: una red caída no puede bloquear la aprobación de la
-  // otra, que es la garantía de que son independientes.
   const connected = networks.length > 0;
-  const networkOf = (post: QueuePost) =>
-    networks.find((n) => n.network === post.network) ?? null;
-
-  /**
-   * Si esta publicación se puede aprobar ahora mismo.
-   *
-   * Una red sin tope publica con normalidad; una CON tope que no se
-   * pudo leer no, porque publicar a ciegas gasta el intento. Los dos
-   * casos llegan como `quota: null` y solo `reportsQuota` los separa.
-   */
-  const canPublish = (post: QueuePost) => {
-    const net = networkOf(post);
-    if (!net) return false;
-    if (!net.reportsQuota) return true;
-    return (net.quota?.remaining ?? 0) > 0;
-  };
 
   /** El nombre de la red como lo lee una persona. */
-  const nameOf = (network: string) =>
-    t.has(`networkNames.${network}`) ? t(`networkNames.${network}`) : network;
+  const nameOf = useCallback(
+    (network: string) =>
+      t.has(`networkNames.${network}`) ? t(`networkNames.${network}`) : network,
+    [t]
+  );
+
+  const stateOf = useCallback(
+    (network: string) => networks.find((n) => n.network === network) ?? null,
+    [networks]
+  );
+
+  // Agrupar por vehículo es lo que convierte dos filas en una tarjeta.
+  // Se descartan las 'discarded': fueron una decisión tomada y no hay
+  // nada más que hacer con ellas.
+  const groups = useMemo(() => {
+    const visible = (filter ? posts.filter((p) => p.network === filter) : posts)
+      .filter((p) => p.status !== 'discarded');
+
+    const byVehicle = new Map<string, QueuePost[]>();
+    for (const post of visible) {
+      const list = byVehicle.get(post.vehicle_id);
+      if (list) list.push(post);
+      else byVehicle.set(post.vehicle_id, [post]);
+    }
+
+    const out: VehicleGroup[] = [];
+    for (const [vehicleId, list] of byVehicle) {
+      out.push({
+        vehicleId,
+        vehicle: list.find((p) => p.vehicle)?.vehicle ?? null,
+        posts: list,
+        pending: list.filter((p) => p.status === 'pending'),
+        retryable: list.filter(
+          (p) =>
+            (p.status === 'failed' || p.status === 'needs_review') &&
+            !p.external_post_id
+        ),
+        createdAt: list
+          .map((p) => p.created_at)
+          .reduce((a, b) => (a > b ? a : b)),
+      });
+    }
+    return out.sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+  }, [posts, filter]);
+
+  // Lo que pide atención arriba; lo terminado, abajo. Un vehículo con
+  // una red publicada y otra fallida sigue arriba: todavía hay algo que
+  // decidir.
+  const active = groups.filter((g) =>
+    g.posts.some((p) => NEEDS_ATTENTION.has(p.status))
+  );
+  const done = groups.filter(
+    (g) => !g.posts.some((p) => NEEDS_ATTENTION.has(p.status))
+  );
 
   if (loading) {
     return (
@@ -223,22 +272,20 @@ export default function SocialQueuePage() {
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">
-          {t('pendingTitle', { count: String(pending.length) })}
+          {t('pendingTitle', { count: String(active.length) })}
         </h2>
 
-        {pending.length === 0 ? (
+        {active.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t('noPending')}</p>
         ) : (
-          pending.map((post) => (
-            <PendingCard
-              key={post.id}
-              post={post}
+          active.map((group) => (
+            <VehicleCard
+              key={group.vehicleId}
+              group={group}
               currency={defaultCurrency ?? 'USD'}
-              busy={busyId === post.id}
-              captionMaxChars={networkOf(post)?.limits.captionMaxChars ?? 0}
-              networkName={nameOf(post.network)}
-              target={networkOf(post)?.displayName ?? null}
-              canPublish={canPublish(post)}
+              busy={busyId === group.vehicleId}
+              nameOf={nameOf}
+              stateOf={stateOf}
               onBusy={setBusyId}
               onDone={load}
             />
@@ -246,15 +293,11 @@ export default function SocialQueuePage() {
         )}
       </section>
 
-      {history.length > 0 && (
+      {done.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">{t('historyTitle')}</h2>
-          {history.map((post) => (
-            <HistoryRow
-              key={post.id}
-              post={post}
-              networkName={nameOf(post.network)}
-            />
+          {done.map((group) => (
+            <HistoryRow key={group.vehicleId} group={group} nameOf={nameOf} />
           ))}
         </section>
       )}
@@ -262,43 +305,69 @@ export default function SocialQueuePage() {
   );
 }
 
-function PendingCard({
-  post,
+/**
+ * Un vehículo, con todas sus redes.
+ *
+ * El texto es UNO: la tarjeta tiene un editor, no dos, y al guardar el
+ * servidor lo escribe en todas las pendientes de este vehículo. Dos
+ * textos distintos para el mismo auto no le sirven a nadie que revisa,
+ * y romperían el botón único.
+ */
+function VehicleCard({
+  group,
   currency,
   busy,
-  captionMaxChars,
-  networkName,
-  target,
-  canPublish,
+  nameOf,
+  stateOf,
   onBusy,
   onDone,
 }: {
-  post: QueuePost;
+  group: VehicleGroup;
   currency: string;
   busy: boolean;
-  /** El de la red de ESTA publicación, nunca el de otra. */
-  captionMaxChars: number;
-  /** Instagram, Facebook. */
-  networkName: string;
-  /** A dónde exactamente: `@usuario` o el nombre de la página. */
-  target: string | null;
-  canPublish: boolean;
+  nameOf: (network: string) => string;
+  stateOf: (network: string) => NetworkState | null;
   onBusy: (id: string | null) => void;
   onDone: () => Promise<void>;
 }) {
   const t = useTranslations('SocialQueue');
+  const { vehicle, pending, retryable, posts } = group;
+
+  // Todas las pendientes comparten el texto, así que alcanza con la
+  // primera para saber cuál es.
+  const source = pending[0] ?? posts[0];
   const [caption, setCaption] = useState(
-    post.edited_caption ?? post.proposed_caption
+    source.edited_caption ?? source.proposed_caption
   );
   const [dirty, setDirty] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(true);
 
-  const remainingChars = captionMaxChars - [...caption].length;
+  // Contra el límite MÁS ESTRICTO de las redes que siguen pendientes:
+  // un texto que una de ellas rechazaría no sirve para un botón que
+  // publica en todas. Es el mismo cálculo que hace el servidor.
+  const limits = strictestLimits(
+    pending
+      .map((p) => stateOf(p.network)?.limits)
+      .filter((l): l is NetworkLimits => l !== undefined)
+  );
+  const remainingChars = (limits?.captionMaxChars ?? 0) - [...caption].length;
+
+  /** Si esta red puede publicar ahora mismo, según su tope. */
+  const canPublish = (post: QueuePost) => {
+    const net = stateOf(post.network);
+    if (!net) return false;
+    if (!net.reportsQuota) return true;
+    return (net.quota?.remaining ?? 0) > 0;
+  };
+
+  const publishable = pending.filter(canPublish);
 
   async function saveCaption() {
-    onBusy(post.id);
+    onBusy(group.vehicleId);
     try {
-      const res = await fetch(`/api/social/queue/${post.id}`, {
+      // Se manda una sola vez: el servidor escribe en todas las
+      // pendientes de este vehículo.
+      const res = await fetch(`/api/social/queue/${source.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caption }),
@@ -310,21 +379,16 @@ function PendingCard({
       }
       setDirty(false);
       toast.success(t('saved'));
+      await onDone();
     } finally {
       onBusy(null);
     }
   }
 
-  /**
-   * Propone una reescritura. No guarda: deja el texto en el editor
-   * para que la persona lo lea y decida. Si la cuenta no tiene IA, el
-   * botón se esconde a partir de la primera respuesta y la cola sigue
-   * funcionando igual.
-   */
   async function rewrite() {
-    onBusy(post.id);
+    onBusy(group.vehicleId);
     try {
-      const res = await fetch(`/api/social/queue/${post.id}/rewrite`, {
+      const res = await fetch(`/api/social/queue/${source.id}/rewrite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caption }),
@@ -343,20 +407,54 @@ function PendingCard({
     }
   }
 
-  async function publish() {
-    onBusy(post.id);
+  /**
+   * Publica en todas las redes pendientes, UNA POR UNA.
+   *
+   * En serie y no en paralelo: cada aprobación toma su propio candado y
+   * habla con una API distinta. En paralelo, un fallo en la primera
+   * dejaría a la segunda a mitad de camino sin poder decir cuál quedó
+   * cómo. Y el fallo de una NO corta el intento de la otra.
+   */
+  async function publishAll() {
+    onBusy(group.vehicleId);
     try {
-      const res = await fetch(`/api/social/queue/${post.id}/approve`, {
+      for (const post of publishable) {
+        const red = nameOf(post.network);
+        try {
+          const res = await fetch(`/api/social/queue/${post.id}/approve`, {
+            method: 'POST',
+          });
+          const json = await res.json();
+          if (res.ok) {
+            toast.success(t('published', { network: red }));
+          } else {
+            // El servidor ya redactó un mensaje que apunta a dónde se
+            // arregla el problema; no se reescribe acá.
+            toast.error(json.error ?? t('publishFailed'));
+          }
+        } catch {
+          toast.error(t('publishFailed'));
+        }
+      }
+      await onDone();
+    } finally {
+      onBusy(null);
+    }
+  }
+
+  /** Devuelve una fallida a la cola. Por red, nunca las dos juntas. */
+  async function retry(post: QueuePost) {
+    onBusy(group.vehicleId);
+    try {
+      const res = await fetch(`/api/social/queue/${post.id}/retry`, {
         method: 'POST',
       });
       const json = await res.json();
       if (!res.ok) {
-        // El servidor ya redactó un mensaje que apunta a dónde se
-        // arregla el problema; no se reescribe acá.
-        toast.error(json.error ?? t('publishFailed'));
-      } else {
-        toast.success(t('published', { network: networkName }));
+        toast.error(json.error ?? t('retryFailed'));
+        return;
       }
+      toast.success(t('retried', { network: nameOf(post.network) }));
       await onDone();
     } finally {
       onBusy(null);
@@ -364,24 +462,19 @@ function PendingCard({
   }
 
   async function discard() {
-    onBusy(post.id);
+    onBusy(group.vehicleId);
     try {
-      const res = await fetch(`/api/social/queue/${post.id}`, {
-        method: 'DELETE',
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        toast.error(json.error ?? t('discardFailed'));
-      } else {
-        toast.success(t('discarded'));
+      for (const post of pending) {
+        await fetch(`/api/social/queue/${post.id}`, { method: 'DELETE' });
       }
+      toast.success(t('discarded'));
       await onDone();
     } finally {
       onBusy(null);
     }
   }
 
-  const vehicle = post.vehicle;
+  const images = source.image_urls;
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
@@ -397,32 +490,7 @@ function PendingCard({
               {formatPrice(vehicle.price, currency)}
             </p>
           )}
-          {/* A DÓNDE VA, arriba del todo. El mismo vehículo puede tener
-              otra tarjeta idéntica de la otra red justo al lado, y
-              aprobar la equivocada no se deshace. */}
-          <p className="text-muted-foreground mt-1 text-xs">
-            <span className="text-foreground border-border rounded-full border px-2 py-0.5 font-medium">
-              {networkName}
-            </span>
-            {target && (
-              <span className="ml-2">
-                {t('publishingTo', { target })}
-              </span>
-            )}
-          </p>
         </div>
-
-        {/* Un vehículo que ya se publicó antes no se bloquea: se avisa.
-            Republicar puede ser lo correcto o un descuido, y desde acá
-            no se distingue — quien decide necesita el dato a la vista. */}
-        {post.previously_published_at && (
-          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs">
-            {t('alreadyPublishedHere', {
-              network: networkName,
-              date: new Date(post.previously_published_at).toLocaleDateString(),
-            })}
-          </span>
-        )}
       </div>
 
       {vehicle && vehicle.status !== 'available' && (
@@ -431,9 +499,25 @@ function PendingCard({
         </p>
       )}
 
-      {post.image_urls.length > 0 && (
+      {/* UNA LÍNEA POR RED, con su estado propio. Es el corazón de esta
+          pantalla: nunca un estado único por vehículo, porque en cuanto
+          una red falla ese estado sería falso sobre la otra. */}
+      <div className="divide-y rounded-md border">
+        {posts.map((post) => (
+          <NetworkRow
+            key={post.id}
+            post={post}
+            busy={busy}
+            label={nameOf(post.network)}
+            target={stateOf(post.network)?.displayName ?? null}
+            onRetry={() => retry(post)}
+          />
+        ))}
+      </div>
+
+      {images.length > 0 && (
         <div className="flex gap-2 overflow-x-auto">
-          {post.image_urls.map((url, i) => (
+          {images.map((url, i) => (
             <div
               key={url}
               className="relative size-24 shrink-0 overflow-hidden rounded-md border"
@@ -452,83 +536,189 @@ function PendingCard({
         </div>
       )}
 
-      <div className="space-y-2">
-        <Textarea
-          value={caption}
-          rows={8}
-          onChange={(e) => {
-            setCaption(e.target.value);
-            setDirty(true);
-          }}
-          disabled={busy}
-        />
-        <div className="text-muted-foreground flex items-center justify-between text-xs">
-          <span className={remainingChars < 0 ? 'text-destructive' : undefined}>
-            {t('charsLeft', { count: String(remainingChars) })}
-          </span>
-          <span className="flex gap-1">
-            {aiAvailable && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={rewrite}
-                disabled={busy}
+      {pending.length > 0 && (
+        <>
+          <div className="space-y-2">
+            <Textarea
+              value={caption}
+              rows={8}
+              onChange={(e) => {
+                setCaption(e.target.value);
+                setDirty(true);
+              }}
+              disabled={busy}
+            />
+            <div className="text-muted-foreground flex items-center justify-between text-xs">
+              <span
+                className={remainingChars < 0 ? 'text-destructive' : undefined}
               >
-                <Sparkles className="mr-1 h-3 w-3" />
-                {t('rewrite')}
-              </Button>
-            )}
-            {dirty && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={saveCaption}
-                disabled={busy}
-              >
-                {t('saveText')}
-              </Button>
-            )}
-          </span>
-        </div>
-      </div>
+                {t('charsLeft', { count: String(remainingChars) })}
+              </span>
+              <span className="flex gap-1">
+                {aiAvailable && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={rewrite}
+                    disabled={busy}
+                  >
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    {t('rewrite')}
+                  </Button>
+                )}
+                {dirty && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={saveCaption}
+                    disabled={busy}
+                  >
+                    {t('saveText')}
+                  </Button>
+                )}
+              </span>
+            </div>
+          </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={publish} disabled={busy || dirty || !canPublish}>
-          {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {t('publish')}
-        </Button>
-        <Button variant="outline" onClick={discard} disabled={busy}>
-          {t('discard')}
-        </Button>
-        {dirty && (
-          <span className="text-muted-foreground self-center text-xs">
-            {t('saveBeforePublishing')}
-          </span>
-        )}
-      </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={publishAll}
+              disabled={busy || dirty || publishable.length === 0}
+            >
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {/* El botón dice EN CUÁNTAS redes va a publicar, para que
+                  nadie lo apriete creyendo que sale en una sola. */}
+              {publishable.length > 1
+                ? t('publishAll', { count: String(publishable.length) })
+                : t('publish')}
+            </Button>
+            <Button variant="outline" onClick={discard} disabled={busy}>
+              {t('discard')}
+            </Button>
+            {dirty && (
+              <span className="text-muted-foreground self-center text-xs">
+                {t('saveBeforePublishing')}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+
+      {pending.length === 0 && retryable.length > 0 && (
+        // Sin pendientes pero con algo que falló: no hay texto que
+        // editar, pero sí una decisión que tomar.
+        <p className="text-muted-foreground text-xs">{t('onlyRetryLeft')}</p>
+      )}
     </div>
   );
 }
 
 /**
- * Una fila del historial.
+ * Una red dentro de la tarjeta de un vehículo: a dónde va, cómo quedó y
+ * qué se puede hacer al respecto.
+ */
+function NetworkRow({
+  post,
+  busy,
+  label,
+  target,
+  onRetry,
+}: {
+  post: QueuePost;
+  busy: boolean;
+  label: string;
+  /** A dónde exactamente: `@usuario` o el nombre de la página. */
+  target: string | null;
+  onRetry: () => void;
+}) {
+  const t = useTranslations('SocialQueue');
+
+  // 'needs_review' NO se ofrece como un reintento cualquiera: puede
+  // haberse publicado, y quien reintenta tiene que saberlo antes.
+  const inDoubt = post.status === 'needs_review';
+  const canRetry =
+    (post.status === 'failed' || inDoubt) && !post.external_post_id;
+
+  const tone =
+    post.status === 'published'
+      ? 'text-emerald-500'
+      : post.status === 'failed'
+        ? 'text-destructive'
+        : inDoubt
+          ? 'text-amber-500'
+          : 'text-muted-foreground';
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+      <div className="min-w-0">
+        <span className="font-medium">{label}</span>
+        <span className={`ml-2 ${tone}`}>{t(`status.${post.status}`)}</span>
+
+        {post.status === 'pending' && target && (
+          <span className="text-muted-foreground ml-2 text-xs">
+            {t('publishingTo', { target })}
+          </span>
+        )}
+        {post.status === 'published' && post.published_at && (
+          <span className="text-muted-foreground ml-2 text-xs">
+            {new Date(post.published_at).toLocaleDateString()}
+          </span>
+        )}
+
+        {/* Un vehículo que ya se publicó antes EN ESTA RED no se
+            bloquea: se avisa. Republicar puede ser lo correcto o un
+            descuido, y desde acá no se distingue. */}
+        {post.status === 'pending' && post.previously_published_at && (
+          <p className="mt-1 text-xs text-amber-500">
+            {t('alreadyPublishedHere', {
+              network: label,
+              date: new Date(post.previously_published_at).toLocaleDateString(),
+            })}
+          </p>
+        )}
+
+        {post.failure_reason && (
+          <p className="text-muted-foreground mt-1 text-xs">
+            {post.failure_kind === 'credentials'
+              ? t('failureCredentials', { network: label })
+              : post.failure_reason}
+          </p>
+        )}
+        {inDoubt && (
+          <p className="mt-1 text-xs text-amber-500">
+            {t('reviewHint', { network: label })}
+          </p>
+        )}
+      </div>
+
+      {canRetry && (
+        <Button size="sm" variant="outline" onClick={onRetry} disabled={busy}>
+          {inDoubt ? t('retryFromReview') : t('retry')}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Un vehículo sin nada que decidir: todo publicado o descartado.
  *
  * Lo publicado NO se puede deshacer desde acá: el sistema nunca borra
- * de Instagram. Cuando el vehículo de una publicación viva se vende,
- * esta fila lo señala para que alguien decida qué hacer con el aviso —
+ * de una red. Cuando el vehículo de una publicación viva se vende, esta
+ * fila lo señala para que alguien decida qué hacer con el aviso —
  * dejarlo como prueba social o retirarlo a mano.
  */
 function HistoryRow({
-  post,
-  networkName,
+  group,
+  nameOf,
 }: {
-  post: QueuePost;
-  networkName: string;
+  group: VehicleGroup;
+  nameOf: (network: string) => string;
 }) {
   const t = useTranslations('SocialQueue');
-  const vehicle = post.vehicle;
-  const soldWithLivePost =
-    post.status === 'published' && vehicle?.status === 'sold';
+  const { vehicle, posts } = group;
+  const live = posts.filter((p) => p.status === 'published');
+  const soldWithLivePost = live.length > 0 && vehicle?.status === 'sold';
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
@@ -538,24 +728,18 @@ function HistoryRow({
             ? `${vehicle.brand} ${vehicle.model} ${vehicle.year}`
             : t('vehicleGone')}
         </span>
-        {/* La red va junto al estado y no en otra columna: dos filas del
-            mismo vehículo con distinto desenlace tienen que poder
-            leerse de un vistazo sin cruzar la mirada. */}
         <span className="text-muted-foreground ml-2">
-          {networkName} · {t(`status.${post.status}`)}
+          {posts
+            .map((p) => `${nameOf(p.network)}: ${t(`status.${p.status}`)}`)
+            .join(' · ')}
         </span>
-        {post.failure_reason && (
-          <p className="text-muted-foreground">
-            {post.failure_kind === 'credentials'
-              ? t('failureCredentials', { network: networkName })
-              : post.failure_reason}
-          </p>
-        )}
       </div>
 
       {soldWithLivePost && (
         <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs">
-          {t('soldWithLivePost', { network: networkName })}
+          {t('soldWithLivePost', {
+            network: live.map((p) => nameOf(p.network)).join(', '),
+          })}
         </span>
       )}
     </div>

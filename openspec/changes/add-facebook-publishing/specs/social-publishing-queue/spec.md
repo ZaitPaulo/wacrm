@@ -229,26 +229,103 @@ Esto no contradice la regla de no duplicar pendientes: salir del inventario ya r
 
 ## ADDED Requirements
 
-### Requirement: La cola declara a qué red va cada publicación
+### Requirement: La cola agrupa por vehículo y declara el estado de cada red
 
-Cada entrada de la cola SHALL indicar de forma visible en qué red se va a publicar, y la cola SHALL permitir filtrar por red.
+La cola SHALL presentar las publicaciones **agrupadas por vehículo**, y cada grupo SHALL mostrar una línea por red con su estado propio. La cola SHALL permitir filtrar por red.
 
-Con dos publicaciones del mismo vehículo una junto a la otra, un desenlace distinto en cada una no puede quedar indistinguible de un vistazo: aprobar creyendo que se aprueba la otra es un error irreversible.
+NO SHALL presentar un estado único por vehículo. Con dos redes, "publicado" a secas es falso en cuanto una de las dos falle, y es exactamente la confusión que hace aprobar creyendo que se aprueba la otra.
 
-#### Scenario: Dos pendientes del mismo vehículo
+#### Scenario: Un vehículo con pendientes en las dos redes
 
 - **WHEN** un vehículo tiene publicaciones pendientes en las dos redes
-- **THEN** la cola muestra ambas identificando claramente la red de cada una
+- **THEN** aparece como UNA tarjeta que muestra las dos redes, cada una con su estado
 
 #### Scenario: Distinto desenlace por red
 
 - **WHEN** una publicación de un vehículo se publicó y la otra falló
-- **THEN** la cola muestra cada estado junto a su red, sin presentar un único estado para el vehículo
+- **THEN** la tarjeta muestra ambos estados junto a su red, sin presentar un único estado para el vehículo
 
 #### Scenario: Se filtra por red
 
 - **WHEN** quien revisa filtra la cola por una red
 - **THEN** solo ve las publicaciones de esa red
+
+### Requirement: Un solo gesto publica en todas las redes pendientes del vehículo
+
+La cola SHALL ofrecer una acción única que apruebe **todas las publicaciones pendientes de ese vehículo**, enviándolas a cada red **una por una**.
+
+Esa acción NO SHALL informar un resultado único: SHALL informar el desenlace **de cada red**. Cada envío conserva su propio candado, su propia revalidación y su propio registro; lo que se ahorra es el segundo gesto, no la separación entre publicaciones.
+
+El fallo en una red NO SHALL impedir el intento en la otra.
+
+#### Scenario: Las dos redes salen bien
+
+- **WHEN** quien revisa publica un vehículo con pendientes en dos redes y ambas aceptan
+- **THEN** las dos quedan publicadas, cada una con el identificador que devolvió su red
+
+#### Scenario: Una sale y la otra falla
+
+- **WHEN** una red acepta la publicación y la otra la rechaza
+- **THEN** la que salió queda publicada, la que falló queda registrada como fallida con su motivo, y quien revisa ve los dos desenlaces por separado
+
+#### Scenario: Solo una red tiene pendiente
+
+- **WHEN** el vehículo ya se publicó en una red y sigue pendiente en la otra
+- **THEN** la acción envía únicamente la pendiente, y no vuelve a publicar la que ya salió
+
+#### Scenario: El texto editado vale para todas
+
+- **WHEN** quien revisa edita el texto y publica
+- **THEN** todas las redes reciben ese texto editado
+
+### Requirement: El texto se valida contra el límite más estricto de las redes pendientes
+
+Al editar el texto de un vehículo con pendientes en varias redes, el sistema SHALL validarlo contra el límite **más estricto** de esas redes.
+
+Un texto que una de las redes rechazaría no sirve para una acción que publica en todas, y descubrirlo al publicar desperdicia la aprobación.
+
+#### Scenario: Texto que excede el límite de una sola red
+
+- **WHEN** el texto entra en el límite de una red pero excede el de la otra, y ambas están pendientes
+- **THEN** se rechaza al guardar, indicando el límite que no se cumple
+
+#### Scenario: Queda pendiente una sola red
+
+- **WHEN** solo queda pendiente la red de límites más amplios
+- **THEN** el texto se valida contra esa red, sin aplicarle el límite de una red que ya no interviene
+
+### Requirement: Una publicación fallida se puede reintentar, y nunca una que ya salió
+
+El sistema SHALL permitir devolver a pendiente una publicación fallida, a pedido explícito de una persona y **por red**.
+
+NO SHALL permitirlo cuando la publicación tenga identificador externo: eso prueba que salió, y republicar duplicaría algo que no se deshace.
+
+Reintentar desde el estado de revisión manual SHALL advertir que no se sabe si la publicación salió, en lugar de presentarse como un reintento corriente.
+
+#### Scenario: Falló por un problema de contenido ya corregido
+
+- **WHEN** quien revisa reintenta una publicación fallida sin identificador externo
+- **THEN** vuelve a quedar pendiente, sin motivo de fallo, y se puede aprobar de nuevo
+
+#### Scenario: Se reintenta solo una de las dos redes
+
+- **WHEN** un vehículo se publicó en una red y falló en la otra, y se reintenta la fallida
+- **THEN** solo esa vuelve a pendiente, y la publicada permanece intacta
+
+#### Scenario: Se intenta reintentar algo ya publicado
+
+- **WHEN** se intenta reintentar una publicación que tiene identificador externo
+- **THEN** la acción se rechaza indicando que esa publicación ya salió
+
+#### Scenario: Reintento desde revisión manual
+
+- **WHEN** quien revisa reintenta una publicación en revisión manual
+- **THEN** el sistema advierte que pudo haberse publicado y que conviene comprobarlo en la red antes de continuar
+
+#### Scenario: Ya existe una pendiente nueva para esa red
+
+- **WHEN** se reintenta una fallida y el vehículo ya tiene otra pendiente en esa misma red
+- **THEN** la acción se rechaza explicando que ya hay un borrador esperando, en vez de fallar sin motivo aparente
 
 ### Requirement: Conectar una red no encola retroactivamente el inventario existente
 

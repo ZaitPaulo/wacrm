@@ -5,7 +5,11 @@ import {
   rateLimitResponse,
   RATE_LIMITS,
 } from '@/lib/rate-limit';
-import { validateCaption } from '@/lib/social/limits';
+import {
+  strictestLimits,
+  validateCaption,
+  type NetworkLimits,
+} from '@/lib/social/limits';
 import { networkAdapter } from '@/lib/social/networks';
 
 type Params = { params: Promise<{ id: string }> };
@@ -25,14 +29,21 @@ function networkLabel(network: string): string {
  *
  * Edita el texto de una publicación pendiente.
  *
+ * EL TEXTO ES DEL VEHÍCULO, NO DE LA FILA. La cola muestra un solo
+ * editor por vehículo y publica en todas sus redes con ese texto, así
+ * que guardar escribe en TODAS sus pendientes. Guardar solo en una
+ * dejaría la otra con el texto viejo y el botón único publicaría dos
+ * cosas distintas.
+ *
  * Los límites se validan ACÁ, al guardar, y no al publicar: descubrir
  * el exceso por el rechazo de Meta desperdicia una aprobación, que es
  * un recurso escaso cuando hay un tope por periodo.
  *
- * Y son los DE LA RED DE ESTA FILA, no los de una red fija. Advertir
- * por un tope que en el destino real no existe impide guardar un texto
- * perfectamente válido; aplicar el tope más laxo al destino más
- * estricto desperdicia la aprobación que se quería proteger.
+ * Y se valida contra el MÁS ESTRICTO de las redes que siguen
+ * pendientes: un texto que una de ellas rechazaría no sirve para un
+ * botón que publica en todas. Cuando queda una sola pendiente, se
+ * valida contra la suya y nada más — el tope de una red que ya no
+ * interviene no tiene por qué impedir escribir.
  */
 export async function PATCH(request: Request, { params }: Params) {
   try {
@@ -54,15 +65,16 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
 
-    // La fila se lee antes de validar porque de ella sale la red, y de
-    // la red salen los límites. La RLS ya acota a la cuenta.
+    // La fila se lee antes de validar porque de ella sale el vehículo, y
+    // del vehículo salen todas sus pendientes. La RLS ya acota a la
+    // cuenta.
     const { data: post, error: postErr } = await supabase
       .from('social_posts')
-      .select('id, network')
+      .select('id, vehicle_id')
       .eq('account_id', accountId)
       .eq('id', id)
       .eq('status', 'pending')
-      .maybeSingle<{ id: string; network: string }>();
+      .maybeSingle<{ id: string; vehicle_id: string }>();
     if (postErr) {
       console.error('[social/queue PATCH] lookup error:', postErr);
       return NextResponse.json(
@@ -77,28 +89,61 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
 
-    const adapter = networkAdapter(post.network);
-    if (!adapter) {
-      console.error('[social/queue PATCH] red desconocida:', post.network);
+    // Las hermanas: las demás pendientes del mismo vehículo. Son las
+    // que comparten el texto y las que definen contra qué se valida.
+    const { data: siblings, error: sibErr } = await supabase
+      .from('social_posts')
+      .select('id, network')
+      .eq('account_id', accountId)
+      .eq('vehicle_id', post.vehicle_id)
+      .eq('status', 'pending')
+      .returns<{ id: string; network: string }[]>();
+    if (sibErr) {
+      console.error('[social/queue PATCH] siblings error:', sibErr);
+      return NextResponse.json(
+        { error: 'No se pudo cargar la publicación' },
+        { status: 500 }
+      );
+    }
+
+    const pending = siblings ?? [];
+    const adapters = pending
+      .map((row) => networkAdapter(row.network))
+      .filter((a) => a !== undefined);
+    const limits = strictestLimits(adapters.map((a) => a.limits));
+    if (!limits) {
       return NextResponse.json(
         { error: 'Esa publicación va a una red que el sistema ya no maneja' },
         { status: 409 }
       );
     }
 
-    const problem = validateCaption(caption, adapter.limits);
+    // El nombre de la red que impone el límite, para poder decir cuál
+    // es. Con un tope compartido, "no entra" sin decir dónde no entra
+    // deja a quien escribe sin saber qué recortar.
+    const tightest = (pick: (l: NetworkLimits) => number | null) =>
+      adapters.reduce((best, a) => {
+        const v = pick(a.limits);
+        if (v === null) return best;
+        const bv = best ? pick(best.limits) : null;
+        return bv === null || v < bv ? a : best;
+      }, adapters[0]);
+
+    const problem = validateCaption(caption, limits);
     if (problem === 'too_long') {
+      const red = tightest((l) => l.captionMaxChars);
       return NextResponse.json(
         {
-          error: `El texto supera los ${adapter.limits.captionMaxChars} caracteres que acepta ${networkLabel(adapter.network)}`,
+          error: `El texto supera los ${limits.captionMaxChars} caracteres que acepta ${networkLabel(red.network)}`,
         },
         { status: 400 }
       );
     }
     if (problem === 'too_many_hashtags') {
+      const red = tightest((l) => l.maxHashtags);
       return NextResponse.json(
         {
-          error: `${networkLabel(adapter.network)} acepta hasta ${adapter.limits.maxHashtags} etiquetas`,
+          error: `${networkLabel(red.network)} acepta hasta ${limits.maxHashtags} etiquetas`,
         },
         { status: 400 }
       );
@@ -108,12 +153,15 @@ export async function PATCH(request: Request, { params }: Params) {
       .from('social_posts')
       .update({ edited_caption: caption })
       .eq('account_id', accountId)
-      .eq('id', id)
+      // TODAS las pendientes del vehículo, no solo la que se editó.
+      .in(
+        'id',
+        pending.map((row) => row.id)
+      )
       // Solo se edita lo que todavía no salió. Una publicación viva no
       // se modifica desde acá — el sistema no toca lo ya publicado.
       .eq('status', 'pending')
-      .select('id')
-      .maybeSingle();
+      .select('id');
     if (error) {
       console.error('[social/queue PATCH] error:', error);
       return NextResponse.json(
@@ -121,14 +169,14 @@ export async function PATCH(request: Request, { params }: Params) {
         { status: 500 }
       );
     }
-    if (!data) {
+    if (!data || data.length === 0) {
       return NextResponse.json(
         { error: 'Esa publicación ya no está pendiente' },
         { status: 409 }
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, updated: data.length });
   } catch (err) {
     return toErrorResponse(err);
   }

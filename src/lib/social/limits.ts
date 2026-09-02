@@ -85,3 +85,32 @@ export function validateCaption(
   }
   return null;
 }
+
+/**
+ * El límite más estricto de un conjunto de redes.
+ *
+ * Existe porque la cola publica en varias redes con UN SOLO texto: un
+ * texto que una de ellas rechazaría no sirve para ese botón, y
+ * descubrirlo al publicar desperdicia la aprobación.
+ *
+ * `maxHashtags` se queda con el tope más bajo de los que existen, y en
+ * `null` solo si NINGUNA red limita: basta con que una lo haga para que
+ * el texto compartido tenga que respetarlo.
+ *
+ * Con una sola red devuelve la suya, así que una red de límites amplios
+ * no arrastra los de otra que ya no interviene.
+ */
+export function strictestLimits(limits: NetworkLimits[]): NetworkLimits | null {
+  if (limits.length === 0) return null;
+
+  return limits.reduce((a, b) => ({
+    maxImages: Math.min(a.maxImages, b.maxImages),
+    captionMaxChars: Math.min(a.captionMaxChars, b.captionMaxChars),
+    maxHashtags:
+      a.maxHashtags === null
+        ? b.maxHashtags
+        : b.maxHashtags === null
+          ? a.maxHashtags
+          : Math.min(a.maxHashtags, b.maxHashtags),
+  }));
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   countHashtags,
   isPublishableImageUrl,
+  strictestLimits,
   validateCaption,
 } from './limits';
 import {
@@ -99,5 +100,39 @@ describe('validateCaption con una red que no limita etiquetas', () => {
     expect(
       validateCaption('a'.repeat(CAPTION_MAX_CHARS + 1), sinTope)
     ).toBe('too_long');
+  });
+});
+
+describe('strictestLimits', () => {
+  const IG = { maxImages: 10, captionMaxChars: 2200, maxHashtags: 30 };
+  const FB = { maxImages: 10, captionMaxChars: 63_206, maxHashtags: null };
+
+  it('sin redes no hay límite que aplicar', () => {
+    expect(strictestLimits([])).toBeNull();
+  });
+
+  it('con una sola red devuelve la suya, sin arrastrar la de otra', () => {
+    // Es lo que permite escribir largo cuando solo queda pendiente
+    // Facebook: el tope de Instagram ya no interviene.
+    expect(strictestLimits([FB])).toEqual(FB);
+  });
+
+  it('se queda con el tope de caracteres más bajo', () => {
+    expect(strictestLimits([FB, IG])!.captionMaxChars).toBe(2200);
+  });
+
+  it('basta con que UNA red limite las etiquetas para que el tope valga', () => {
+    // Facebook no limita, Instagram sí. El texto es compartido, así que
+    // tiene que respetar el de Instagram o el botón único no sirve.
+    expect(strictestLimits([FB, IG])!.maxHashtags).toBe(30);
+    expect(strictestLimits([IG, FB])!.maxHashtags).toBe(30);
+  });
+
+  it('deja null solo si NINGUNA red limita las etiquetas', () => {
+    expect(strictestLimits([FB, { ...FB, maxImages: 8 }])!.maxHashtags).toBeNull();
+  });
+
+  it('se queda con el máximo de fotos más bajo', () => {
+    expect(strictestLimits([IG, { ...FB, maxImages: 4 }])!.maxImages).toBe(4);
   });
 });

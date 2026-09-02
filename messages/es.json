@@ -2581,7 +2581,14 @@
       "instagram": "Instagram",
       "facebook": "Facebook"
     },
-    "alreadyPublishedHere": "Ya se publicó en {network} el {date}"
+    "alreadyPublishedHere": "Ya se publicó en {network} el {date}",
+    "publishAll": "Publicar en las {count} redes",
+    "retry": "Reintentar",
+    "retryFromReview": "Ya lo revisé, reintentar",
+    "retried": "La publicación de {network} volvió a la cola",
+    "retryFailed": "No se pudo reintentar",
+    "reviewHint": "No sabemos si esta publicación salió. Revisala en {network} antes de reintentar — el sistema no reintenta solo para no publicar dos veces.",
+    "onlyRetryLeft": "No queda nada pendiente de este vehículo. Reintentá la red que falló si querés volver a intentarlo."
   },
   "Brand": {
     "description": "CRM de WhatsApp para la compraventa de vehículos."
