@@ -2583,12 +2583,13 @@
     },
     "alreadyPublishedHere": "Ya se publicó en {network} el {date}",
     "publishAll": "Publicar en las {count} redes",
-    "retry": "Reintentar",
-    "retryFromReview": "Ya lo revisé, reintentar",
-    "retried": "La publicación de {network} volvió a la cola",
+    "retry": "Volver a la cola",
+    "retryFromReview": "Ya lo revisé, volver a la cola",
+    "retried": "La publicación de {network} volvió a la cola: revísala y pulsa Publicar",
     "retryFailed": "No se pudo reintentar",
     "reviewHint": "No sabemos si esta publicación salió. Revisala en {network} antes de reintentar — el sistema no reintenta solo para no publicar dos veces.",
-    "onlyRetryLeft": "No queda nada pendiente de este vehículo. Reintentá la red que falló si querés volver a intentarlo."
+    "onlyRetryLeft": "No queda nada pendiente de este vehículo. Devuelve a la cola la red que falló si quieres volver a intentarlo.",
+    "lastFailure": "El intento anterior falló: {reason}"
   },
   "Brand": {
     "description": "CRM de WhatsApp para la compraventa de vehículos."

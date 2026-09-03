@@ -639,6 +639,17 @@ function NetworkRow({
   const canRetry =
     (post.status === 'failed' || inDoubt) && !post.external_post_id;
 
+  // El motivo del último fallo sobrevive al rearmado, así que una fila
+  // pendiente puede traerlo. Se rotula distinto en ese caso: en una
+  // fallida describe cómo está, en una pendiente describe lo que ya
+  // pasó, y confundirlos haría leer un intento viejo como el estado
+  // actual.
+  const motivo = post.failure_reason
+    ? post.failure_kind === 'credentials'
+      ? t('failureCredentials', { network: label })
+      : post.failure_reason
+    : null;
+
   const tone =
     post.status === 'published'
       ? 'text-emerald-500'
@@ -677,11 +688,11 @@ function NetworkRow({
           </p>
         )}
 
-        {post.failure_reason && (
+        {motivo && (
           <p className="text-muted-foreground mt-1 text-xs">
-            {post.failure_kind === 'credentials'
-              ? t('failureCredentials', { network: label })
-              : post.failure_reason}
+            {post.status === 'pending'
+              ? t('lastFailure', { reason: motivo })
+              : motivo}
           </p>
         )}
         {inDoubt && (

@@ -173,6 +173,169 @@ describe('publishImagePost', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('no da por listo un contenedor del que Instagram no informa el estado', async () => {
+    // Una respuesta 200 SIN `status_code` no dice que esté listo: dice
+    // que no sabemos. Leerla como "listo" publica un contenedor a medio
+    // hacer, y eso vuelve como "Media ID is not available".
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValueOnce(ok({ id: 'container-1', status_code: 'FINISHED' }))
+      .mockResolvedValueOnce(ok({ id: 'post-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const postId = await publishImagePost({
+      ...AUTH,
+      imageUrls: ['https://cdn.example.com/a.jpg'],
+      caption: 'x',
+      poll: { intervalMs: 0 },
+    });
+
+    expect(postId).toBe('post-1');
+    // Volvió a preguntar en vez de publicar con la respuesta muda.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[3][0]).toContain('media_publish');
+  });
+
+  it('se rinde si Instagram nunca informa el estado', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValue(ok({ id: 'container-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const err = await publishImagePost({
+      ...AUTH,
+      imageUrls: ['https://cdn.example.com/a.jpg'],
+      caption: 'x',
+      poll: { intervalMs: 0, timeoutMs: 0 },
+    }).catch((e: unknown) => e);
+
+    expect((err as SocialPublishError).kind).toBe('content');
+    expect((err as Error).message).toMatch(/no informó el estado/i);
+    expect(
+      fetchMock.mock.calls.some((c) => String(c[0]).includes('media_publish'))
+    ).toBe(false);
+  });
+
+  it('reintenta el envío cuando Meta dice que la media todavía no está', async () => {
+    // 9007 es un "todavía no", no un "nunca": Meta contestó, así que no
+    // publicó nada y volver a intentar no puede duplicar.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValueOnce(ok({ id: 'container-1', status_code: 'FINISHED' }))
+      .mockResolvedValueOnce(
+        metaError(400, {
+          message: 'Media ID is not available',
+          code: 9007,
+          type: 'OAuthException',
+        })
+      )
+      .mockResolvedValueOnce(ok({ id: 'post-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const postId = await publishImagePost({
+      ...AUTH,
+      imageUrls: ['https://cdn.example.com/a.jpg'],
+      caption: 'x',
+      poll: { intervalMs: 0 },
+      retry: { delayMs: 0 },
+    });
+
+    expect(postId).toBe('post-1');
+    const envios = fetchMock.mock.calls.filter((c) =>
+      String(c[0]).includes('media_publish')
+    );
+    expect(envios).toHaveLength(2);
+  });
+
+  it('deja de reintentar y falla si Meta insiste en que no está', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValueOnce(ok({ id: 'container-1', status_code: 'FINISHED' }))
+      // Una fábrica y no un objeto fijo: el cuerpo de un Response solo
+      // se lee una vez, y acá se lo pide en cada insistencia.
+      .mockImplementation(() =>
+        metaError(400, {
+          message: 'Media ID is not available',
+          code: 9007,
+          type: 'OAuthException',
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const err = await publishImagePost({
+      ...AUTH,
+      imageUrls: ['https://cdn.example.com/a.jpg'],
+      caption: 'x',
+      poll: { intervalMs: 0 },
+      retry: { attempts: 3, delayMs: 0 },
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(SocialPublishError);
+    expect((err as Error).message).toMatch(/Media ID is not available/);
+    expect(
+      fetchMock.mock.calls.filter((c) => String(c[0]).includes('media_publish'))
+    ).toHaveLength(3);
+  });
+
+  it('no reintenta un rechazo que no es de espera', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValueOnce(ok({ id: 'container-1', status_code: 'FINISHED' }))
+      .mockResolvedValue(
+        metaError(401, {
+          message: 'Invalid OAuth access token',
+          code: 190,
+          type: 'OAuthException',
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const err = await publishImagePost({
+      ...AUTH,
+      imageUrls: ['https://cdn.example.com/a.jpg'],
+      caption: 'x',
+      poll: { intervalMs: 0 },
+      retry: { delayMs: 0 },
+    }).catch((e: unknown) => e);
+
+    expect((err as SocialPublishError).kind).toBe('credentials');
+    // Un token rechazado no mejora reintentando.
+    expect(
+      fetchMock.mock.calls.filter((c) => String(c[0]).includes('media_publish'))
+    ).toHaveLength(1);
+  });
+
+  it('NO reintenta cuando el envío se quedó sin respuesta', async () => {
+    // Sin respuesta no se sabe si salió. Reintentar podría duplicar una
+    // publicación que no se puede retirar; eso va a revisión manual.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'container-1' }))
+      .mockResolvedValueOnce(ok({ id: 'container-1', status_code: 'FINISHED' }))
+      .mockRejectedValue(new Error('socket hang up'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const err = await publishImagePost({
+      ...AUTH,
+      imageUrls: ['https://cdn.example.com/a.jpg'],
+      caption: 'x',
+      poll: { intervalMs: 0 },
+      retry: { delayMs: 0 },
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(SocialPublishError);
+    expect((err as SocialPublishError).answered).toBe(false);
+    expect(
+      fetchMock.mock.calls.filter((c) => String(c[0]).includes('media_publish'))
+    ).toHaveLength(1);
+  });
+
   it('rechaza publicar sin imágenes', async () => {
     vi.stubGlobal('fetch', vi.fn());
     await expect(

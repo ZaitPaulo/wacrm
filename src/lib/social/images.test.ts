@@ -24,7 +24,7 @@ interface UploadOptions {
 }
 
 /** Cliente de Storage simulado, con el encadenamiento de supabase-js. */
-function fakeDb(opts: { uploadError?: string } = {}) {
+function fakeDb(opts: { uploadError?: string; yaConvertidas?: boolean } = {}) {
   // Los parámetros van declarados aunque el cuerpo no los use: sin
   // ellos las llamadas registradas se tipan como tupla vacía y leer
   // mock.calls[0][2] no compila.
@@ -37,10 +37,16 @@ function fakeDb(opts: { uploadError?: string } = {}) {
   const getPublicUrl = vi.fn((path: string) => ({
     data: { publicUrl: `https://bucket.example.com/${path}` },
   }));
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const exists = vi.fn(async (_path: string) => ({
+    data: opts.yaConvertidas ?? false,
+    error: null,
+  }));
   return {
-    db: { storage: { from: () => ({ upload, getPublicUrl }) } },
+    db: { storage: { from: () => ({ upload, getPublicUrl, exists }) } },
     upload,
     getPublicUrl,
+    exists,
   };
 }
 
@@ -176,6 +182,41 @@ describe('ensurePublishableImages', () => {
     });
 
     expect(flatten).toHaveBeenCalledWith({ background: '#ffffff' });
+  });
+
+  it('reutiliza la copia que dejó la otra red en vez de rehacerla', async () => {
+    // La ruta no lleva la red, así que publicar el mismo vehículo en la
+    // segunda red cae en el objeto que dejó la primera. Volver a
+    // descargar, convertir y subir es trabajo repetido sobre bytes
+    // idénticos, y encima reescribe el objeto que Meta está por leer.
+    const { db, upload } = fakeDb({ yaConvertidas: true });
+
+    const out = await ensurePublishableImages({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      db: db as any,
+      accountId: ACCOUNT_ID,
+      imageUrls: ['https://cdn.example.com/a.webp'],
+    });
+
+    expect(out[0]).toContain('bucket.example.com');
+    expect(out[0].endsWith('.jpg')).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(sharpMock).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it('convierte igual si la copia no está', async () => {
+    const { db, upload, exists } = fakeDb({ yaConvertidas: false });
+
+    await ensurePublishableImages({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      db: db as any,
+      accountId: ACCOUNT_ID,
+      imageUrls: ['https://cdn.example.com/a.webp'],
+    });
+
+    expect(exists).toHaveBeenCalledTimes(1);
+    expect(upload).toHaveBeenCalledTimes(1);
   });
 
   it('conserva el orden, que define el encuadre del carrusel', async () => {

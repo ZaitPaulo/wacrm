@@ -101,6 +101,29 @@ async function convertAndUpload(args: {
 }): Promise<string> {
   const { db, accountId, sourceUrl } = args;
 
+  const path = convertedObjectPath(accountId, sourceUrl);
+  const publicUrlOf = () =>
+    db.storage.from(SHOWCASE_BUCKET).getPublicUrl(path).data.publicUrl;
+
+  // La copia que dejó la primera red sirve tal cual para la segunda: la
+  // ruta deriva del hash de la URL de origen y no lleva la red, así que
+  // los bytes son los mismos. Sin esta comprobación el reúso que promete
+  // la decisión 9 no ocurría nunca —se decidía mirando la URL ORIGINAL,
+  // que jamás es publicable—, y cada red volvía a descargar, convertir y
+  // sobreescribir el mismo objeto.
+  //
+  // Un fallo consultando no se propaga: se convierte, que es lo que se
+  // hacía antes de existir esta comprobación. Ahorrar trabajo no puede
+  // costar una publicación.
+  try {
+    const { data: yaEsta } = await db.storage
+      .from(SHOWCASE_BUCKET)
+      .exists(path);
+    if (yaEsta) return publicUrlOf();
+  } catch {
+    // Se convierte igual.
+  }
+
   const original = await downloadImage(sourceUrl);
 
   let jpeg: Buffer;
@@ -124,7 +147,6 @@ async function convertAndUpload(args: {
   // además una porción minúscula del pool.
   const body = new Uint8Array(jpeg);
 
-  const path = convertedObjectPath(accountId, sourceUrl);
   const { error } = await db.storage.from(SHOWCASE_BUCKET).upload(path, body, {
     contentType: 'image/jpeg',
     cacheControl: '3600',
@@ -138,10 +160,7 @@ async function convertAndUpload(args: {
     );
   }
 
-  const {
-    data: { publicUrl },
-  } = db.storage.from(SHOWCASE_BUCKET).getPublicUrl(path);
-  return publicUrl;
+  return publicUrlOf();
 }
 
 /**

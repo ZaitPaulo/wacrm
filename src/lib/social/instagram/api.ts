@@ -283,30 +283,72 @@ export async function waitForContainerReady(
     );
     const status = data.status_code;
 
+    if (status === 'ERROR') {
+      throw contentError(
+        'Instagram no pudo procesar las fotos de esta publicación'
+      );
+    }
+    if (status === 'EXPIRED') {
+      throw contentError(
+        'Instagram descartó la publicación por antigüedad; hay que rearmarla'
+      );
+    }
+
     // Un estado que no reconocemos se deja pasar en vez de bloquear la
     // publicación: Meta ha renombrado sus valores antes, y plantarse
     // sería convertir un renombre en "no se puede publicar nunca".
-    if (status !== 'IN_PROGRESS') {
-      if (status === 'ERROR') {
-        throw contentError(
-          'Instagram no pudo procesar las fotos de esta publicación'
-        );
-      }
-      if (status === 'EXPIRED') {
-        throw contentError(
-          'Instagram descartó la publicación por antigüedad; hay que rearmarla'
-        );
-      }
-      return;
-    }
+    //
+    // PERO UNA RESPUESTA SIN ESTADO NO ES UN ESTADO NUEVO: es una
+    // respuesta que no contesta la pregunta. Tratarla como "listo"
+    // publica un contenedor a medio hacer, y eso vuelve como "Media ID
+    // is not available" —el fallo del 2026-09-03—. Ante el silencio se
+    // vuelve a preguntar, y si nunca contesta gana el plazo.
+    const informado = typeof status === 'string' && status.length > 0;
+    if (informado && status !== 'IN_PROGRESS') return;
 
     if (Date.now() + intervalMs >= deadline) {
       throw contentError(
-        'Instagram sigue procesando las fotos; reintenta en un momento'
+        informado
+          ? 'Instagram sigue procesando las fotos; reintenta en un momento'
+          : 'Instagram no informó el estado de la publicación; reintenta en un momento'
       );
     }
     await sleep(intervalMs);
   }
+}
+
+/**
+ * El código con el que Meta dice "esa media todavía no está lista".
+ *
+ * Llega como `OAuthException` sin serlo —de ahí que `errors.ts` no lo
+ * lea como un problema de credenciales—, y describe una condición
+ * PASAJERA: el contenedor existe, Meta lo dio por `FINISHED`, pero
+ * todavía no lo acepta para publicar.
+ */
+const MEDIA_NOT_READY_CODE = 9007;
+
+/** Cuántas veces se insiste con el envío ante ese "todavía no". */
+const PUBLISH_ATTEMPTS = 3;
+
+/** Cuánto se espera entre insistencias. */
+const PUBLISH_RETRY_DELAY_MS = 5_000;
+
+/**
+ * True si el rechazo es "todavía no está lista", y por lo tanto vale la
+ * pena volver a intentar.
+ *
+ * EXIGE QUE META HAYA CONTESTADO. Sin respuesta no se sabe si la
+ * publicación salió, y ahí reintentar puede duplicar algo que no se
+ * retira: ese caso va a revisión manual por su propio camino
+ * (`isOutcomeUnknown`), nunca por acá.
+ */
+function isMediaNotReady(err: unknown): boolean {
+  if (!(err instanceof SocialPublishError)) return false;
+  if (!err.answered) return false;
+  return (
+    err.code === MEDIA_NOT_READY_CODE ||
+    /media id is not available/i.test(err.message)
+  );
 }
 
 /**
@@ -318,23 +360,49 @@ export async function waitForContainerReady(
  * PRECONDICIÓN: el contenedor tiene que estar en `FINISHED`. Llamarla
  * sin pasar antes por `waitForContainerReady` devuelve "Media ID is not
  * available", que además viene disfrazado de error de credenciales.
+ *
+ * PERO `FINISHED` NO ALCANZA. El 2026-09-03 Meta rechazó con ese mismo
+ * mensaje un contenedor que él acababa de dar por terminado, y el
+ * sistema lo anotó como fallo definitivo: la publicación quedó muerta
+ * hasta que una persona la rearmó a mano. Es un "todavía no" leído como
+ * "nunca". Por eso se insiste unas pocas veces antes de rendirse.
+ *
+ * Reintentar es SEGURO acá y solo acá: se hace únicamente cuando Meta
+ * contestó rechazando, o sea cuando consta que no publicó nada.
  */
 export async function publishContainer(
-  args: IgAuthArgs & { creationId: string }
-): Promise<string> {
-  const { igUserId, accessToken, creationId } = args;
-  const data = await igPost<ContainerResponse>(
-    `${igUserId}/media_publish`,
-    accessToken,
-    { creation_id: creationId },
-    'publish'
-  );
-  if (!data.id) {
-    throw contentError(
-      'Instagram no devolvió el identificador de la publicación'
-    );
+  args: IgAuthArgs & {
+    creationId: string;
+    /** Solo para las pruebas: acorta o acota las insistencias. */
+    retry?: { attempts?: number; delayMs?: number };
   }
-  return data.id;
+): Promise<string> {
+  const { igUserId, accessToken, creationId, retry } = args;
+  const attempts = retry?.attempts ?? PUBLISH_ATTEMPTS;
+  const delayMs = retry?.delayMs ?? PUBLISH_RETRY_DELAY_MS;
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const data = await igPost<ContainerResponse>(
+        `${igUserId}/media_publish`,
+        accessToken,
+        { creation_id: creationId },
+        'publish'
+      );
+      if (!data.id) {
+        throw contentError(
+          'Instagram no devolvió el identificador de la publicación'
+        );
+      }
+      return data.id;
+    } catch (err) {
+      if (attempt >= attempts || !isMediaNotReady(err)) throw err;
+      console.warn(
+        `[instagram] la media todavía no está disponible (intento ${attempt}/${attempts}); reintento en ${delayMs} ms`
+      );
+      await sleep(delayMs);
+    }
+  }
 }
 
 /**
@@ -359,6 +427,7 @@ export async function publishContainer(
  *   el orden que define el encuadre del carrusel. Se recorta al tope.
  * @param caption Texto de la publicación; en un carrusel va en el padre.
  * @param poll Acorta la espera del procesado. Solo para las pruebas.
+ * @param retry Acota las insistencias del envío. Solo para las pruebas.
  */
 export async function publishImagePost(
   args: IgAuthArgs & {
@@ -366,9 +435,11 @@ export async function publishImagePost(
     caption: string;
     /** Solo para las pruebas: acorta la espera del procesado. */
     poll?: { intervalMs?: number; timeoutMs?: number };
+    /** Solo para las pruebas: acota las insistencias del envío. */
+    retry?: { attempts?: number; delayMs?: number };
   }
 ): Promise<string> {
-  const { igUserId, accessToken, imageUrls, caption, poll } = args;
+  const { igUserId, accessToken, imageUrls, caption, poll, retry } = args;
 
   if (imageUrls.length === 0) {
     throw contentError('No hay imágenes para publicar');
@@ -379,7 +450,7 @@ export async function publishImagePost(
   /** Nada se publica sin que Instagram haya terminado de procesarlo. */
   const publishWhenReady = async (creationId: string) => {
     await waitForContainerReady({ ...auth, containerId: creationId, ...poll });
-    return publishContainer({ ...auth, creationId });
+    return publishContainer({ ...auth, creationId, retry });
   };
 
   if (imageUrls.length === 1) {

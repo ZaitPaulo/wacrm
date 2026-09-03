@@ -21,7 +21,9 @@ type Params = { params: Promise<{ id: string }> };
  * reponerlo a mano con SQL.
  *
  * NO PUBLICA NADA. Solo devuelve la fila a `pending`; sale a la red
- * recién cuando alguien aprueba, que sigue siendo el único camino.
+ * recién cuando alguien aprueba, que sigue siendo el único camino. La
+ * pantalla lo nombra en esos términos —«Volver a la cola»— porque
+ * llamarlo «Reintentar» hacía esperar un envío que no ocurre.
  */
 export async function POST(_request: Request, { params }: Params) {
   try {
@@ -83,10 +85,16 @@ export async function POST(_request: Request, { params }: Params) {
 
     const { data, error } = await supabase
       .from('social_posts')
+      // EL MOTIVO DEL FALLO NO SE BORRA. Rearmar no deshace lo que
+      // pasó: quien vuelva a la cola —o quien mire el problema una hora
+      // después— tiene que poder leer por qué no salió la vez anterior.
+      // Borrarlo dejaba una pendiente indistinguible de una recién
+      // preparada, y el motivo solo quedaba en los logs del servidor.
+      //
+      // Se limpia solo al publicar bien (`approveAndPublish`) o al
+      // volver a fallar, que lo reescribe.
       .update({
         status: 'pending',
-        failure_kind: null,
-        failure_reason: null,
         publish_locked_at: null,
       })
       .eq('account_id', accountId)
