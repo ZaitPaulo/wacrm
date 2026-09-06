@@ -3,6 +3,7 @@ import {
   INITIAL_FILTER_STATE,
   serializeFilterState,
   hasActiveFilters,
+  countActiveFilters,
   getRecentVehicleIds,
   filterVehicles,
   sortVehicles,
@@ -136,6 +137,25 @@ describe('Storefront filter & sort logic', () => {
       expect(hasActiveFilters({ ...INITIAL_FILTER_STATE, withPhotos: true })).toBe(true)
       expect(hasActiveFilters({ ...INITIAL_FILTER_STATE, automatic: true })).toBe(true)
       expect(hasActiveFilters({ ...INITIAL_FILTER_STATE, recent: true })).toBe(true)
+    })
+  })
+
+  describe('countActiveFilters', () => {
+    it('returns 0 for initial state', () => {
+      expect(countActiveFilters(INITIAL_FILTER_STATE)).toBe(0)
+    })
+
+    it('correctly counts active filters, shortcuts, and query', () => {
+      expect(countActiveFilters({ ...INITIAL_FILTER_STATE, q: 'duster' })).toBe(1)
+      expect(
+        countActiveFilters({
+          ...INITIAL_FILTER_STATE,
+          q: 'duster',
+          brand: 'Renault',
+          withPhotos: true,
+          automatic: true,
+        }),
+      ).toBe(4)
     })
   })
 
