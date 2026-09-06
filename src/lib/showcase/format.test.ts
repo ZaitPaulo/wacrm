@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { splitHours } from './format'
+import {
+  DEFAULT_BRAND_COLOR,
+  requestPhotosHref,
+  resolveBrandColor,
+  splitHours,
+} from './format'
 
 describe('splitHours', () => {
   it('splits on newlines, which is what the textarea produces', () => {
@@ -50,3 +55,66 @@ describe('splitHours', () => {
     expect(splitHours('Todos los días 8-8')).toEqual(['Todos los días 8-8'])
   })
 })
+
+describe('resolveBrandColor', () => {
+  it('returns valid 6-digit hex color as provided', () => {
+    expect(resolveBrandColor('#e21b22')).toBe('#e21b22')
+    expect(resolveBrandColor('#E21B22')).toBe('#E21B22')
+    expect(resolveBrandColor('#0059bb')).toBe('#0059bb')
+    expect(resolveBrandColor('#123456')).toBe('#123456')
+  })
+
+  it('falls back to DEFAULT_BRAND_COLOR for null, undefined or empty string', () => {
+    expect(resolveBrandColor(null)).toBe(DEFAULT_BRAND_COLOR)
+    expect(resolveBrandColor(undefined)).toBe(DEFAULT_BRAND_COLOR)
+    expect(resolveBrandColor('')).toBe(DEFAULT_BRAND_COLOR)
+    expect(resolveBrandColor('   ')).toBe(DEFAULT_BRAND_COLOR)
+  })
+
+  it('falls back to DEFAULT_BRAND_COLOR for invalid formats', () => {
+    expect(resolveBrandColor('red')).toBe(DEFAULT_BRAND_COLOR)
+    expect(resolveBrandColor('#fff')).toBe(DEFAULT_BRAND_COLOR)
+    expect(resolveBrandColor('#12345')).toBe(DEFAULT_BRAND_COLOR)
+    expect(resolveBrandColor('#1234567')).toBe(DEFAULT_BRAND_COLOR)
+    expect(resolveBrandColor('123456')).toBe(DEFAULT_BRAND_COLOR)
+    expect(resolveBrandColor('#gggggg')).toBe(DEFAULT_BRAND_COLOR)
+    expect(resolveBrandColor('#12 456')).toBe(DEFAULT_BRAND_COLOR)
+  })
+})
+
+describe('requestPhotosHref', () => {
+  const baseVehicle = {
+    brand: 'Renault',
+    model: 'Duster',
+    year: 2022,
+  }
+
+  it('strips non-digits from phone number and creates wa.me link', () => {
+    const href = requestPhotosHref('+57 (300) 123-4567', baseVehicle)
+    expect(href).toMatch(/^https:\/\/wa\.me\/573001234567\?text=/)
+  })
+
+  it('includes brand, model, year in message without ref tag when public_ref is missing', () => {
+    const href = requestPhotosHref('573001234567', baseVehicle)
+    const url = new URL(href)
+    const text = url.searchParams.get('text') ?? ''
+    expect(text).toContain('Renault')
+    expect(text).toContain('Duster')
+    expect(text).toContain('2022')
+    expect(text).not.toContain('[Ref:')
+  })
+
+  it('appends formatted ref tag at the end when public_ref is present', () => {
+    const href = requestPhotosHref('573001234567', {
+      ...baseVehicle,
+      public_ref: 'X7K2M9',
+    })
+    const url = new URL(href)
+    const text = url.searchParams.get('text') ?? ''
+    expect(text).toContain('Renault')
+    expect(text).toContain('Duster')
+    expect(text).toContain('2022')
+    expect(text).toMatch(/\[Ref:\s*X7K2M9\]$/)
+  })
+})
+
