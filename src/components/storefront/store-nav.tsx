@@ -22,7 +22,7 @@ export async function StoreNav({ account }: { account: ShowcaseAccount }) {
                 className="h-8 w-auto object-contain"
               />
             ) : (
-              <span className="text-2xl font-extrabold uppercase tracking-tighter text-black">
+              <span className="text-2xl font-extrabold uppercase tracking-tighter text-black font-[family-name:var(--font-barlow-condensed)]">
                 {displayName}
               </span>
             )}
@@ -30,9 +30,9 @@ export async function StoreNav({ account }: { account: ShowcaseAccount }) {
           <nav className="hidden items-center gap-6 md:flex">
             <Link
               href="/#inventario"
-              className="border-b-2 border-black pb-1 text-xs font-semibold uppercase tracking-wide text-black"
+              className="border-b-2 border-black pb-1 text-xs font-semibold uppercase tracking-wide text-black hover:border-(--brand) hover:text-(--brand) transition-colors font-[family-name:var(--font-barlow-condensed)]"
             >
-              Inventario
+              {t('inventory')}
             </Link>
           </nav>
         </div>
@@ -42,14 +42,14 @@ export async function StoreNav({ account }: { account: ShowcaseAccount }) {
               href={`https://wa.me/${waDigits}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden text-xs font-semibold uppercase tracking-wide text-[#44474d] transition-colors hover:text-black md:block"
+              className="hidden text-xs font-semibold uppercase tracking-wide text-[#44474d] transition-colors hover:text-(--brand) md:block font-[family-name:var(--font-barlow-condensed)]"
             >
-              Contacto
+              {t('contact')}
             </a>
           )}
           <Link
             href="/login"
-            className="rounded-lg bg-[#0059bb] px-6 py-2.5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#0070ea]"
+            className="rounded-lg bg-black px-6 py-2.5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-neutral-800 font-[family-name:var(--font-barlow-condensed)]"
           >
             {t('signIn')}
           </Link>

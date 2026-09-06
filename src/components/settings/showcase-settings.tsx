@@ -15,6 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { useCan } from '@/hooks/use-can';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { DEFAULT_BRAND_COLOR } from '@/lib/showcase/format';
 
 /**
  * Ajustes de la vitrina pública (migraciones 503/505). Un admin activa
@@ -34,6 +35,7 @@ export function ShowcaseSettings() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [hours, setHours] = useState('');
+  const [brandColor, setBrandColor] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,6 +77,7 @@ export function ShowcaseSettings() {
           setWhatsapp(a.public_whatsapp ?? '');
           setName(a.public_name ?? '');
           setLogoUrl(a.public_logo_url ?? '');
+          setBrandColor(a.public_brand_color ?? '');
           setAddress(a.public_address ?? '');
           setPhone(a.public_phone ?? '');
           setEmail(a.public_email ?? '');
@@ -88,6 +91,12 @@ export function ShowcaseSettings() {
   }, []);
 
   async function save() {
+    const trimmedColor = brandColor.trim();
+    if (trimmedColor !== '' && !/^#[0-9a-fA-F]{6}$/.test(trimmedColor)) {
+      toast.error('El color de marca debe tener formato hexadecimal válido (ej. #e21b22)');
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch('/api/account', {
@@ -98,6 +107,7 @@ export function ShowcaseSettings() {
           public_whatsapp: whatsapp.trim() || null,
           public_name: name.trim() || null,
           public_logo_url: logoUrl.trim() || null,
+          public_brand_color: trimmedColor || null,
           public_address: address.trim() || null,
           public_phone: phone.trim() || null,
           public_email: email.trim() || null,
@@ -225,6 +235,52 @@ export function ShowcaseSettings() {
               className="hidden"
               onChange={handleLogoUpload}
             />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="pbrandcolor">Color de marca</Label>
+            <div className="flex items-center gap-3">
+              <div
+                className="size-9 rounded-lg border border-border shrink-0 shadow-xs transition-colors"
+                style={{
+                  backgroundColor: /^#[0-9a-fA-F]{6}$/.test(brandColor.trim())
+                    ? brandColor.trim()
+                    : DEFAULT_BRAND_COLOR,
+                }}
+                title="Vista previa del color"
+              />
+              <input
+                type="color"
+                value={
+                  /^#[0-9a-fA-F]{6}$/.test(brandColor.trim())
+                    ? brandColor.trim()
+                    : DEFAULT_BRAND_COLOR
+                }
+                onChange={(e) => setBrandColor(e.target.value)}
+                disabled={!canEdit}
+                className="size-9 rounded-lg border border-border cursor-pointer bg-transparent p-0.5"
+              />
+              <Input
+                id="pbrandcolor"
+                value={brandColor}
+                onChange={(e) => setBrandColor(e.target.value)}
+                placeholder={DEFAULT_BRAND_COLOR}
+                disabled={!canEdit}
+                className="max-w-[160px] font-mono"
+              />
+              {canEdit && brandColor && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setBrandColor('')}
+                >
+                  Restablecer
+                </Button>
+              )}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Color de acento institucional para botones y destacados en la vitrina pública. Si se deja vacío, se usa el rojo institucional de respaldo ({DEFAULT_BRAND_COLOR}).
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="pphone">{t('showcase.phone')}</Label>

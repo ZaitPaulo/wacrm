@@ -40,7 +40,7 @@ export function ShareVehicleButton({
   const base =
     'relative z-20 inline-flex items-center justify-center gap-2 rounded-lg' +
     ' border border-[#c5c6cd] bg-white text-[#191c1e] transition-colors' +
-    ' hover:bg-[#f2f4f6]';
+    ' hover:bg-[#f2f4f6] hover:border-(--brand)';
 
   return (
     <a
@@ -53,7 +53,7 @@ export function ShareVehicleButton({
       className={
         variant === 'card'
           ? `${base} size-11 shrink-0`
-          : `${base} w-full px-6 py-4 text-sm font-semibold uppercase tracking-wide`
+          : `${base} w-full px-6 py-4 text-sm font-semibold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]`
       }
     >
       <Share2 className={variant === 'card' ? 'size-[18px]' : 'size-5'} />

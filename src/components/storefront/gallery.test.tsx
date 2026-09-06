@@ -3,11 +3,12 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('next/image', () => ({
-  default: (props: any) => React.createElement('img', { ...props, src: props.src }),
+  default: (props: Record<string, unknown>) =>
+    React.createElement('img', { ...props, src: props.src as string }),
 }))
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string, params?: Record<string, any>) => {
+  useTranslations: () => (key: string, params?: Record<string, unknown>) => {
     if (key === 'galleryCount' && params) {
       return `${params.current} de ${params.total}`
     }

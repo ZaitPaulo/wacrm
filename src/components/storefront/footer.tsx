@@ -34,7 +34,7 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
               // un logotipo ya lleva el nombre dentro, así que mostrar
               // los dos lo repetía. Mismo criterio que la cabecera
               // (`store-nav.tsx`), que siempre enseñó uno u otro.
-              <p className="text-xl font-black uppercase tracking-tight text-black">
+              <p className="text-xl font-black uppercase tracking-tight text-black font-[family-name:var(--font-barlow-condensed)]">
                 {displayName}
               </p>
             )}
@@ -57,7 +57,7 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
 
           {/* Contacto */}
           <div>
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#191c1e]">
+            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#191c1e] font-[family-name:var(--font-barlow-condensed)]">
               {t('contact')}
             </h4>
             <ul className="space-y-2.5 text-sm text-[#44474d]">
@@ -72,7 +72,7 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
                   <Phone className="size-4 shrink-0 text-[#75777e]" />
                   <a
                     href={`tel:${account.public_phone.replace(/\s+/g, '')}`}
-                    className="hover:text-black"
+                    className="transition-colors hover:text-(--brand)"
                   >
                     {account.public_phone}
                   </a>
@@ -85,7 +85,7 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
                     href={`https://wa.me/${waDigits}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-black"
+                    className="transition-colors hover:text-(--brand)"
                   >
                     WhatsApp
                   </a>
@@ -94,7 +94,7 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
               {account.public_email && (
                 <li className="flex items-center gap-2">
                   <Mail className="size-4 shrink-0 text-[#75777e]" />
-                  <a href={`mailto:${account.public_email}`} className="hover:text-black">
+                  <a href={`mailto:${account.public_email}`} className="transition-colors hover:text-(--brand)">
                     {account.public_email}
                   </a>
                 </li>
@@ -108,10 +108,10 @@ export async function StoreFooter({ account }: { account: ShowcaseAccount }) {
             © {new Date().getFullYear()} {displayName}
           </span>
           <div className="flex items-center gap-4">
-            <Link href="/privacidad" className="transition-colors hover:text-black">
+            <Link href="/privacidad" className="transition-colors hover:text-(--brand)">
               {t('privacy')}
             </Link>
-            <Link href="/login" className="transition-colors hover:text-black">
+            <Link href="/login" className="transition-colors hover:text-(--brand)">
               {t('administration')}
             </Link>
           </div>

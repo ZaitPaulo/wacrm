@@ -32,7 +32,7 @@ export async function GET() {
     const { data: extra } = await ctx.supabase
       .from("accounts")
       .select(
-        "showcase_enabled, public_whatsapp, public_name, public_logo_url, public_address, public_phone, public_email, public_hours",
+        "showcase_enabled, public_whatsapp, public_brand_color, public_name, public_logo_url, public_address, public_phone, public_email, public_hours",
       )
       .eq("id", ctx.accountId)
       .maybeSingle();
@@ -41,6 +41,7 @@ export async function GET() {
         ...ctx.account,
         showcase_enabled: extra?.showcase_enabled ?? false,
         public_whatsapp: extra?.public_whatsapp ?? null,
+        public_brand_color: extra?.public_brand_color ?? null,
         public_name: extra?.public_name ?? null,
         public_logo_url: extra?.public_logo_url ?? null,
         public_address: extra?.public_address ?? null,
@@ -133,6 +134,29 @@ export async function PATCH(request: Request) {
       }
     }
 
+    if (body.public_brand_color !== undefined) {
+      if (body.public_brand_color === null || body.public_brand_color === "") {
+        update.public_brand_color = null;
+      } else if (typeof body.public_brand_color === "string") {
+        const trimmed = body.public_brand_color.trim();
+        if (trimmed === "") {
+          update.public_brand_color = null;
+        } else if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+          update.public_brand_color = trimmed;
+        } else {
+          return NextResponse.json(
+            { error: "El color de marca debe tener formato hexadecimal válido (ej. #e21b22)." },
+            { status: 400 },
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { error: "'public_brand_color' must be a string or null" },
+          { status: 400 },
+        );
+      }
+    }
+
     // Perfil público del negocio (footer): textos libres anulables.
     const textFields = [
       "public_name",
@@ -167,7 +191,7 @@ export async function PATCH(request: Request) {
       .from("accounts")
       .update(update)
       .eq("id", ctx.accountId)
-      .select("id, name, showcase_enabled, public_whatsapp")
+      .select("id, name, showcase_enabled, public_whatsapp, public_brand_color")
       .single();
 
     if (error) {
