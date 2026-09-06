@@ -8,7 +8,7 @@ import type {
 } from './format'
 
 const ACCOUNT_COLUMNS =
-  'id, name, default_currency, public_whatsapp, public_name, public_logo_url, public_address, public_phone, public_email, public_hours'
+  'id, name, default_currency, public_whatsapp, public_brand_color, public_name, public_logo_url, public_address, public_phone, public_email, public_hours'
 
 // ============================================================
 // Datos de la vitrina pública (server-only).
@@ -52,7 +52,7 @@ export const getShowcase = cache(async (): Promise<ShowcaseData | null> => {
   const { data: vehicles, error: vehErr } = await db
     .from('inventory_vehicles')
     .select(
-      'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, condition, features, images, public_ref',
+      'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, condition, features, images, public_ref, created_at',
     )
     .eq('account_id', account.id)
     .eq('status', 'available')
@@ -69,13 +69,18 @@ export const getShowcase = cache(async (): Promise<ShowcaseData | null> => {
 
 /**
  * Un vehículo 'available' de la cuenta vitrina, por id, con todos los
- * campos de detalle + la cuenta (para el CTA y el footer). `null` si no
- * existe, no está disponible, o no pertenece a la vitrina activa.
+ * campos de detalle + la cuenta (para el CTA y el footer) + hasta 3
+ * vehículos parecidos (misma body_type, ordenados por cercanía de precio).
+ * `null` si no existe, no está disponible, o no pertenece a la vitrina activa.
  */
 export const getShowcaseVehicle = cache(
   async (
     id: string,
-  ): Promise<{ account: ShowcaseAccount; vehicle: ShowcaseVehicleDetail } | null> => {
+  ): Promise<{
+    account: ShowcaseAccount
+    vehicle: ShowcaseVehicleDetail
+    similarVehicles: ShowcaseVehicle[]
+  } | null> => {
     const db = admin()
 
     const { data: account, error: accErr } = await db
@@ -88,7 +93,7 @@ export const getShowcaseVehicle = cache(
     const { data: vehicle, error: vehErr } = await db
       .from('inventory_vehicles')
       .select(
-        'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, color, condition, features, images, public_ref',
+        'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, color, condition, features, images, public_ref, created_at',
       )
       .eq('account_id', account.id)
       .eq('id', id)
@@ -96,9 +101,33 @@ export const getShowcaseVehicle = cache(
       .maybeSingle()
     if (vehErr || !vehicle) return null
 
+    let similarVehicles: ShowcaseVehicle[] = []
+    if (vehicle.body_type) {
+      const { data: similar, error: simErr } = await db
+        .from('inventory_vehicles')
+        .select(
+          'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, condition, features, images, public_ref, created_at',
+        )
+        .eq('account_id', account.id)
+        .eq('status', 'available')
+        .eq('body_type', vehicle.body_type)
+        .neq('id', vehicle.id)
+
+      if (!simErr && similar && similar.length > 0) {
+        similarVehicles = (similar as ShowcaseVehicle[])
+          .sort(
+            (a, b) =>
+              Math.abs(Number(a.price) - Number(vehicle.price)) -
+              Math.abs(Number(b.price) - Number(vehicle.price)),
+          )
+          .slice(0, 3)
+      }
+    }
+
     return {
       account: account as ShowcaseAccount,
       vehicle: vehicle as ShowcaseVehicleDetail,
+      similarVehicles,
     }
   },
 )

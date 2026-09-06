@@ -13,6 +13,7 @@ export interface ShowcaseAccount {
   /** Moneda de la cuenta; los precios de los vehículos se muestran con su símbolo. */
   default_currency: string
   public_whatsapp: string | null
+  public_brand_color: string | null
   public_name: string | null
   public_logo_url: string | null
   public_address: string | null
@@ -36,6 +37,7 @@ export interface ShowcaseVehicle {
   images: string[] | null
   /** Código corto para atribuir la consulta de WhatsApp a este vehículo. */
   public_ref: string | null
+  created_at?: string
 }
 
 export interface ShowcaseData {
@@ -75,6 +77,21 @@ export function featuresToList(features: ShowcaseVehicle['features']): string[] 
   return Object.entries(features).map(([k, v]) => (v === true ? k : `${k}: ${String(v)}`))
 }
 
+/** Color de marca institucional de respaldo (#e21b22). */
+export const DEFAULT_BRAND_COLOR = '#e21b22'
+
+const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/
+
+/**
+ * Valida un color hexadecimal (#rrggbb).
+ * Si no está definido o es inválido, devuelve el color institucional de respaldo.
+ */
+export function resolveBrandColor(value: string | null | undefined): string {
+  if (!value) return DEFAULT_BRAND_COLOR
+  const trimmed = value.trim()
+  return HEX_COLOR_REGEX.test(trimmed) ? trimmed : DEFAULT_BRAND_COLOR
+}
+
 /**
  * Construye el enlace wa.me con un mensaje prellenado sobre el vehículo.
  *
@@ -92,6 +109,23 @@ export function whatsappHref(
 ): string {
   const digits = number.replace(/\D/g, '')
   let msg = `Hola, me interesa el ${vehicle.brand} ${vehicle.model} ${vehicle.year}. ¿Sigue disponible?`
+  if (vehicle.public_ref) msg += ` ${formatRefTag(vehicle.public_ref)}`
+  return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`
+}
+
+/**
+ * Construye el enlace wa.me con un mensaje prellenado solicitando fotos del vehículo.
+ *
+ * Hermana de whatsappHref: lleva formatRefTag al final para que la consulta
+ * entrante atribuya correctamente el vehículo en el CRM aun cuando el vehículo no tenga fotos.
+ */
+export function requestPhotosHref(
+  number: string,
+  vehicle: Pick<ShowcaseVehicle, 'brand' | 'model' | 'year'> &
+    Partial<Pick<ShowcaseVehicle, 'public_ref'>>,
+): string {
+  const digits = number.replace(/\D/g, '')
+  let msg = `Hola, me interesa el ${vehicle.brand} ${vehicle.model} ${vehicle.year}. ¿Podrían compartirme fotos?`
   if (vehicle.public_ref) msg += ` ${formatRefTag(vehicle.public_ref)}`
   return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`
 }
