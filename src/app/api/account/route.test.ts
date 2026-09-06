@@ -7,8 +7,8 @@ const { mockSupabase, state } = vi.hoisted(() => {
   }
 
   const mockSupabase = {
-    from: vi.fn().mockImplementation((table: string) => ({
-      select: vi.fn().mockImplementation((cols: string) => ({
+    from: vi.fn().mockImplementation(() => ({
+      select: vi.fn().mockImplementation(() => ({
         eq: vi.fn().mockImplementation(() => ({
           maybeSingle: vi.fn().mockResolvedValue({
             data: {

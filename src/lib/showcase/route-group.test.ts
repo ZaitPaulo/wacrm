@@ -20,6 +20,7 @@ vi.mock('@/lib/showcase/data', () => ({
 }))
 
 import { getShowcase } from '@/lib/showcase/data'
+import type { ShowcaseAccount, ShowcaseData } from '@/lib/showcase/format'
 import StorefrontLayout from '@/app/(storefront)/layout'
 
 const appDir = path.resolve(process.cwd(), 'src/app')
@@ -89,7 +90,7 @@ describe('Section 3: Storefront route group and visual system', () => {
           default_currency: 'USD',
           public_whatsapp: '123456789',
           public_brand_color: '#123456',
-        } as any,
+        } as unknown as ShowcaseAccount,
         vehicles: [],
       })
 
@@ -105,7 +106,9 @@ describe('Section 3: Storefront route group and visual system', () => {
     })
 
     it('safely handles showcase data with missing account without throwing', async () => {
-      vi.mocked(getShowcase).mockResolvedValueOnce({ account: undefined } as any)
+      vi.mocked(getShowcase).mockResolvedValueOnce({
+        account: undefined,
+      } as unknown as ShowcaseData)
 
       const res = await StorefrontLayout({ children: 'Test Child' })
       expect(res.props.style).toHaveProperty('--brand')
