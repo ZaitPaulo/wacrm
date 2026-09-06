@@ -49,18 +49,23 @@ export function serializeFilterState(state: StorefrontFilterState): Record<strin
 
 /** Indica si hay algún criterio de búsqueda o filtro activo. */
 export function hasActiveFilters(state: StorefrontFilterState): boolean {
-  return (
-    state.q.trim() !== '' ||
-    state.brand !== '' ||
-    state.year !== '' ||
-    state.budget !== '' ||
-    state.mileage !== '' ||
-    state.transmission !== '' ||
-    state.fuel !== '' ||
-    state.withPhotos ||
-    state.automatic ||
-    state.recent
-  )
+  return countActiveFilters(state) > 0
+}
+
+/** Cuenta cuántos criterios de búsqueda y filtros están activos. */
+export function countActiveFilters(state: StorefrontFilterState): number {
+  let count = 0
+  if (state.q.trim()) count++
+  if (state.brand) count++
+  if (state.year) count++
+  if (state.budget) count++
+  if (state.mileage) count++
+  if (state.transmission) count++
+  if (state.fuel) count++
+  if (state.withPhotos) count++
+  if (state.automatic) count++
+  if (state.recent) count++
+  return count
 }
 
 /** Obtiene los IDs de los N vehículos más recientes según created_at. */

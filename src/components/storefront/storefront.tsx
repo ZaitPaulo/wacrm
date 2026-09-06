@@ -32,6 +32,7 @@ import {
 import {
   INITIAL_FILTER_STATE,
   hasActiveFilters,
+  countActiveFilters,
   getRecentVehicleIds,
   filterVehicles,
   sortVehicles,
@@ -39,7 +40,7 @@ import {
   type SortOption,
 } from './storefront-filter'
 
-export { serializeFilterState, hasActiveFilters } from './storefront-filter'
+export { serializeFilterState, hasActiveFilters, countActiveFilters } from './storefront-filter'
 
 const SELECT_CLASS =
   'w-full appearance-none rounded-lg border border-[#c5c6cd] bg-[#f2f4f6] min-h-[44px] py-2 pl-3 pr-8 text-xs font-semibold text-[#191c1e] outline-none transition-all focus:border-(--brand) focus:ring-2 focus:ring-(--brand)/20'
@@ -92,7 +93,7 @@ function niceBudgetTiers(maxPrice: number): number[] {
   return Array.from(new Set(tiers)).filter((t) => t > 0 && t < maxPrice)
 }
 
-function VehicleCard({
+export function VehicleCard({
   v,
   account,
   whatsapp,
@@ -323,6 +324,7 @@ export function Storefront({
   )
 
   const active = useMemo(() => hasActiveFilters(state), [state])
+  const activeCount = useMemo(() => countActiveFilters(state), [state])
 
   const clear = () => setState(INITIAL_FILTER_STATE)
 
@@ -345,10 +347,10 @@ export function Storefront({
         </div>
       </section>
 
-      {/* 4.4 Bloque de controles anclado sticky top-0 */}
+      {/* 4.4 & 6.1 Bloque de controles anclado sticky top-0 */}
       <div className="sticky top-0 z-40 w-full border-b border-[#c5c6cd]/50 bg-white/95 backdrop-blur-md shadow-xs">
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-12 py-3 space-y-3">
-          {/* Fila (a): Marca / logo y buscador */}
+          {/* Fila 1: Logo/Nombre y Buscador por texto (todos los tamaños) */}
           <div className="flex items-center justify-between gap-3 sm:gap-4">
             <Link href="/" className="flex items-center gap-2 shrink-0">
               {safeAccount.public_logo_url ? (
@@ -386,38 +388,83 @@ export function Storefront({
               )}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setMobileFiltersOpen((prev) => !prev)}
-                className="inline-flex md:hidden min-h-[44px] items-center gap-1.5 rounded-lg border border-[#c5c6cd] bg-white px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#191c1e]"
-              >
-                <SlidersHorizontal className="size-4" />
-                <span>{s('filters')}</span>
-              </button>
-
-              <div className="hidden md:flex items-center gap-3">
-                {effectiveWhatsapp && (
-                  <a
-                    href={`https://wa.me/${effectiveWhatsapp.replace(/\D/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-bold uppercase tracking-wider text-[#44474d] hover:text-black transition-colors"
-                  >
-                    {s('contact')}
-                  </a>
-                )}
-                <Link
-                  href="/login"
-                  className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-neutral-800"
+            <div className="hidden md:flex items-center gap-3 shrink-0">
+              {effectiveWhatsapp && (
+                <a
+                  href={`https://wa.me/${effectiveWhatsapp.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold uppercase tracking-wider text-[#44474d] hover:text-black transition-colors"
                 >
-                  {s('signIn')}
-                </Link>
-              </div>
+                  {s('contact')}
+                </a>
+              )}
+              <Link
+                href="/login"
+                className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-neutral-800"
+              >
+                {s('signIn')}
+              </Link>
             </div>
           </div>
 
-          {/* Fila (b): Los 6 selectores de filtros en desktop */}
+          {/* 6.1 Fila 2 en móvil: Botón de filtros + atajos horizontales deslizables */}
+          <div className="flex md:hidden items-center gap-2 pt-1 border-t border-[#c5c6cd]/30">
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen((prev) => !prev)}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[#c5c6cd] bg-white px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#191c1e] shrink-0 active:bg-[#f2f4f6]"
+            >
+              <SlidersHorizontal className="size-4" />
+              <span>{s('filters')}</span>
+              {activeCount > 0 && (
+                <span className="flex size-5 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+
+            <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none flex-1">
+              <button
+                type="button"
+                onClick={() => setState((prev) => ({ ...prev, withPhotos: !prev.withPhotos }))}
+                className={`inline-flex min-h-[38px] items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors shrink-0 ${
+                  state.withPhotos
+                    ? 'bg-black text-white'
+                    : 'border border-[#c5c6cd] bg-white text-[#44474d]'
+                }`}
+              >
+                <Camera className="size-3" />
+                {s('shortcutWithPhotos')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setState((prev) => ({ ...prev, automatic: !prev.automatic }))}
+                className={`inline-flex min-h-[38px] items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors shrink-0 ${
+                  state.automatic
+                    ? 'bg-black text-white'
+                    : 'border border-[#c5c6cd] bg-white text-[#44474d]'
+                }`}
+              >
+                <Gauge className="size-3" />
+                {s('shortcutAutomatic')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setState((prev) => ({ ...prev, recent: !prev.recent }))}
+                className={`inline-flex min-h-[38px] items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors shrink-0 ${
+                  state.recent
+                    ? 'bg-black text-white'
+                    : 'border border-[#c5c6cd] bg-white text-[#44474d]'
+                }`}
+              >
+                <Sparkles className="size-3" />
+                {s('shortcutRecentlyAdded')}
+              </button>
+            </div>
+          </div>
+
+          {/* 4.4 Fila (b): Los 6 selectores de filtros en desktop */}
           <div className="hidden md:grid md:grid-cols-6 gap-2.5">
             <SelectField
               label={s('brand')}
@@ -498,91 +545,116 @@ export function Storefront({
             </SelectField>
           </div>
 
-          {/* Desplegable de filtros en móvil */}
+          {/* 6.2 Desplegable de filtros en móvil */}
           {mobileFiltersOpen && (
-            <div className="md:hidden pt-3 border-t border-[#c5c6cd]/40 grid grid-cols-2 gap-2.5">
-              <SelectField
-                label={s('brand')}
-                value={state.brand}
-                onChange={(v) => setState((prev) => ({ ...prev, brand: v }))}
-              >
-                <option value="">{s('anyFeminine')}</option>
-                {brands.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </SelectField>
+            <div className="md:hidden pt-3 border-t border-[#c5c6cd]/40 space-y-3 max-h-[60vh] overflow-y-auto pb-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#191c1e]">
+                  {s('filters')} {activeCount > 0 ? `(${activeCount})` : ''}
+                </span>
+                {active && (
+                  <button
+                    type="button"
+                    onClick={clear}
+                    className="min-h-[44px] inline-flex items-center text-xs font-bold uppercase tracking-wider text-(--brand) hover:underline"
+                  >
+                    {s('clearFilters')}
+                  </button>
+                )}
+              </div>
 
-              <SelectField
-                label={s('year')}
-                value={state.year}
-                onChange={(v) => setState((prev) => ({ ...prev, year: v }))}
-              >
-                <option value="">{s('anyYear')}</option>
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </SelectField>
+              <div className="grid grid-cols-2 gap-2.5">
+                <SelectField
+                  label={s('brand')}
+                  value={state.brand}
+                  onChange={(v) => setState((prev) => ({ ...prev, brand: v }))}
+                >
+                  <option value="">{s('anyFeminine')}</option>
+                  {brands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </SelectField>
 
-              <SelectField
-                label={s('budget')}
-                value={state.budget}
-                onChange={(v) => setState((prev) => ({ ...prev, budget: v }))}
-              >
-                <option value="">{s('noLimit')}</option>
-                {budgetTiers.map((t) => (
-                  <option key={t} value={t}>
-                    {s('upTo', { value: formatPrice(t, currency) })}
-                  </option>
-                ))}
-              </SelectField>
+                <SelectField
+                  label={s('year')}
+                  value={state.year}
+                  onChange={(v) => setState((prev) => ({ ...prev, year: v }))}
+                >
+                  <option value="">{s('anyYear')}</option>
+                  {years.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </SelectField>
 
-              <SelectField
-                label={s('mileage')}
-                value={state.mileage}
-                onChange={(v) => setState((prev) => ({ ...prev, mileage: v }))}
-              >
-                <option value="">{s('noLimit')}</option>
-                {mileageTiers.map((t) => (
-                  <option key={t} value={t}>
-                    {s('upTo', { value: `${formatNumber(t)} km` })}
-                  </option>
-                ))}
-              </SelectField>
+                <SelectField
+                  label={s('budget')}
+                  value={state.budget}
+                  onChange={(v) => setState((prev) => ({ ...prev, budget: v }))}
+                >
+                  <option value="">{s('noLimit')}</option>
+                  {budgetTiers.map((t) => (
+                    <option key={t} value={t}>
+                      {s('upTo', { value: formatPrice(t, currency) })}
+                    </option>
+                  ))}
+                </SelectField>
 
-              <SelectField
-                label={s('transmission')}
-                value={state.transmission}
-                onChange={(v) => setState((prev) => ({ ...prev, transmission: v }))}
-              >
-                <option value="">{s('anyFeminine')}</option>
-                {transmissionOpts.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {t(o.labelKey)}
-                  </option>
-                ))}
-              </SelectField>
+                <SelectField
+                  label={s('mileage')}
+                  value={state.mileage}
+                  onChange={(v) => setState((prev) => ({ ...prev, mileage: v }))}
+                >
+                  <option value="">{s('noLimit')}</option>
+                  {mileageTiers.map((t) => (
+                    <option key={t} value={t}>
+                      {s('upTo', { value: `${formatNumber(t)} km` })}
+                    </option>
+                  ))}
+                </SelectField>
 
-              <SelectField
-                label={s('fuel')}
-                value={state.fuel}
-                onChange={(v) => setState((prev) => ({ ...prev, fuel: v }))}
+                <SelectField
+                  label={s('transmission')}
+                  value={state.transmission}
+                  onChange={(v) => setState((prev) => ({ ...prev, transmission: v }))}
+                >
+                  <option value="">{s('anyFeminine')}</option>
+                  {transmissionOpts.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {t(o.labelKey)}
+                    </option>
+                  ))}
+                </SelectField>
+
+                <SelectField
+                  label={s('fuel')}
+                  value={state.fuel}
+                  onChange={(v) => setState((prev) => ({ ...prev, fuel: v }))}
+                >
+                  <option value="">{s('anyMasculine')}</option>
+                  {fuelOpts.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {t(o.labelKey)}
+                    </option>
+                  ))}
+                </SelectField>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen(false)}
+                className="w-full min-h-[44px] rounded-lg bg-black text-white text-xs font-bold uppercase tracking-wider transition-colors hover:bg-neutral-800 shadow-xs"
               >
-                <option value="">{s('anyMasculine')}</option>
-                {fuelOpts.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {t(o.labelKey)}
-                  </option>
-                ))}
-              </SelectField>
+                {s('applyFilters', { count: shown.length })}
+              </button>
             </div>
           )}
 
-          {/* Fila (c): Atajos rápidos, conteo y orden */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#c5c6cd]/30">
+          {/* 4.4 Fila (c): Atajos rápidos, conteo y orden (desktop) */}
+          <div className="hidden md:flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#c5c6cd]/30">
             <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
               <button
                 type="button"
@@ -660,7 +732,7 @@ export function Storefront({
       </div>
 
       {/* Grilla y Estado Vacío */}
-      <section className="w-full bg-[#f7f9fb] px-4 sm:px-6 py-8 lg:px-12">
+      <section className="w-full bg-[#f7f9fb] px-4 sm:px-6 py-8 pb-28 md:pb-12 lg:px-12">
         <div className="mx-auto max-w-[1280px]">
           {shown.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-[#c5c6cd]/40 bg-white p-12 text-center shadow-xs">
@@ -712,6 +784,34 @@ export function Storefront({
           )}
         </div>
       </section>
+
+      {/* 6.4 Barra inferior anclada en móvil */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#c5c6cd]/40 bg-white/95 backdrop-blur-md p-3 flex gap-2 md:hidden shadow-lg">
+        <button
+          type="button"
+          onClick={() => setMobileFiltersOpen((prev) => !prev)}
+          className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-lg border border-[#c5c6cd] bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[#191c1e] shadow-xs active:bg-[#f2f4f6]"
+        >
+          <SlidersHorizontal className="size-4" />
+          <span>{s('filters')}</span>
+          {activeCount > 0 && (
+            <span className="flex size-5 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
+              {activeCount}
+            </span>
+          )}
+        </button>
+        {effectiveWhatsapp && (
+          <a
+            href={`https://wa.me/${effectiveWhatsapp.replace(/\D/g, '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs active:bg-[#20b358]"
+          >
+            <WhatsAppIcon className="size-4" />
+            <span>{s('contact')}</span>
+          </a>
+        )}
+      </div>
     </>
   )
 }
