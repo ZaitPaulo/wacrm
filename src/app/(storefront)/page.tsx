@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { getShowcase } from '@/lib/showcase/data'
 import { getBaseUrl } from '@/lib/showcase/site-url'
 import { Storefront } from '@/components/storefront/storefront'
-import { StoreNav } from '@/components/storefront/store-nav'
 import { StoreFooter } from '@/components/storefront/footer'
 
 // Refleja los cambios del CRM al instante (inventario, precios, on/off).
@@ -66,7 +65,6 @@ export default async function StorefrontPage() {
 
   const { account, vehicles } = data
   const displayName = account.public_name?.trim() || account.name
-  const heroImage = vehicles.find((v) => v.images?.[0])?.images?.[0] ?? null
   const base = await getBaseUrl()
 
   // Datos estructurados (schema.org) para resultados enriquecidos.
@@ -113,13 +111,11 @@ export default async function StorefrontPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <StoreNav account={account} />
-
       <main className="flex-grow">
         <Storefront
           vehicles={vehicles}
+          account={account}
           whatsapp={account.public_whatsapp}
-          heroImage={heroImage}
           currency={account.default_currency}
           baseUrl={base}
         />
