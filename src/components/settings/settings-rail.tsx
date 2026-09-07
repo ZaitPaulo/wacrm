@@ -4,7 +4,9 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
 import {
+  canAccessSection,
   RAIL_GROUPS,
   SECTION_META,
   SETTINGS_SECTIONS,
@@ -32,6 +34,7 @@ export function SettingsRail({
   hints?: Partial<Record<SettingsSection, ReactNode>>;
 }) {
   const t = useTranslations('Settings');
+  const { accountRole } = useAuth();
   const activeRef = useRef<HTMLButtonElement>(null);
 
   // When horizontal (mobile), keep the active chip in view. On desktop
@@ -57,8 +60,15 @@ export function SettingsRail({
     >
       {RAIL_GROUPS.map(({ label, group }) => {
         const items = SETTINGS_SECTIONS.filter(
-          (s) => SECTION_META[s].group === group,
+          (s) =>
+            SECTION_META[s].group === group &&
+            canAccessSection(s, accountRole),
         );
+        // Para un agente el grupo "Workspace" queda entero fuera, y el
+        // "top" también (Overview es admin-only). Sin este corte
+        // quedaría flotando el título de un grupo sin ninguna entrada
+        // debajo, más el separador que lo acompaña.
+        if (items.length === 0) return null;
         return (
           <div
             key={group}

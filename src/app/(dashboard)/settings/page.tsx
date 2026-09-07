@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
@@ -45,7 +45,7 @@ export default function SettingsPage() {
 function SettingsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { defaultCurrency } = useAuth();
+  const { defaultCurrency, accountRole, profileLoading } = useAuth();
   const { mode } = useTheme();
   const t = useTranslations('Settings');
 
@@ -53,7 +53,27 @@ function SettingsPageInner() {
   // section — deep-linkable, and it keeps the existing links in the
   // app sidebar/header working. Legacy tab values (tags, custom-fields)
   // resolve onto their new home; unknown/empty → the Overview landing.
-  const section = resolveSection(searchParams.get('tab'));
+  //
+  // El rol entra en la resolución: una sección que el rol no alcanza cae
+  // en su sección de arranque, así un `?tab=whatsapp` reenviado no le
+  // pinta a un agente el formulario de credenciales de Meta.
+  const requested = searchParams.get('tab');
+  const section = resolveSection(requested, accountRole);
+
+  // Y si la URL pedía otra cosa, se corrige también en la barra de
+  // direcciones — si no, el enlace queda "funcionando" a medias: muestra
+  // el perfil pero sigue diciendo `?tab=whatsapp`, y basta un refresh o
+  // un reenvío para reproducir la confusión.
+  //
+  // Un `/settings` pelado (sin `?tab=`) no se toca: ahí nadie pidió nada
+  // en concreto y reescribir la URL sería ruido en el historial.
+  useEffect(() => {
+    if (profileLoading) return;
+    if (requested === null || requested === section) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', section);
+    router.replace(`/settings?${params.toString()}`, { scroll: false });
+  }, [profileLoading, requested, section, searchParams, router]);
 
   const go = (next: SettingsSection) => {
     const params = new URLSearchParams(searchParams.toString());

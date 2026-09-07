@@ -31,7 +31,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { hasMinRole, type AccountRole } from "@/lib/auth/roles";
+import { type AccountRole } from "@/lib/auth/roles";
+import { canAccessPath, homeForRole } from "@/lib/auth/route-access";
 
 // Per-role chip metadata used in the sidebar's account strip + the
 // Members tab roster. Keeping this near both consumers in a single
@@ -92,14 +93,12 @@ interface NavItem {
    * Purely informational — doesn't affect routing or access.
    */
   beta?: boolean;
-  /**
-   * Oculta la entrada para quien no llegue a `admin`. La ruta y su API
-   * se protegen igual del lado del servidor — esto solo evita ofrecer
-   * una pantalla en la que no se podría hacer nada.
-   */
-  adminOnly?: boolean;
 }
 
+// Qué entradas ve cada rol NO se decide acá: se deriva de
+// `ADMIN_ONLY_ROUTES` en `@/lib/auth/route-access`, la misma lista que
+// usa el guard del shell para rebotar a quien escriba la URL a mano.
+// Así lo que se oculta y lo que se bloquea no pueden divergir.
 const navItems: NavItem[] = [
   { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { href: "/inbox", labelKey: "inbox", icon: MessageSquare },
@@ -109,7 +108,7 @@ const navItems: NavItem[] = [
   // La URL sigue siendo /instagram para no romper enlaces guardados,
   // pero la cola ya no es de una sola red: el rótulo no puede nombrar
   // a Instagram mientras lista publicaciones de Facebook.
-  { href: "/instagram", labelKey: "social", icon: Megaphone, adminOnly: true },
+  { href: "/instagram", labelKey: "social", icon: Megaphone },
   { href: "/documents", labelKey: "documents", icon: FileText },
   { href: "/pipelines", labelKey: "pipelines", icon: GitBranch },
   { href: "/broadcasts", labelKey: "broadcasts", icon: Radio },
@@ -130,6 +129,14 @@ interface SidebarProps {
 
 import { useTranslations } from "next-intl";
 
+/**
+ * Navegación principal del dashboard.
+ *
+ * Las entradas que ve cada quien dependen del rol: `canAccessPath` filtra
+ * contra `ADMIN_ONLY_ROUTES`, la misma lista que aplica el guard del shell.
+ * Mientras el perfil carga el filtro falla cerrado, así que el menú aparece
+ * corto un instante en vez de ofrecer pantallas que después rebotarían.
+ */
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const t = useTranslations("Sidebar");
   const pathname = usePathname();
@@ -205,7 +212,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         {/* Logo row. On mobile we put a close button here; on desktop the
             close button is hidden since the sidebar is always-visible. */}
         <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          {/* El logo lleva a la home del rol, no a `/dashboard` fijo: para
+              un agente el panel está fuera de su alcance y el enlace
+              terminaría rebotando contra el guard del shell. */}
+          <Link
+            href={homeForRole(accountRole)}
+            className="flex items-center gap-2"
+          >
             {/* Mismo monograma que el favicon (`src/app/icon.png`): las
                 iniciales en blanco sobre negro con la línea roja de la
                 marca. Se dibuja con CSS en vez de servir el PNG para que
@@ -240,11 +253,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="flex flex-col gap-1">
             {navItems
-              .filter(
-                (item) =>
-                  !item.adminOnly ||
-                  (accountRole && hasMinRole(accountRole, "admin")),
-              )
+              .filter((item) => canAccessPath(item.href, accountRole))
               .map((item) => {
               const isActive =
                 pathname === item.href ||
