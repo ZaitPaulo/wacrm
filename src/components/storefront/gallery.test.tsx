@@ -16,7 +16,14 @@ vi.mock('next-intl', () => ({
   },
 }))
 
-import { Gallery, galleryReducer } from './gallery'
+import {
+  Gallery,
+  galleryReducer,
+  MIN_SCALE,
+  MAX_SCALE,
+  ZOOM_STEP,
+  TOGGLE_SCALE,
+} from './gallery'
 
 describe('Gallery component (task 7.3)', () => {
   it('renders single photo without navigation controls or counter', () => {
@@ -97,19 +104,36 @@ describe('Gallery lightbox and zoom (TDD)', () => {
     expect(html).toContain('1 de 2')
   })
 
-  it('renders zoom-out button and enlarged image state when zoomed', () => {
+  it('renders zoom-out button and a scaled, draggable stage when zoomed', () => {
     const html = renderToStaticMarkup(
       React.createElement(Gallery, {
         images: ['https://example.com/1.jpg'],
         alt: 'Car',
         initialOpen: true,
-        initialZoomed: true,
+        initialScale: TOGGLE_SCALE,
       }),
     )
 
     expect(html).toContain('aria-label="zoomOut"')
-    expect(html).toMatch(/scale-150|scale-200/)
-    expect(html).toContain('cursor-zoom-out')
+    // La ampliacion va en el transform del lienzo, no en una clase fija.
+    expect(html).toContain('scale(' + TOGGLE_SCALE + ')')
+    // Se recorre arrastrando, nunca con barras de scroll del navegador.
+    expect(html).toContain('cursor-grab')
+  })
+
+  it('never renders browser scrollbars inside the viewer', () => {
+    for (const scale of [MIN_SCALE, TOGGLE_SCALE, MAX_SCALE]) {
+      const html = renderToStaticMarkup(
+        React.createElement(Gallery, {
+          images: ['https://example.com/1.jpg'],
+          alt: 'Car',
+          initialOpen: true,
+          initialScale: scale,
+        }),
+      )
+      expect(html).not.toContain('overflow-auto')
+      expect(html).toContain('overflow-hidden')
+    }
   })
 
   it('hides previous and next buttons when there is only a single photo in lightbox', () => {
@@ -128,66 +152,100 @@ describe('Gallery lightbox and zoom (TDD)', () => {
   })
 
   describe('galleryReducer state logic', () => {
-    it('opens lightbox and resets zoom', () => {
-      const initial = { isOpen: false, isZoomed: true, selected: 0 }
-      const state = galleryReducer(initial, { type: 'OPEN' })
-      expect(state).toEqual({ isOpen: true, isZoomed: false, selected: 0 })
+    const fitted = (selected = 0) => ({
+      isOpen: true,
+      selected,
+      scale: MIN_SCALE,
+      offsetX: 0,
+      offsetY: 0,
     })
 
-    it('closes lightbox and resets zoom', () => {
-      const initial = { isOpen: true, isZoomed: true, selected: 2 }
-      const state = galleryReducer(initial, { type: 'CLOSE' })
-      expect(state).toEqual({ isOpen: false, isZoomed: false, selected: 2 })
+    const zoomed = (selected = 0) => ({
+      isOpen: true,
+      selected,
+      scale: TOGGLE_SCALE,
+      offsetX: 40,
+      offsetY: -25,
     })
 
-    it('toggles zoom state', () => {
-      const state1 = galleryReducer(
-        { isOpen: true, isZoomed: false, selected: 0 },
-        { type: 'TOGGLE_ZOOM' },
-      )
-      expect(state1.isZoomed).toBe(true)
-
-      const state2 = galleryReducer(state1, { type: 'TOGGLE_ZOOM' })
-      expect(state2.isZoomed).toBe(false)
+    it('opens lightbox fitted to the viewer', () => {
+      const state = galleryReducer({ ...zoomed(), isOpen: false }, { type: 'OPEN' })
+      expect(state).toEqual(fitted(0))
     })
 
-    it('navigates to next photo and wraps around, resetting zoom', () => {
-      const state1 = galleryReducer(
-        { isOpen: true, isZoomed: true, selected: 0 },
-        { type: 'NEXT', total: 3 },
-      )
-      expect(state1.selected).toBe(1)
-      expect(state1.isZoomed).toBe(false)
+    it('closes lightbox and resets the view', () => {
+      const state = galleryReducer(zoomed(2), { type: 'CLOSE' })
+      expect(state).toEqual({ ...fitted(2), isOpen: false })
+    })
 
-      const state2 = galleryReducer(
-        { isOpen: true, isZoomed: true, selected: 2 },
-        { type: 'NEXT', total: 3 },
+    it('toggles between fitted and zoomed, recentring on the way back', () => {
+      const state1 = galleryReducer(fitted(), { type: 'TOGGLE_ZOOM' })
+      expect(state1.scale).toBe(TOGGLE_SCALE)
+      expect(state1.offsetX).toBe(0)
+
+      const state2 = galleryReducer({ ...state1, offsetX: 80 }, { type: 'TOGGLE_ZOOM' })
+      expect(state2.scale).toBe(MIN_SCALE)
+      expect(state2.offsetX).toBe(0)
+    })
+
+    it('zooms by steps and clamps to the allowed range', () => {
+      expect(galleryReducer(fitted(), { type: 'ZOOM_BY', delta: -1 }).scale).toBe(MIN_SCALE)
+
+      const maxed = galleryReducer(
+        { ...fitted(), scale: MAX_SCALE },
+        { type: 'ZOOM_BY', delta: 10 },
       )
+      expect(maxed.scale).toBe(MAX_SCALE)
+
+      const stepped = galleryReducer(fitted(), { type: 'ZOOM_BY', delta: ZOOM_STEP })
+      expect(stepped.scale).toBe(MIN_SCALE + ZOOM_STEP)
+    })
+
+    it('recentres when zooming all the way back out', () => {
+      const state = galleryReducer(
+        { isOpen: true, selected: 0, scale: MIN_SCALE + ZOOM_STEP, offsetX: 90, offsetY: 60 },
+        { type: 'ZOOM_BY', delta: -ZOOM_STEP },
+      )
+      expect(state).toEqual(fitted(0))
+    })
+
+    it('pans within bounds and never past them', () => {
+      const start = { isOpen: true, selected: 0, scale: TOGGLE_SCALE, offsetX: 0, offsetY: 0 }
+
+      const moved = galleryReducer(start, { type: 'PAN', dx: 30, dy: -20, maxX: 100, maxY: 100 })
+      expect(moved.offsetX).toBe(30)
+      expect(moved.offsetY).toBe(-20)
+
+      const clamped = galleryReducer(moved, { type: 'PAN', dx: 500, dy: -500, maxX: 100, maxY: 100 })
+      expect(clamped.offsetX).toBe(100)
+      expect(clamped.offsetY).toBe(-100)
+    })
+
+    it('cannot pan at all when the photo fits the viewer', () => {
+      const state = galleryReducer(fitted(), { type: 'PAN', dx: 50, dy: 50, maxX: 0, maxY: 0 })
+      expect(state.offsetX).toBe(0)
+      expect(state.offsetY).toBe(0)
+    })
+
+    it('navigates to next photo and wraps around, resetting the view', () => {
+      const state1 = galleryReducer(zoomed(0), { type: 'NEXT', total: 3 })
+      expect(state1).toEqual(fitted(1))
+
+      const state2 = galleryReducer(zoomed(2), { type: 'NEXT', total: 3 })
       expect(state2.selected).toBe(0)
     })
 
-    it('navigates to previous photo and wraps around, resetting zoom', () => {
-      const state1 = galleryReducer(
-        { isOpen: true, isZoomed: true, selected: 1 },
-        { type: 'PREV', total: 3 },
-      )
-      expect(state1.selected).toBe(0)
-      expect(state1.isZoomed).toBe(false)
+    it('navigates to previous photo and wraps around, resetting the view', () => {
+      const state1 = galleryReducer(zoomed(1), { type: 'PREV', total: 3 })
+      expect(state1).toEqual(fitted(0))
 
-      const state2 = galleryReducer(
-        { isOpen: true, isZoomed: true, selected: 0 },
-        { type: 'PREV', total: 3 },
-      )
+      const state2 = galleryReducer(zoomed(0), { type: 'PREV', total: 3 })
       expect(state2.selected).toBe(2)
     })
 
-    it('selects a specific photo by index, resetting zoom', () => {
-      const state = galleryReducer(
-        { isOpen: true, isZoomed: true, selected: 0 },
-        { type: 'SELECT', index: 3 },
-      )
-      expect(state.selected).toBe(3)
-      expect(state.isZoomed).toBe(false)
+    it('selects a specific photo by index, resetting the view', () => {
+      const state = galleryReducer(zoomed(0), { type: 'SELECT', index: 3 })
+      expect(state).toEqual(fitted(3))
     })
   })
 })

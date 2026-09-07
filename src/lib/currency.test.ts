@@ -6,12 +6,38 @@ import {
   formatCurrencyShort,
 } from "./currency";
 
+/**
+ * 1234 agrupado según el locale del runtime: "1,234" en en-US, "1.234"
+ * en es-CO. `formatCurrency` pasa `undefined` como locale, así que el
+ * separador de miles lo decide la máquina que corre el test — fijar
+ * "1,234" en las aserciones hacía fallar la suite entera en cualquier
+ * equipo configurado en español, que es donde se desarrolla esto.
+ *
+ * Comparar contra el `NumberFormat` simple del mismo runtime sigue
+ * siendo una prueba real: detecta que se pierda la agrupación o que
+ * aparezcan decimales, sin atarse a un idioma.
+ */
+const GROUPED_1234 = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 0,
+}).format(1234);
+
+/** Cifra con decimales, en cualquiera de las dos notaciones. */
+const HAS_MINOR_UNITS = /[.,]\d{2}\b/;
+
 describe("formatCurrency", () => {
+  it("groups thousands the same way the runtime does", () => {
+    // Guarda de cordura: si esto dejara de cumplirse, GROUPED_1234 ya no
+    // sería una referencia válida y las demás aserciones se volverían
+    // vacías en vez de fallar.
+    // El separador puede ser punto, coma o un espacio duro: \s cubre NBSP.
+    expect(GROUPED_1234).toMatch(/^1[.,\s]234$/);
+  });
+
   it("formats whole amounts with no minor units", () => {
     // Use a non-breaking-space-tolerant check: Intl may insert NBSP.
     const out = formatCurrency(1234, "USD");
-    expect(out).toContain("1,234");
-    expect(out).not.toContain(".00");
+    expect(out).toContain(GROUPED_1234);
+    expect(out).not.toMatch(HAS_MINOR_UNITS);
   });
 
   it("defaults to USD when no currency is given", () => {
@@ -30,13 +56,13 @@ describe("formatCurrency", () => {
     // Intl is lenient here — it uses the code as the symbol.
     const out = formatCurrency(1234, "ZZZ");
     expect(out).toContain("ZZZ");
-    expect(out).toContain("1,234");
+    expect(out).toContain(GROUPED_1234);
   });
 
   it("never throws on a structurally invalid code (no DB CHECK on deals.currency)", () => {
     for (const bad of ["United States", "US", "USDD", "12", "u$d"]) {
       expect(() => formatCurrency(1234, bad)).not.toThrow();
-      expect(formatCurrency(1234, bad)).toContain("1,234");
+      expect(formatCurrency(1234, bad)).toContain(GROUPED_1234);
     }
   });
 

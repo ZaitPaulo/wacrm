@@ -105,7 +105,11 @@ export default async function StorefrontPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f7f9fb] text-[#191c1e]">
+    // pb-20 en móvil: la barra inferior anclada de `Storefront` es
+    // `fixed`, así que al final del scroll se monta sobre el pie. El
+    // relleno deja el hueco donde la barra descansa. Desaparece en `lg`,
+    // que es donde la barra deja de mostrarse.
+    <div className="flex min-h-screen flex-col bg-[#f7f9fb] pb-20 text-[#191c1e] lg:pb-0">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

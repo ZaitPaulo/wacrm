@@ -2518,8 +2518,6 @@
     "galleryCount": "{current} of {total}",
     "similarVehicles": "Similar vehicles",
     "backToInventory": "Back to inventory",
-    "refCodeLabel": "Reference code",
-    "refCodeExplanation": "Mention this code when contacting us to identify this specific vehicle.",
     "inventory": "Inventory",
     "zoomImage": "Zoom image",
     "close": "Close",

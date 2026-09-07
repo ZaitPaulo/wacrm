@@ -44,8 +44,6 @@ describe('Storefront translations consistency', () => {
       'galleryCount',
       'similarVehicles',
       'backToInventory',
-      'refCodeLabel',
-      'refCodeExplanation',
       'inventory',
       'zoomImage',
       'close',

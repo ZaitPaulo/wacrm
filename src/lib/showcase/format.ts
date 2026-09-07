@@ -37,7 +37,6 @@ export interface ShowcaseVehicle {
   images: string[] | null
   /** Código corto para atribuir la consulta de WhatsApp a este vehículo. */
   public_ref: string | null
-  created_at?: string
 }
 
 export interface ShowcaseData {

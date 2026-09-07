@@ -2518,8 +2518,6 @@
     "galleryCount": "{total}장 중 {current}장",
     "similarVehicles": "비슷한 차량",
     "backToInventory": "재고 목록으로 돌아가기",
-    "refCodeLabel": "참조 코드",
-    "refCodeExplanation": "문의 시 이 코드를 알려주시면 해당 차량을 바로 안내해 드립니다.",
     "inventory": "재고",
     "zoomImage": "이미지 확대",
     "close": "닫기",

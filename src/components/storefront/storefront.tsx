@@ -10,8 +10,6 @@ import {
   SlidersHorizontal,
   ChevronDown,
   Camera,
-  Sparkles,
-  Gauge,
   CameraOff,
   SearchX,
 } from 'lucide-react'
@@ -27,13 +25,13 @@ import {
 import {
   TRANSMISSIONS,
   FUEL_TYPES,
+  BODY_TYPES,
   type SpecOption,
 } from '@/lib/inventory/specs'
 import {
   INITIAL_FILTER_STATE,
   hasActiveFilters,
   countActiveFilters,
-  getRecentVehicleIds,
   filterVehicles,
   sortVehicles,
   type StorefrontFilterState,
@@ -93,20 +91,149 @@ function niceBudgetTiers(maxPrice: number): number[] {
   return Array.from(new Set(tiers)).filter((t) => t > 0 && t < maxPrice)
 }
 
+/**
+ * Los siete selectores de filtro, en un solo sitio.
+ *
+ * Los consumen dos contenedores con maquetación distinta —el lateral fijo
+ * de escritorio (una columna) y el panel desplegable del teléfono (dos)—,
+ * así que este componente solo emite los campos y deja la rejilla a quien
+ * lo monta. Antes estaban escritos dos veces y cualquier cambio había que
+ * hacerlo por duplicado.
+ */
+function FilterFields({
+  state,
+  setState,
+  brands,
+  years,
+  budgetTiers,
+  mileageTiers,
+  transmissionOpts,
+  fuelOpts,
+  bodyOpts,
+  currency,
+}: {
+  state: StorefrontFilterState
+  setState: React.Dispatch<React.SetStateAction<StorefrontFilterState>>
+  brands: string[]
+  years: number[]
+  budgetTiers: number[]
+  mileageTiers: number[]
+  transmissionOpts: SpecOption[]
+  fuelOpts: SpecOption[]
+  bodyOpts: SpecOption[]
+  currency: string
+}) {
+  const t = useTranslations('Inventory')
+  const s = useTranslations('Storefront')
+
+  return (
+    <>
+      <SelectField
+        label={s('brand')}
+        value={state.brand}
+        onChange={(v) => setState((prev) => ({ ...prev, brand: v }))}
+      >
+        <option value="">{s('anyFeminine')}</option>
+        {brands.map((b) => (
+          <option key={b} value={b}>
+            {b}
+          </option>
+        ))}
+      </SelectField>
+
+      <SelectField
+        label={s('year')}
+        value={state.year}
+        onChange={(v) => setState((prev) => ({ ...prev, year: v }))}
+      >
+        <option value="">{s('anyYear')}</option>
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </SelectField>
+
+      <SelectField
+        label={s('budget')}
+        value={state.budget}
+        onChange={(v) => setState((prev) => ({ ...prev, budget: v }))}
+      >
+        <option value="">{s('noLimit')}</option>
+        {budgetTiers.map((tier) => (
+          <option key={tier} value={tier}>
+            {s('upTo', { value: formatPrice(tier, currency) })}
+          </option>
+        ))}
+      </SelectField>
+
+      <SelectField
+        label={s('mileage')}
+        value={state.mileage}
+        onChange={(v) => setState((prev) => ({ ...prev, mileage: v }))}
+      >
+        <option value="">{s('noLimit')}</option>
+        {mileageTiers.map((tier) => (
+          <option key={tier} value={tier}>
+            {s('upTo', { value: `${formatNumber(tier)} km` })}
+          </option>
+        ))}
+      </SelectField>
+
+      <SelectField
+        label={s('transmission')}
+        value={state.transmission}
+        onChange={(v) => setState((prev) => ({ ...prev, transmission: v }))}
+      >
+        <option value="">{s('anyFeminine')}</option>
+        {transmissionOpts.map((o) => (
+          <option key={o.value} value={o.value}>
+            {t(o.labelKey)}
+          </option>
+        ))}
+      </SelectField>
+
+      <SelectField
+        label={s('fuel')}
+        value={state.fuel}
+        onChange={(v) => setState((prev) => ({ ...prev, fuel: v }))}
+      >
+        <option value="">{s('anyMasculine')}</option>
+        {fuelOpts.map((o) => (
+          <option key={o.value} value={o.value}>
+            {t(o.labelKey)}
+          </option>
+        ))}
+      </SelectField>
+
+      <SelectField
+        label={s('bodyType')}
+        value={state.body}
+        onChange={(v) => setState((prev) => ({ ...prev, body: v }))}
+      >
+        <option value="">{s('anyFeminine')}</option>
+        {bodyOpts.map((o) => (
+          <option key={o.value} value={o.value}>
+            {t(o.labelKey)}
+          </option>
+        ))}
+      </SelectField>
+    </>
+  )
+}
+
 export function VehicleCard({
   v,
   account,
   whatsapp,
   currency,
   baseUrl,
-  isRecent,
 }: {
   v: ShowcaseVehicle
   account: ShowcaseAccount
   whatsapp: string | null
   currency: string
   baseUrl: string
-  isRecent: boolean
 }) {
   const t = useTranslations('Inventory')
   const s = useTranslations('Storefront')
@@ -135,12 +262,6 @@ export function VehicleCard({
     badge = (
       <span className="rounded bg-black/90 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-xs">
         {s('new')}
-      </span>
-    )
-  } else if (isRecent) {
-    badge = (
-      <span className="rounded bg-(--brand) px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-xs">
-        {s('recentlyAdded')}
       </span>
     )
   } else if (v.images && v.images.length > 1) {
@@ -259,7 +380,8 @@ export function Storefront({
   currency: string
   baseUrl: string
 }) {
-  const t = useTranslations('Inventory')
+  // El catálogo de `Inventory` lo consume ahora `FilterFields`, que es
+  // quien traduce las etiquetas de transmisión, combustible y carrocería.
   const s = useTranslations('Storefront')
 
   const safeAccount: ShowcaseAccount = account ?? {
@@ -281,8 +403,6 @@ export function Storefront({
 
   const [state, setState] = useState<StorefrontFilterState>(INITIAL_FILTER_STATE)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
-
-  const recentIds = useMemo(() => getRecentVehicleIds(vehicles, 12), [vehicles])
 
   const brands = useMemo(
     () => Array.from(new Set(vehicles.map((v) => v.brand))).sort(),
@@ -313,10 +433,14 @@ export function Storefront({
     () => presentOptions(vehicles, (v) => v.fuel_type, FUEL_TYPES),
     [vehicles],
   )
+  const bodyOpts = useMemo(
+    () => presentOptions(vehicles, (v) => v.body_type, BODY_TYPES),
+    [vehicles],
+  )
 
   const filtered = useMemo(
-    () => filterVehicles(vehicles, state, recentIds),
-    [vehicles, state, recentIds],
+    () => filterVehicles(vehicles, state),
+    [vehicles, state],
   )
   const shown = useMemo(
     () => sortVehicles(filtered, state.sort),
@@ -330,29 +454,22 @@ export function Storefront({
 
   return (
     <>
-      {/* 4.7 Banda de marca de altura fija */}
-      <section className="w-full border-b border-black/10 bg-black px-4 sm:px-6 py-6 lg:px-12 text-white">
-        <div className="mx-auto flex max-w-[1280px] flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight font-[family-name:var(--font-barlow-condensed)]">
-              {s('heroTitle')}
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-neutral-300">
-              {s('heroSubtitle')}
-            </p>
-          </div>
-          <span className="hidden sm:inline-block rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-neutral-200">
-            {s('ogAvailability', { count: vehicles.length })}
-          </span>
-        </div>
-      </section>
-
-      {/* 4.4 & 6.1 Bloque de controles anclado sticky top-0 */}
+      {/* Cabecera fija: marca y buscador en todos los anchos; por debajo
+          de `lg`, además, el botón que abre los filtros y el conteo. Los
+          selectores en sí viven en el lateral (ver más abajo). */}
       <div className="sticky top-0 z-40 w-full border-b border-[#c5c6cd]/50 bg-white/95 backdrop-blur-md shadow-xs">
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-12 py-3 space-y-3">
-          {/* Fila 1: Logo/Nombre y Buscador por texto (todos los tamaños) */}
-          <div className="flex items-center justify-between gap-3 sm:gap-4">
-            <Link href="/" className="flex items-center gap-2 shrink-0">
+          {/* Marca a la izquierda; buscador y orden pegados al borde
+              derecho, en la misma línea. Por debajo de `md` la fila se
+              parte: el orden se queda junto al logo y el buscador baja a
+              ocupar el ancho completo, que es lo único que cabe en un
+              teléfono sin encoger los tres a la vez.
+
+              La banda negra de bienvenida y el par "Contacto / Iniciar
+              sesión" se retiraron por pedido del negocio; el acceso al CRM
+              sigue en el pie, como "Administración". */}
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <Link href="/" className="order-1 flex items-center gap-2 shrink-0">
               {safeAccount.public_logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -367,7 +484,7 @@ export function Storefront({
               )}
             </Link>
 
-            <div className="relative flex-1 max-w-lg">
+            <div className="relative order-3 w-full md:order-2 md:ml-auto md:w-80 lg:w-[26rem]">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#75777e]" />
               <input
                 type="text"
@@ -388,28 +505,27 @@ export function Storefront({
               )}
             </div>
 
-            <div className="hidden md:flex items-center gap-3 shrink-0">
-              {effectiveWhatsapp && (
-                <a
-                  href={`https://wa.me/${effectiveWhatsapp.replace(/\D/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-bold uppercase tracking-wider text-[#44474d] hover:text-black transition-colors"
-                >
-                  {s('contact')}
-                </a>
-              )}
-              <Link
-                href="/login"
-                className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-neutral-800"
+            <div className="relative order-2 ml-auto shrink-0 md:order-3 md:ml-0">
+              <select
+                value={state.sort}
+                onChange={(e) => setState((prev) => ({ ...prev, sort: e.target.value as SortOption }))}
+                className="appearance-none rounded-lg border border-[#c5c6cd] bg-white min-h-[44px] py-1.5 pl-3 pr-8 text-xs font-bold uppercase tracking-wider text-[#191c1e] outline-none transition-all focus:border-(--brand)"
               >
-                {s('signIn')}
-              </Link>
+                <option value="">{s('sort')}</option>
+                <option value="price_asc">{s('sortLowestPrice')}</option>
+                <option value="price_desc">{s('sortHighestPrice')}</option>
+                <option value="mileage_asc">{s('sortLowestMileage')}</option>
+                <option value="year_desc">{s('sortNewestYear')}</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#75777e]" />
             </div>
           </div>
 
-          {/* 6.1 Fila 2 en móvil: Botón de filtros + atajos horizontales deslizables */}
-          <div className="flex md:hidden items-center gap-2 pt-1 border-t border-[#c5c6cd]/30">
+          {/* Por debajo de `lg` no hay lateral, así que los filtros se
+              alcanzan desde aquí. Esta fila viaja con la cabecera fija: es
+              lo que evita volver arriba para cambiar un criterio, que era
+              el defecto de la maqueta original en el teléfono. */}
+          <div className="flex lg:hidden items-center gap-2 pt-1 border-t border-[#c5c6cd]/30">
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((prev) => !prev)}
@@ -424,130 +540,30 @@ export function Storefront({
               )}
             </button>
 
-            <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none flex-1">
+            {/* En `lg` el conteo vive en el pie del lateral; aquí acompaña
+                al botón para que siga siendo permanente al hacer scroll. */}
+            <span className="text-xs font-bold uppercase tracking-wider text-[#44474d] whitespace-nowrap">
+              {active
+                ? s('resultsCount', { shown: shown.length, total: vehicles.length })
+                : s('totalCount', { total: vehicles.length })}
+            </span>
+
+            {active && (
               <button
                 type="button"
-                onClick={() => setState((prev) => ({ ...prev, withPhotos: !prev.withPhotos }))}
-                className={`inline-flex min-h-[38px] items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors shrink-0 ${
-                  state.withPhotos
-                    ? 'bg-black text-white'
-                    : 'border border-[#c5c6cd] bg-white text-[#44474d]'
-                }`}
+                onClick={clear}
+                className="ml-auto inline-flex min-h-[44px] items-center gap-1 text-xs font-bold uppercase tracking-wider text-(--brand) shrink-0"
               >
-                <Camera className="size-3" />
-                {s('shortcutWithPhotos')}
+                <X className="size-3.5" />
+                {s('clear')}
               </button>
-              <button
-                type="button"
-                onClick={() => setState((prev) => ({ ...prev, automatic: !prev.automatic }))}
-                className={`inline-flex min-h-[38px] items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors shrink-0 ${
-                  state.automatic
-                    ? 'bg-black text-white'
-                    : 'border border-[#c5c6cd] bg-white text-[#44474d]'
-                }`}
-              >
-                <Gauge className="size-3" />
-                {s('shortcutAutomatic')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setState((prev) => ({ ...prev, recent: !prev.recent }))}
-                className={`inline-flex min-h-[38px] items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors shrink-0 ${
-                  state.recent
-                    ? 'bg-black text-white'
-                    : 'border border-[#c5c6cd] bg-white text-[#44474d]'
-                }`}
-              >
-                <Sparkles className="size-3" />
-                {s('shortcutRecentlyAdded')}
-              </button>
-            </div>
+            )}
           </div>
 
-          {/* 4.4 Fila (b): Los 6 selectores de filtros en desktop */}
-          <div className="hidden md:grid md:grid-cols-6 gap-2.5">
-            <SelectField
-              label={s('brand')}
-              value={state.brand}
-              onChange={(v) => setState((prev) => ({ ...prev, brand: v }))}
-            >
-              <option value="">{s('anyFeminine')}</option>
-              {brands.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </SelectField>
-
-            <SelectField
-              label={s('year')}
-              value={state.year}
-              onChange={(v) => setState((prev) => ({ ...prev, year: v }))}
-            >
-              <option value="">{s('anyYear')}</option>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </SelectField>
-
-            <SelectField
-              label={s('budget')}
-              value={state.budget}
-              onChange={(v) => setState((prev) => ({ ...prev, budget: v }))}
-            >
-              <option value="">{s('noLimit')}</option>
-              {budgetTiers.map((t) => (
-                <option key={t} value={t}>
-                  {s('upTo', { value: formatPrice(t, currency) })}
-                </option>
-              ))}
-            </SelectField>
-
-            <SelectField
-              label={s('mileage')}
-              value={state.mileage}
-              onChange={(v) => setState((prev) => ({ ...prev, mileage: v }))}
-            >
-              <option value="">{s('noLimit')}</option>
-              {mileageTiers.map((t) => (
-                <option key={t} value={t}>
-                  {s('upTo', { value: `${formatNumber(t)} km` })}
-                </option>
-              ))}
-            </SelectField>
-
-            <SelectField
-              label={s('transmission')}
-              value={state.transmission}
-              onChange={(v) => setState((prev) => ({ ...prev, transmission: v }))}
-            >
-              <option value="">{s('anyFeminine')}</option>
-              {transmissionOpts.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {t(o.labelKey)}
-                </option>
-              ))}
-            </SelectField>
-
-            <SelectField
-              label={s('fuel')}
-              value={state.fuel}
-              onChange={(v) => setState((prev) => ({ ...prev, fuel: v }))}
-            >
-              <option value="">{s('anyMasculine')}</option>
-              {fuelOpts.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {t(o.labelKey)}
-                </option>
-              ))}
-            </SelectField>
-          </div>
-
-          {/* 6.2 Desplegable de filtros en móvil */}
+          {/* Panel de filtros por debajo de `lg`: se abre sobre la lista,
+              sin sacar al visitante de los resultados ni perder el scroll. */}
           {mobileFiltersOpen && (
-            <div className="md:hidden pt-3 border-t border-[#c5c6cd]/40 space-y-3 max-h-[60vh] overflow-y-auto pb-2">
+            <div className="lg:hidden pt-3 border-t border-[#c5c6cd]/40 space-y-3 max-h-[60vh] overflow-y-auto pb-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#191c1e]">
                   {s('filters')} {activeCount > 0 ? `(${activeCount})` : ''}
@@ -564,83 +580,18 @@ export function Storefront({
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
-                <SelectField
-                  label={s('brand')}
-                  value={state.brand}
-                  onChange={(v) => setState((prev) => ({ ...prev, brand: v }))}
-                >
-                  <option value="">{s('anyFeminine')}</option>
-                  {brands.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </SelectField>
-
-                <SelectField
-                  label={s('year')}
-                  value={state.year}
-                  onChange={(v) => setState((prev) => ({ ...prev, year: v }))}
-                >
-                  <option value="">{s('anyYear')}</option>
-                  {years.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </SelectField>
-
-                <SelectField
-                  label={s('budget')}
-                  value={state.budget}
-                  onChange={(v) => setState((prev) => ({ ...prev, budget: v }))}
-                >
-                  <option value="">{s('noLimit')}</option>
-                  {budgetTiers.map((t) => (
-                    <option key={t} value={t}>
-                      {s('upTo', { value: formatPrice(t, currency) })}
-                    </option>
-                  ))}
-                </SelectField>
-
-                <SelectField
-                  label={s('mileage')}
-                  value={state.mileage}
-                  onChange={(v) => setState((prev) => ({ ...prev, mileage: v }))}
-                >
-                  <option value="">{s('noLimit')}</option>
-                  {mileageTiers.map((t) => (
-                    <option key={t} value={t}>
-                      {s('upTo', { value: `${formatNumber(t)} km` })}
-                    </option>
-                  ))}
-                </SelectField>
-
-                <SelectField
-                  label={s('transmission')}
-                  value={state.transmission}
-                  onChange={(v) => setState((prev) => ({ ...prev, transmission: v }))}
-                >
-                  <option value="">{s('anyFeminine')}</option>
-                  {transmissionOpts.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {t(o.labelKey)}
-                    </option>
-                  ))}
-                </SelectField>
-
-                <SelectField
-                  label={s('fuel')}
-                  value={state.fuel}
-                  onChange={(v) => setState((prev) => ({ ...prev, fuel: v }))}
-                >
-                  <option value="">{s('anyMasculine')}</option>
-                  {fuelOpts.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {t(o.labelKey)}
-                    </option>
-                  ))}
-                </SelectField>
+                <FilterFields
+                  state={state}
+                  setState={setState}
+                  brands={brands}
+                  years={years}
+                  budgetTiers={budgetTiers}
+                  mileageTiers={mileageTiers}
+                  transmissionOpts={transmissionOpts}
+                  fuelOpts={fuelOpts}
+                  bodyOpts={bodyOpts}
+                  currency={currency}
+                />
               </div>
 
               <button
@@ -652,88 +603,58 @@ export function Storefront({
               </button>
             </div>
           )}
+        </div>
+      </div>
 
-          {/* 4.4 Fila (c): Atajos rápidos, conteo y orden (desktop) */}
-          <div className="hidden md:flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#c5c6cd]/30">
-            <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
-              <button
-                type="button"
-                onClick={() => setState((prev) => ({ ...prev, withPhotos: !prev.withPhotos }))}
-                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold uppercase tracking-wider transition-colors shrink-0 ${
-                  state.withPhotos
-                    ? 'bg-black text-white'
-                    : 'border border-[#c5c6cd] bg-white text-[#44474d] hover:bg-[#f2f4f6]'
-                }`}
-              >
-                <Camera className="size-3.5" />
-                {s('shortcutWithPhotos')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setState((prev) => ({ ...prev, automatic: !prev.automatic }))}
-                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold uppercase tracking-wider transition-colors shrink-0 ${
-                  state.automatic
-                    ? 'bg-black text-white'
-                    : 'border border-[#c5c6cd] bg-white text-[#44474d] hover:bg-[#f2f4f6]'
-                }`}
-              >
-                <Gauge className="size-3.5" />
-                {s('shortcutAutomatic')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setState((prev) => ({ ...prev, recent: !prev.recent }))}
-                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-bold uppercase tracking-wider transition-colors shrink-0 ${
-                  state.recent
-                    ? 'bg-black text-white'
-                    : 'border border-[#c5c6cd] bg-white text-[#44474d] hover:bg-[#f2f4f6]'
-                }`}
-              >
-                <Sparkles className="size-3.5" />
-                {s('shortcutRecentlyAdded')}
-              </button>
-            </div>
+      {/* Inventario: lateral de filtros fijo + grilla.
+          El lateral vuelve a ser la maqueta original por pedido del negocio:
+          la barra superior de filtros se sentía cargada. Lo que NO vuelve es
+          el punto débil de aquella versión —en pantallas angostas los filtros
+          quedaban tras un botón que se perdía al hacer scroll—: por debajo de
+          `lg` siguen viviendo en el panel que se abre desde la cabecera fija. */}
+      <section id="inventario" className="w-full scroll-mt-24 bg-[#f7f9fb] px-4 sm:px-6 py-8 pb-28 lg:pb-12 lg:px-12">
+        <div className="mx-auto grid max-w-[1280px] gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
 
-            <div className="flex items-center gap-3 ml-auto">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#44474d] whitespace-nowrap">
-                {active
-                  ? s('resultsCount', { shown: shown.length, total: vehicles.length })
-                  : s('totalCount', { total: vehicles.length })}
-              </span>
-
+          <aside className="hidden h-fit lg:sticky lg:top-24 lg:block rounded-xl border border-[#c5c6cd]/50 bg-white p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)]">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-[#191c1e] font-[family-name:var(--font-barlow-condensed)]">
+                {s('filters')}
+              </h3>
               {active && (
                 <button
                   type="button"
                   onClick={clear}
-                  className="inline-flex min-h-[36px] items-center gap-1 text-xs font-bold uppercase tracking-wider text-(--brand) hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-(--brand) hover:underline"
                 >
                   <X className="size-3.5" />
                   {s('clear')}
                 </button>
               )}
-
-              <div className="relative">
-                <select
-                  value={state.sort}
-                  onChange={(e) => setState((prev) => ({ ...prev, sort: e.target.value as SortOption }))}
-                  className="appearance-none rounded-lg border border-[#c5c6cd] bg-[#f2f4f6] min-h-[36px] py-1.5 pl-3 pr-8 text-xs font-bold uppercase tracking-wider text-[#191c1e] outline-none transition-all focus:border-(--brand)"
-                >
-                  <option value="">{s('sort')}</option>
-                  <option value="price_asc">{s('sortLowestPrice')}</option>
-                  <option value="price_desc">{s('sortHighestPrice')}</option>
-                  <option value="mileage_asc">{s('sortLowestMileage')}</option>
-                  <option value="year_desc">{s('sortNewestYear')}</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#75777e]" />
-              </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Grilla y Estado Vacío */}
-      <section className="w-full bg-[#f7f9fb] px-4 sm:px-6 py-8 pb-28 md:pb-12 lg:px-12">
-        <div className="mx-auto max-w-[1280px]">
+            <div className="space-y-4">
+              <FilterFields
+                state={state}
+                setState={setState}
+                brands={brands}
+                years={years}
+                budgetTiers={budgetTiers}
+                mileageTiers={mileageTiers}
+                transmissionOpts={transmissionOpts}
+                fuelOpts={fuelOpts}
+                bodyOpts={bodyOpts}
+                currency={currency}
+              />
+            </div>
+
+            <p className="mt-5 border-t border-[#c5c6cd]/50 pt-4 text-xs font-bold uppercase tracking-wider text-[#44474d]">
+              {active
+                ? s('resultsCount', { shown: shown.length, total: vehicles.length })
+                : s('totalCount', { total: vehicles.length })}
+            </p>
+          </aside>
+
+          <div>
           {shown.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-[#c5c6cd]/40 bg-white p-12 text-center shadow-xs">
               <div className="rounded-full bg-[#f2f4f6] p-4 text-[#75777e]">
@@ -768,7 +689,7 @@ export function Storefront({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {shown.map((v) => (
                 <VehicleCard
                   key={v.id}
@@ -777,16 +698,16 @@ export function Storefront({
                   whatsapp={effectiveWhatsapp}
                   currency={currency}
                   baseUrl={baseUrl}
-                  isRecent={recentIds.has(v.id)}
                 />
               ))}
             </div>
           )}
+          </div>
         </div>
       </section>
 
       {/* 6.4 Barra inferior anclada en móvil */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#c5c6cd]/40 bg-white/95 backdrop-blur-md p-3 flex gap-2 md:hidden shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#c5c6cd]/40 bg-white/95 backdrop-blur-md p-3 flex gap-2 lg:hidden shadow-lg">
         <button
           type="button"
           onClick={() => setMobileFiltersOpen((prev) => !prev)}

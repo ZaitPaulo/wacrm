@@ -7,7 +7,6 @@ import type { ShowcaseAccount } from '@/lib/showcase/format';
 export async function StoreNav({ account }: { account: ShowcaseAccount }) {
   const t = await getTranslations('Storefront');
   const displayName = account.public_name?.trim() || account.name;
-  const waDigits = account.public_whatsapp?.replace(/\D/g, '') || null;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[#c5c6cd]/60 bg-white/90 backdrop-blur-md">
@@ -35,24 +34,6 @@ export async function StoreNav({ account }: { account: ShowcaseAccount }) {
               {t('inventory')}
             </Link>
           </nav>
-        </div>
-        <div className="flex items-center gap-4">
-          {waDigits && (
-            <a
-              href={`https://wa.me/${waDigits}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden text-xs font-semibold uppercase tracking-wide text-[#44474d] transition-colors hover:text-(--brand) md:block font-[family-name:var(--font-barlow-condensed)]"
-            >
-              {t('contact')}
-            </a>
-          )}
-          <Link
-            href="/login"
-            className="rounded-lg bg-black px-6 py-2.5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-neutral-800 font-[family-name:var(--font-barlow-condensed)]"
-          >
-            {t('signIn')}
-          </Link>
         </div>
       </div>
     </header>

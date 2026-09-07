@@ -1,23 +1,42 @@
 'use client'
 
-import { useReducer, useEffect } from 'react'
+import { useReducer, useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import Image from 'next/image'
 import { ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight } from 'lucide-react'
+
+/** Escala mínima: la foto entera, ajustada al visor. */
+export const MIN_SCALE = 1
+export const MAX_SCALE = 4
+/** Salto de la rueda del ratón y de los botones + / −. */
+export const ZOOM_STEP = 0.5
+/** A cuánto salta el botón de lupa desde la vista ajustada. */
+export const TOGGLE_SCALE = 2.5
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max)
 
 export type GalleryAction =
   | { type: 'OPEN' }
   | { type: 'CLOSE' }
   | { type: 'TOGGLE_ZOOM' }
+  | { type: 'ZOOM_BY'; delta: number }
+  | { type: 'PAN'; dx: number; dy: number; maxX: number; maxY: number }
   | { type: 'NEXT'; total: number }
   | { type: 'PREV'; total: number }
   | { type: 'SELECT'; index: number }
 
 export interface GalleryState {
   isOpen: boolean
-  isZoomed: boolean
+  /** 1 = ajustada al visor. Por encima, la foto se recorre arrastrando. */
+  scale: number
+  offsetX: number
+  offsetY: number
   selected: number
 }
+
+/** Vista sin ampliar: escala 1 y centrada. */
+const FIT = { scale: MIN_SCALE, offsetX: 0, offsetY: 0 }
 
 export function galleryReducer(
   state: GalleryState,
@@ -25,25 +44,48 @@ export function galleryReducer(
 ): GalleryState {
   switch (action.type) {
     case 'OPEN':
-      return { ...state, isOpen: true, isZoomed: false }
+      return { ...state, isOpen: true, ...FIT }
     case 'CLOSE':
-      return { ...state, isOpen: false, isZoomed: false }
+      return { ...state, isOpen: false, ...FIT }
     case 'TOGGLE_ZOOM':
-      return { ...state, isZoomed: !state.isZoomed }
+      return state.scale > MIN_SCALE
+        ? { ...state, ...FIT }
+        : { ...state, scale: TOGGLE_SCALE, offsetX: 0, offsetY: 0 }
+    case 'ZOOM_BY': {
+      const scale = clamp(state.scale + action.delta, MIN_SCALE, MAX_SCALE)
+      // Al volver a la vista ajustada se recentra: si no, la foto se
+      // quedaría desplazada sin que quede margen para arrastrarla.
+      if (scale === MIN_SCALE) return { ...state, ...FIT }
+      // El desplazamiento se reescala con la ampliación para que el punto
+      // que se está mirando no salte al cambiar de nivel.
+      const ratio = scale / state.scale
+      return {
+        ...state,
+        scale,
+        offsetX: state.offsetX * ratio,
+        offsetY: state.offsetY * ratio,
+      }
+    }
+    case 'PAN':
+      return {
+        ...state,
+        offsetX: clamp(state.offsetX + action.dx, -action.maxX, action.maxX),
+        offsetY: clamp(state.offsetY + action.dy, -action.maxY, action.maxY),
+      }
     case 'NEXT':
       return {
         ...state,
         selected: (state.selected + 1) % action.total,
-        isZoomed: false,
+        ...FIT,
       }
     case 'PREV':
       return {
         ...state,
         selected: (state.selected - 1 + action.total) % action.total,
-        isZoomed: false,
+        ...FIT,
       }
     case 'SELECT':
-      return { ...state, selected: action.index, isZoomed: false }
+      return { ...state, selected: action.index, ...FIT }
     default:
       return state
   }
@@ -53,22 +95,44 @@ export interface GalleryProps {
   images: string[]
   alt: string
   initialOpen?: boolean
-  initialZoomed?: boolean
+  initialScale?: number
 }
 
 export function Gallery({
   images,
   alt,
   initialOpen = false,
-  initialZoomed = false,
+  initialScale = MIN_SCALE,
 }: GalleryProps) {
   const s = useTranslations('Storefront')
   const [state, dispatch] = useReducer(galleryReducer, {
     selected: 0,
     isOpen: initialOpen,
-    isZoomed: initialZoomed,
+    scale: initialScale,
+    offsetX: 0,
+    offsetY: 0,
   })
-  const { selected, isOpen, isZoomed } = state
+  const { selected, isOpen, scale, offsetX, offsetY } = state
+  const isZoomed = scale > MIN_SCALE
+
+  // Marco del visor y lienzo que lleva la transformación. Se miden en vivo
+  // para saber cuánto sobresale la foto y no dejar arrastrarla más allá.
+  const frameRef = useRef<HTMLDivElement | null>(null)
+  const stageRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef({ active: false, x: 0, y: 0, moved: false })
+  // El arrastre en curso sí necesita re-render —cambia el cursor y apaga la
+  // transición—, así que va en estado y no solo en la ref.
+  const [isDragging, setIsDragging] = useState(false)
+
+  const panBounds = useCallback(() => {
+    const frame = frameRef.current?.getBoundingClientRect()
+    const stage = stageRef.current?.getBoundingClientRect()
+    if (!frame || !stage) return { maxX: 0, maxY: 0 }
+    return {
+      maxX: Math.max(0, (stage.width - frame.width) / 2),
+      maxY: Math.max(0, (stage.height - frame.height) / 2),
+    }
+  }, [])
 
   useEffect(() => {
     if (!isOpen) return
@@ -80,6 +144,10 @@ export function Gallery({
         dispatch({ type: 'NEXT', total: images.length })
       } else if (e.key === 'ArrowLeft' && images.length > 1) {
         dispatch({ type: 'PREV', total: images.length })
+      } else if (e.key === '+' || e.key === '=') {
+        dispatch({ type: 'ZOOM_BY', delta: ZOOM_STEP })
+      } else if (e.key === '-') {
+        dispatch({ type: 'ZOOM_BY', delta: -ZOOM_STEP })
       }
     }
 
@@ -222,28 +290,80 @@ export function Gallery({
               </button>
             )}
 
+            {/* Visor. `overflow-hidden` a propósito: la ampliación se
+                recorre arrastrando, no con las barras del navegador —que
+                aparecían porque `scale()` no cambia el tamaño de caja, así
+                que el contenedor seguía midiendo lo de antes y encajonaba
+                la foto en una columna con scrollbars encima. */}
             <div
-              className={`relative flex items-center justify-center max-h-[85vh] max-w-[90vw] transition-all duration-300 ${
-                isZoomed
-                  ? 'cursor-zoom-out overflow-auto'
-                  : 'cursor-zoom-in'
+              ref={frameRef}
+              className={`relative flex h-full w-full items-center justify-center overflow-hidden ${
+                !isZoomed ? 'cursor-zoom-in' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
               }`}
+              onWheel={(e) => {
+                e.stopPropagation()
+                dispatch({
+                  type: 'ZOOM_BY',
+                  delta: e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP,
+                })
+              }}
+              onPointerDown={(e) => {
+                if (!isZoomed) return
+                e.stopPropagation()
+                dragRef.current = { active: true, x: e.clientX, y: e.clientY, moved: false }
+                setIsDragging(true)
+                e.currentTarget.setPointerCapture(e.pointerId)
+              }}
+              onPointerMove={(e) => {
+                if (!dragRef.current.active) return
+                const dx = e.clientX - dragRef.current.x
+                const dy = e.clientY - dragRef.current.y
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragRef.current.moved = true
+                dragRef.current.x = e.clientX
+                dragRef.current.y = e.clientY
+                const { maxX, maxY } = panBounds()
+                dispatch({ type: 'PAN', dx, dy, maxX, maxY })
+              }}
+              onPointerUp={(e) => {
+                if (dragRef.current.active) {
+                  e.currentTarget.releasePointerCapture(e.pointerId)
+                  dragRef.current.active = false
+                  setIsDragging(false)
+                }
+              }}
+              onPointerCancel={() => {
+                dragRef.current.active = false
+                setIsDragging(false)
+              }}
               onClick={(e) => {
                 e.stopPropagation()
+                // Un arrastre termina en click; solo alterna si no se movió.
+                if (dragRef.current.moved) {
+                  dragRef.current.moved = false
+                  return
+                }
                 dispatch({ type: 'TOGGLE_ZOOM' })
               }}
             >
-              <Image
-                src={images[selected]}
-                alt={alt}
-                width={1920}
-                height={1080}
-                unoptimized
-                priority
-                className={`max-h-[80vh] w-auto max-w-[85vw] object-contain select-none transition-transform duration-300 ${
-                  isZoomed ? 'scale-150 sm:scale-200' : 'scale-100'
-                }`}
-              />
+              <div
+                ref={stageRef}
+                className="flex items-center justify-center will-change-transform"
+                style={{
+                  transform: `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${scale})`,
+                  transition: isDragging ? 'none' : 'transform 200ms ease-out',
+                }}
+              >
+                <Image
+                  src={images[selected]}
+                  alt={alt}
+                  width={1920}
+                  height={1080}
+                  unoptimized
+                  priority
+                  draggable={false}
+                  className="max-h-[78vh] max-w-[88vw] w-auto h-auto object-contain select-none pointer-events-none"
+                />
+              </div>
             </div>
 
             {images.length > 1 && (

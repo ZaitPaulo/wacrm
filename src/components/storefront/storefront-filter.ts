@@ -11,9 +11,7 @@ export interface StorefrontFilterState {
   mileage: string
   transmission: string
   fuel: string
-  withPhotos: boolean
-  automatic: boolean
-  recent: boolean
+  body: string
 }
 
 export const INITIAL_FILTER_STATE: StorefrontFilterState = {
@@ -25,9 +23,7 @@ export const INITIAL_FILTER_STATE: StorefrontFilterState = {
   mileage: '',
   transmission: '',
   fuel: '',
-  withPhotos: false,
-  automatic: false,
-  recent: false,
+  body: '',
 }
 
 /** Serializa el estado de búsqueda a un Record<string, string> plano. */
@@ -41,9 +37,7 @@ export function serializeFilterState(state: StorefrontFilterState): Record<strin
   if (state.mileage) result.mileage = state.mileage
   if (state.transmission) result.transmission = state.transmission
   if (state.fuel) result.fuel = state.fuel
-  if (state.withPhotos) result.withPhotos = 'true'
-  if (state.automatic) result.automatic = 'true'
-  if (state.recent) result.recent = 'true'
+  if (state.body) result.body = state.body
   return result
 }
 
@@ -62,27 +56,14 @@ export function countActiveFilters(state: StorefrontFilterState): number {
   if (state.mileage) count++
   if (state.transmission) count++
   if (state.fuel) count++
-  if (state.withPhotos) count++
-  if (state.automatic) count++
-  if (state.recent) count++
+  if (state.body) count++
   return count
 }
 
-/** Obtiene los IDs de los N vehículos más recientes según created_at. */
-export function getRecentVehicleIds(vehicles: ShowcaseVehicle[], count = 12): Set<string> {
-  const sorted = [...vehicles].sort((a, b) => {
-    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
-    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
-    return timeB - timeA
-  })
-  return new Set(sorted.slice(0, count).map((v) => v.id))
-}
-
-/** Aplica búsqueda por texto, los 6 filtros y los 3 atajos sobre la lista de vehículos. */
+/** Aplica la búsqueda por texto y los siete filtros sobre la lista. */
 export function filterVehicles(
   vehicles: ShowcaseVehicle[],
   state: StorefrontFilterState,
-  recentIds: Set<string>,
 ): ShowcaseVehicle[] {
   const query = state.q.trim().toLowerCase()
   const queryTerms = query ? query.split(/\s+/) : []
@@ -112,13 +93,7 @@ export function filterVehicles(
     if (state.fuel && v.fuel_type !== state.fuel) {
       return false
     }
-    if (state.withPhotos && (!v.images || v.images.length === 0)) {
-      return false
-    }
-    if (state.automatic && v.transmission !== 'automatic') {
-      return false
-    }
-    if (state.recent && !recentIds.has(v.id)) {
+    if (state.body && v.body_type !== state.body) {
       return false
     }
     return true

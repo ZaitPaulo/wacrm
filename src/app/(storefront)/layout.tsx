@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Barlow, Barlow_Condensed } from 'next/font/google'
-import { getShowcase } from '@/lib/showcase/data'
+import { getShowcaseAccount } from '@/lib/showcase/data'
 import { resolveBrandColor } from '@/lib/showcase/format'
 
 const barlow = Barlow({
@@ -23,8 +23,8 @@ export default async function StorefrontLayout({
 }: {
   children: ReactNode
 }) {
-  const data = await getShowcase()
-  const brandColor = resolveBrandColor(data?.account?.public_brand_color)
+  const account = await getShowcaseAccount()
+  const brandColor = resolveBrandColor(account?.public_brand_color)
 
   return (
     <div

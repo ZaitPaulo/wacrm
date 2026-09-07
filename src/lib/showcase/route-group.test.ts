@@ -17,10 +17,11 @@ vi.mock('next/font/google', () => ({
 // Mock showcase data
 vi.mock('@/lib/showcase/data', () => ({
   getShowcase: vi.fn(),
+  getShowcaseAccount: vi.fn(),
 }))
 
-import { getShowcase } from '@/lib/showcase/data'
-import type { ShowcaseAccount, ShowcaseData } from '@/lib/showcase/format'
+import { getShowcaseAccount } from '@/lib/showcase/data'
+import { DEFAULT_BRAND_COLOR, type ShowcaseAccount } from '@/lib/showcase/format'
 import StorefrontLayout from '@/app/(storefront)/layout'
 
 const appDir = path.resolve(process.cwd(), 'src/app')
@@ -53,6 +54,14 @@ describe('Section 3: Storefront route group and visual system', () => {
       expect(fs.existsSync(path.join(appDir, 'opengraph-image.tsx'))).toBe(false)
       expect(fs.existsSync(path.join(appDir, 'vehiculo'))).toBe(false)
     })
+
+    // /privacidad usa StoreNav y StoreFooter, que dependen de --brand y de
+    // las fuentes de marca. Fuera del grupo esas variables no existen: los
+    // hover perdían el color y la cabecera caía a la tipografía del CRM.
+    it('contains privacidad/ in (storefront)/, not in root src/app/', () => {
+      expect(fs.existsSync(path.join(storefrontDir, 'privacidad', 'page.tsx'))).toBe(true)
+      expect(fs.existsSync(path.join(appDir, 'privacidad'))).toBe(false)
+    })
   })
 
   describe('3.2 Font configuration in layout.tsx', () => {
@@ -83,35 +92,44 @@ describe('Section 3: Storefront route group and visual system', () => {
     })
 
     it('renders with brand color when account has public_brand_color', async () => {
-      vi.mocked(getShowcase).mockResolvedValueOnce({
-        account: {
-          id: 'acc_1',
-          name: 'Lora Motors',
-          default_currency: 'USD',
-          public_whatsapp: '123456789',
-          public_brand_color: '#123456',
-        } as unknown as ShowcaseAccount,
-        vehicles: [],
-      })
+      vi.mocked(getShowcaseAccount).mockResolvedValueOnce({
+        id: 'acc_1',
+        name: 'Lora Motors',
+        default_currency: 'USD',
+        public_whatsapp: '123456789',
+        public_brand_color: '#123456',
+      } as unknown as ShowcaseAccount)
 
       const res = await StorefrontLayout({ children: 'Test Child' })
       expect(res.props.style).toHaveProperty('--brand', '#123456')
     })
 
     it('safely handles null account data without throwing (safe navigation)', async () => {
-      vi.mocked(getShowcase).mockResolvedValueOnce(null)
+      vi.mocked(getShowcaseAccount).mockResolvedValueOnce(null)
 
       const res = await StorefrontLayout({ children: 'Test Child' })
       expect(res.props.style).toHaveProperty('--brand')
     })
 
-    it('safely handles showcase data with missing account without throwing', async () => {
-      vi.mocked(getShowcase).mockResolvedValueOnce({
-        account: undefined,
-      } as unknown as ShowcaseData)
+    it('falls back to the default brand color when the stored value is invalid', async () => {
+      vi.mocked(getShowcaseAccount).mockResolvedValueOnce({
+        id: 'acc_1',
+        name: 'Lora Motors',
+        default_currency: 'USD',
+        public_brand_color: 'rojo',
+      } as unknown as ShowcaseAccount)
 
       const res = await StorefrontLayout({ children: 'Test Child' })
-      expect(res.props.style).toHaveProperty('--brand')
+      expect(res.props.style).toHaveProperty('--brand', DEFAULT_BRAND_COLOR)
+    })
+
+    // El layout envuelve TODA la vitrina, incluida cada ficha. Pedir el
+    // inventario completo aquí para leer una columna de `accounts` añadía
+    // una consulta de 128 filas por vista de ficha, que el `cache()` de
+    // React no deduplica porque la ficha llama a otra función.
+    it('does not pull the whole inventory just to read the brand color', () => {
+      expect(layoutContent).toContain('getShowcaseAccount')
+      expect(layoutContent).not.toMatch(/\bgetShowcase\b(?!Account)/)
     })
   })
 })

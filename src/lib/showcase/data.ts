@@ -32,6 +32,31 @@ function admin(): SupabaseClient {
 }
 
 /**
+ * Solo la cuenta marcada como vitrina, sin su inventario.
+ *
+ * Existe para el layout público, que necesita el color de marca y nada
+ * más. Con `getShowcase()` cada vista de ficha arrastraba las 128 filas
+ * de `inventory_vehicles` —con sus `images` y su `features`— para leer
+ * una única columna de `accounts`: el `cache()` de React deduplica por
+ * función, y la ficha llama a `getShowcaseVehicle`, no a `getShowcase`,
+ * así que esa consulta no se reaprovechaba nunca.
+ */
+export const getShowcaseAccount = cache(async (): Promise<ShowcaseAccount | null> => {
+  const db = admin()
+
+  const { data: account, error } = await db
+    .from('accounts')
+    .select(ACCOUNT_COLUMNS)
+    .eq('showcase_enabled', true)
+    .maybeSingle()
+  if (error) {
+    console.error('[showcase] account fetch error:', error)
+    return null
+  }
+  return (account as ShowcaseAccount) ?? null
+})
+
+/**
  * Devuelve la cuenta marcada como vitrina + sus vehículos disponibles,
  * o `null` si ninguna cuenta tiene la vitrina activada.
  */
@@ -52,7 +77,7 @@ export const getShowcase = cache(async (): Promise<ShowcaseData | null> => {
   const { data: vehicles, error: vehErr } = await db
     .from('inventory_vehicles')
     .select(
-      'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, condition, features, images, public_ref, created_at',
+      'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, condition, features, images, public_ref',
     )
     .eq('account_id', account.id)
     .eq('status', 'available')
@@ -93,7 +118,7 @@ export const getShowcaseVehicle = cache(
     const { data: vehicle, error: vehErr } = await db
       .from('inventory_vehicles')
       .select(
-        'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, color, condition, features, images, public_ref, created_at',
+        'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, color, condition, features, images, public_ref',
       )
       .eq('account_id', account.id)
       .eq('id', id)
@@ -106,12 +131,20 @@ export const getShowcaseVehicle = cache(
       const { data: similar, error: simErr } = await db
         .from('inventory_vehicles')
         .select(
-          'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, condition, features, images, public_ref, created_at',
+          'id, brand, model, year, price, mileage, transmission, fuel_type, body_type, condition, features, images, public_ref',
         )
         .eq('account_id', account.id)
         .eq('status', 'available')
         .eq('body_type', vehicle.body_type)
         .neq('id', vehicle.id)
+        // Se piden solo los del entorno de precio (±40 %) y con tope, en
+        // vez de toda la carrocería: "Camioneta" son decenas de filas con
+        // sus `images`, y de ahí se usan tres. El orden final por cercanía
+        // de precio se hace en memoria porque Postgres no ordena por
+        // distancia a un valor sin una expresión que el cliente no expone.
+        .gte('price', vehicle.price * 0.6)
+        .lte('price', vehicle.price * 1.4)
+        .limit(20)
 
       if (!simErr && similar && similar.length > 0) {
         similarVehicles = (similar as ShowcaseVehicle[])

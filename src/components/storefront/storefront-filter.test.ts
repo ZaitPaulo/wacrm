@@ -4,7 +4,6 @@ import {
   serializeFilterState,
   hasActiveFilters,
   countActiveFilters,
-  getRecentVehicleIds,
   filterVehicles,
   sortVehicles,
   type StorefrontFilterState,
@@ -26,7 +25,6 @@ const mockVehicles: ShowcaseVehicle[] = [
     features: null,
     images: ['https://example.com/duster.jpg'],
     public_ref: 'REF-001',
-    created_at: '2026-08-26T10:00:00Z',
   },
   {
     id: 'v2',
@@ -42,7 +40,6 @@ const mockVehicles: ShowcaseVehicle[] = [
     features: null,
     images: ['https://example.com/corolla.jpg'],
     public_ref: 'REF-002',
-    created_at: '2026-08-26T11:00:00Z',
   },
   {
     id: 'v3',
@@ -58,7 +55,6 @@ const mockVehicles: ShowcaseVehicle[] = [
     features: null,
     images: [], // No photos
     public_ref: 'REF-003',
-    created_at: '2026-08-26T09:00:00Z',
   },
   {
     id: 'v4',
@@ -74,7 +70,6 @@ const mockVehicles: ShowcaseVehicle[] = [
     features: null,
     images: null, // null photos
     public_ref: null,
-    created_at: '2026-08-26T12:00:00Z',
   },
 ]
 
@@ -95,9 +90,7 @@ describe('Storefront filter & sort logic', () => {
         mileage: '50000',
         transmission: 'automatic',
         fuel: 'hybrid',
-        withPhotos: true,
-        automatic: true,
-        recent: false,
+        body: 'suv',
       }
       const serialized = serializeFilterState(state)
       expect(serialized).toEqual({
@@ -109,8 +102,7 @@ describe('Storefront filter & sort logic', () => {
         mileage: '50000',
         transmission: 'automatic',
         fuel: 'hybrid',
-        withPhotos: 'true',
-        automatic: 'true',
+        body: 'suv',
       })
     })
   })
@@ -133,10 +125,8 @@ describe('Storefront filter & sort logic', () => {
       expect(hasActiveFilters({ ...INITIAL_FILTER_STATE, fuel: 'gasoline' })).toBe(true)
     })
 
-    it('returns true when any shortcut is active', () => {
-      expect(hasActiveFilters({ ...INITIAL_FILTER_STATE, withPhotos: true })).toBe(true)
-      expect(hasActiveFilters({ ...INITIAL_FILTER_STATE, automatic: true })).toBe(true)
-      expect(hasActiveFilters({ ...INITIAL_FILTER_STATE, recent: true })).toBe(true)
+    it('returns true when the body type filter is active', () => {
+      expect(hasActiveFilters({ ...INITIAL_FILTER_STATE, body: 'suv' })).toBe(true)
     })
   })
 
@@ -145,93 +135,74 @@ describe('Storefront filter & sort logic', () => {
       expect(countActiveFilters(INITIAL_FILTER_STATE)).toBe(0)
     })
 
-    it('correctly counts active filters, shortcuts, and query', () => {
+    it('correctly counts active filters and query', () => {
       expect(countActiveFilters({ ...INITIAL_FILTER_STATE, q: 'duster' })).toBe(1)
       expect(
         countActiveFilters({
           ...INITIAL_FILTER_STATE,
           q: 'duster',
           brand: 'Renault',
-          withPhotos: true,
-          automatic: true,
+          body: 'suv',
+          transmission: 'automatic',
         }),
       ).toBe(4)
     })
-  })
 
-  describe('getRecentVehicleIds', () => {
-    it('returns at most 12 most recent vehicles by created_at', () => {
-      const manyVehicles: ShowcaseVehicle[] = Array.from({ length: 20 }, (_, i) => ({
-        id: `v_${i}`,
-        brand: 'Brand',
-        model: `Model ${i}`,
-        year: 2020 + (i % 5),
-        price: 10000,
-        mileage: 10000,
-        transmission: 'manual',
-        fuel_type: 'gasoline',
-        body_type: 'sedan',
-        condition: 'used',
-        features: null,
-        images: [],
-        public_ref: null,
-        created_at: new Date(Date.UTC(2026, 7, 1 + i)).toISOString(),
-      }))
-
-      const recentIds = getRecentVehicleIds(manyVehicles, 12)
-      expect(recentIds.size).toBe(12)
-      // Most recent should be v_19 down to v_8
-      expect(recentIds.has('v_19')).toBe(true)
-      expect(recentIds.has('v_8')).toBe(true)
-      expect(recentIds.has('v_7')).toBe(false)
+    it('counts the body type filter', () => {
+      expect(countActiveFilters({ ...INITIAL_FILTER_STATE, body: 'suv' })).toBe(1)
+      expect(hasActiveFilters({ ...INITIAL_FILTER_STATE, body: 'suv' })).toBe(true)
     })
   })
 
   describe('filterVehicles', () => {
-    const recentIds = new Set(['v4', 'v2'])
-
     it('filters by free text q matching brand, model, or year (case insensitive partial match)', () => {
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, q: 'dust' }, recentIds).map((v) => v.id)).toEqual(['v1'])
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, q: 'TOYOTA' }, recentIds).map((v) => v.id)).toEqual(['v2', 'v4'])
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, q: '2020' }, recentIds).map((v) => v.id)).toEqual(['v3'])
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, q: 'cross 2023' }, recentIds).map((v) => v.id)).toEqual(['v2'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, q: 'dust' }).map((v) => v.id)).toEqual(['v1'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, q: 'TOYOTA' }).map((v) => v.id)).toEqual(['v2', 'v4'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, q: '2020' }).map((v) => v.id)).toEqual(['v3'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, q: 'cross 2023' }).map((v) => v.id)).toEqual(['v2'])
+    })
+
+    it('filters by body type (carrocería)', () => {
+      expect(
+        filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, body: 'suv' }).map(
+          (v) => v.id,
+        ),
+      ).toEqual(['v1', 'v2'])
+      expect(
+        filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, body: 'sedan' }).map(
+          (v) => v.id,
+        ),
+      ).toEqual(['v4'])
+      // Una carrocería sin vehículos no devuelve nada, y no rompe.
+      expect(
+        filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, body: 'convertible' }),
+      ).toEqual([])
+    })
+
+    it('combines body type with another filter', () => {
+      const res = filterVehicles(
+        mockVehicles,
+        { ...INITIAL_FILTER_STATE, body: 'suv', fuel: 'hybrid' },
+      )
+      expect(res.map((v) => v.id)).toEqual(['v2'])
     })
 
     it('filters by brand, year, budget, mileage, transmission, fuel', () => {
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, brand: 'Toyota' }, recentIds).map((v) => v.id)).toEqual(['v2', 'v4'])
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, year: '2021' }, recentIds).map((v) => v.id)).toEqual(['v1'])
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, budget: '70000000' }, recentIds).map((v) => v.id)).toEqual(['v1', 'v3'])
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, mileage: '20000' }, recentIds).map((v) => v.id)).toEqual(['v2', 'v4'])
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, transmission: 'manual' }, recentIds).map((v) => v.id)).toEqual(['v1'])
-      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, fuel: 'hybrid' }, recentIds).map((v) => v.id)).toEqual(['v2'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, brand: 'Toyota' }).map((v) => v.id)).toEqual(['v2', 'v4'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, year: '2021' }).map((v) => v.id)).toEqual(['v1'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, budget: '70000000' }).map((v) => v.id)).toEqual(['v1', 'v3'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, mileage: '20000' }).map((v) => v.id)).toEqual(['v2', 'v4'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, transmission: 'manual' }).map((v) => v.id)).toEqual(['v1'])
+      expect(filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, fuel: 'hybrid' }).map((v) => v.id)).toEqual(['v2'])
     })
 
-    it('filters by shortcut withPhotos (only vehicles with at least 1 photo)', () => {
-      const res = filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, withPhotos: true }, recentIds)
-      expect(res.map((v) => v.id)).toEqual(['v1', 'v2'])
-    })
-
-    it('filters by shortcut automatic (only automatic transmission)', () => {
-      const res = filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, automatic: true }, recentIds)
-      expect(res.map((v) => v.id)).toEqual(['v2', 'v3', 'v4'])
-    })
-
-    it('filters by shortcut recent (only vehicles in recentIds)', () => {
-      const res = filterVehicles(mockVehicles, { ...INITIAL_FILTER_STATE, recent: true }, recentIds)
-      expect(res.map((v) => v.id)).toEqual(['v2', 'v4'])
-    })
-
-    it('combines text query, filters, and shortcuts', () => {
-      const res = filterVehicles(
-        mockVehicles,
-        {
-          ...INITIAL_FILTER_STATE,
-          q: 'toyota',
-          withPhotos: true,
-          automatic: true,
-        },
-        recentIds,
-      )
+    it('combines text query with several filters', () => {
+      const res = filterVehicles(mockVehicles, {
+        ...INITIAL_FILTER_STATE,
+        q: 'toyota',
+        transmission: 'automatic',
+        body: 'suv',
+      })
       expect(res.map((v) => v.id)).toEqual(['v2'])
     })
   })

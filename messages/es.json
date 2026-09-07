@@ -2511,8 +2511,6 @@
     "galleryCount": "{current} de {total}",
     "similarVehicles": "Vehículos parecidos",
     "backToInventory": "Volver al inventario",
-    "refCodeLabel": "Código de referencia",
-    "refCodeExplanation": "Menciona este código al escribirnos para identificar este vehículo de inmediato.",
     "inventory": "Inventario",
     "zoomImage": "Ampliar imagen",
     "close": "Cerrar",
