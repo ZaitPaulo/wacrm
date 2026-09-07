@@ -151,7 +151,10 @@ export default async function VehiclePage({ params }: Params) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f7f9fb] text-[#191c1e]">
+    // pb-20 hasta `lg`: la barra inferior con el precio y el contacto es
+    // `fixed`, así que al final del scroll se monta sobre el pie. El
+    // relleno deja el hueco donde la barra descansa.
+    <div className="flex min-h-screen flex-col bg-[#f7f9fb] pb-20 text-[#191c1e] lg:pb-0">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -229,22 +232,6 @@ export default async function VehiclePage({ params }: Params) {
                 <Stat label={s('condition')} value={labelOf(t, CONDITIONS, v.condition)} />
               </div>
 
-              {/* 7.5 Código de referencia y su explicación */}
-              {v.public_ref && (
-                <div className="rounded-xl border border-[#c5c6cd]/50 bg-white p-4 space-y-1 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#75777e]">
-                      {s('refCodeLabel')}
-                    </span>
-                    <span className="font-mono text-xs font-bold text-[#191c1e] bg-[#f2f4f6] px-2.5 py-1 rounded">
-                      {v.public_ref}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#75777e] leading-relaxed">
-                    {s('refCodeExplanation')}
-                  </p>
-                </div>
-              )}
 
               {/* Acciones principales */}
               <div className="flex flex-col gap-3">
@@ -358,7 +345,6 @@ export default async function VehiclePage({ params }: Params) {
                   whatsapp={account.public_whatsapp}
                   currency={account.default_currency}
                   baseUrl={base}
-                  isRecent={false}
                 />
               ))}
             </div>

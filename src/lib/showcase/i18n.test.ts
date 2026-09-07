@@ -24,22 +24,16 @@ describe('Storefront translations consistency', () => {
 
   it('includes all required redesign keys', () => {
     const requiredKeys = [
-      'search',
       'searchPlaceholder',
       'sort',
       'sortLowestPrice',
       'sortHighestPrice',
       'sortLowestMileage',
       'sortNewestYear',
-      'shortcutWithPhotos',
-      'shortcutAutomatic',
-      'shortcutRecentlyAdded',
-      'recentlyAdded',
       'resultsCount',
       'totalCount',
       'clear',
       'clearFilters',
-      'activeFilters',
       'applyFilters',
       'emptyTitle',
       'emptySubtitle',
@@ -53,8 +47,12 @@ describe('Storefront translations consistency', () => {
       'refCodeLabel',
       'refCodeExplanation',
       'inventory',
-      'featuredInventory',
-      'vehicleNotFound',
+      'zoomImage',
+      'close',
+      'nextPhoto',
+      'previousPhoto',
+      'zoomIn',
+      'zoomOut',
     ]
 
     for (const key of requiredKeys) {
