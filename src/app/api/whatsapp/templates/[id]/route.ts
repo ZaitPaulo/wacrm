@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import {
+  ForbiddenError,
+  UnauthorizedError,
+  requireRole,
+  toErrorResponse,
+} from '@/lib/auth/account'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import {
   deleteMessageTemplate,
@@ -27,6 +32,12 @@ import { ensureImageHeaderHandle } from '@/lib/whatsapp/template-header-handle'
  * Initial submission (DRAFT → PENDING) lives at the sibling
  * /submit endpoint — keep this route narrowly about lifecycle of
  * already-submitted templates.
+ *
+ * Ambos verbos exigen rol `admin`. Las plantillas son datos de
+ * configuración (mismas políticas RLS que /submit y /sync), y sobre
+ * todo: los dos handlers llaman a Meta ANTES de escribir en la base,
+ * así que la RLS por sí sola llegaría tarde — rechazaría la escritura
+ * local cuando el cambio del otro lado ya es irreversible.
  */
 
 const EDITABLE_STATUSES = new Set(['APPROVED', 'REJECTED', 'PAUSED'])
@@ -56,29 +67,16 @@ export async function PATCH(
         { status: 400 },
       )
     }
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Resolve the caller's account_id so template + whatsapp_config
-    // lookups work for teammates who didn't author the row.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    const accountId = profile?.account_id as string | undefined
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
-        { status: 403 },
-      )
-    }
+    // Mismo razonamiento que en /submit: las plantillas son datos de
+    // configuración —`canEditSettings` y las políticas
+    // message_templates_update/delete (migración 017) piden 'admin'—, y
+    // acá la llamada a Meta ocurre ANTES de tocar la fila local. Resolver
+    // el account_id contra el perfil solo probaba membresía, así que un
+    // agente podía editar la plantilla en Meta y recién después chocar
+    // contra la RLS: un efecto externo que la base no puede deshacer, y
+    // que además dejaba la fila local describiendo algo que ya no existe
+    // del otro lado.
+    const { supabase, accountId } = await requireRole('admin')
 
     let payload: TemplatePayload
     try {
@@ -219,6 +217,11 @@ export async function PATCH(
       dry_run: isDryRun(),
     })
   } catch (error) {
+    // requireRole lanza Unauthorized/Forbidden; toErrorResponse las mapea
+    // a 401/403 y deja el resto en el 500 genérico de abajo.
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+      return toErrorResponse(error)
+    }
     console.error('Error editing template:', error)
     return NextResponse.json(
       {
@@ -242,30 +245,12 @@ export async function DELETE(
         { status: 400 },
       )
     }
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Same account-scoping rationale as the PATCH handler above —
-    // teammates need to be able to operate on shared templates +
-    // the shared whatsapp_config.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    const accountId = profile?.account_id as string | undefined
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
-        { status: 403 },
-      )
-    }
+    // Mismo criterio que el PATCH de arriba, y con más razón: el borrado
+    // en Meta es irreversible y ocurre antes del borrado local. Peor aún,
+    // un DELETE que la RLS filtra no devuelve error —afecta cero filas y
+    // punto—, así que un agente recibía `{ success: true }` por una
+    // plantilla que ya no existía en Meta pero seguía listada en el CRM.
+    const { supabase, accountId } = await requireRole('admin')
 
     const { data: existing, error: lookupErr } = await supabase
       .from('message_templates')
@@ -318,6 +303,11 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, dry_run: isDryRun() })
   } catch (error) {
+    // Ver el catch del PATCH: 401/403 de requireRole van por su propio
+    // mapeo, el resto cae en el 500 genérico.
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+      return toErrorResponse(error)
+    }
     console.error('Error deleting template:', error)
     return NextResponse.json(
       {
