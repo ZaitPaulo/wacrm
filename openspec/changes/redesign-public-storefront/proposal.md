@@ -12,12 +12,12 @@ El rediseño ya se exploró y se aprobó como prototipo interactivo en el canvas
 ## What Changes
 
 - **La vitrina toma la identidad del negocio.** Negro, blanco y un color de acento **por cuenta**, no una paleta fija en el código. Tipografía condensada para títulos y precios, bordes duros, bloques de color plano.
-- **Los controles de búsqueda quedan fijos en pantalla**, en escritorio y en móvil: buscador por texto, filtros, atajos, conteo de resultados y orden acompañan al visitante durante todo el scroll. Deja de existir la barra lateral y deja de existir el estado "filtros escondidos arriba".
+- **Los controles de búsqueda quedan fijos en pantalla**, en escritorio y en móvil: buscador por texto, filtros, conteo de resultados y orden acompañan al visitante durante todo el scroll. Deja de existir la barra lateral y deja de existir el estado "filtros escondidos arriba".
 - **Se agrega buscar por texto** (marca, modelo o año) y **ordenar** (menor precio, mayor precio, menos kilometraje, año más reciente). Ninguna de las dos existe hoy.
-- **Se agregan atajos de un toque** para las búsquedas más frecuentes: con fotos, automáticos, recién ingresados.
 - **El vehículo sin fotos deja de ser un hueco.** Muestra un bloque con la marca del negocio y su propia llamada a la acción: pedir las fotos por WhatsApp, con el código de referencia del vehículo.
 - **La ficha del vehículo mantiene la acción de compra siempre visible**: en escritorio, el panel de precio y contacto queda fijo mientras sube la galería; en móvil, una barra inferior fija lleva el precio y el botón de WhatsApp. Además muestra el código de referencia y una fila de vehículos parecidos.
 - **El filtro "Modelo" se reemplaza por el buscador de texto.** Un desplegable de modelos dependiente de la marca es más lento de usar que escribir "duster", y ocupa un espacio que en la barra fija es caro.
+- **No se agregan atajos de un toque.** Se probaron —con fotos, automáticos, recién ingresados— y el negocio los descartó: con siete selectores a la vista, una segunda fila de filtros repetía criterios que los desplegables ya cubren.
 - **Toda la copia nueva pasa por el catálogo de mensajes**, y de paso se corrigen las cadenas que hoy están escritas directamente en `storefront.tsx` ("Inventario Destacado", "Todas", "Todos", "Sin límite", "Limpiar", "Filtros", "No hay vehículos que coincidan con tu búsqueda", el subtítulo del hero).
 
 **Qué NO cambia.** El origen de los datos (`getShowcase`, `getShowcaseVehicle`), los metadatos y el `og:image` generado, el JSON-LD de schema.org, el `sitemap`/`robots`, el bucket de imágenes, el panel de Ajustes → Public showcase salvo el campo nuevo, y la atribución por código de referencia, que se conserva y se extiende.
@@ -47,11 +47,11 @@ El rediseño ya se exploró y se aprobó como prototipo interactivo en el canvas
 
 **Código**
 
-- `src/components/storefront/storefront.tsx` — reescritura: barra fija, buscador, orden, atajos, tarjetas nuevas, estado vacío.
+- `src/components/storefront/storefront.tsx` — reescritura: barra fija, buscador, orden, tarjetas nuevas, estado vacío.
 - `src/components/storefront/store-nav.tsx` — se integra a la barra fija; deja de ser un `header` independiente en la portada, pero sigue sirviendo a la ficha.
 - `src/components/storefront/gallery.tsx` — miniaturas y contador; versión móvil con puntos.
 - `src/app/vehiculo/[id]/page.tsx` — panel de compra fijo, referencia visible, vehículos parecidos.
-- `src/app/page.tsx` — el hero deja de derivarse de la primera foto del inventario.
+- `src/app/page.tsx` — desaparece el hero: ni foto del inventario ni banda de marca. La portada abre en la cabecera fija.
 - `src/components/storefront/footer.tsx`, `share-vehicle-button.tsx` — ajuste de paleta.
 - `src/lib/showcase/format.ts` — helper del mensaje de "pedir fotos" (junto a `whatsappHref`).
 

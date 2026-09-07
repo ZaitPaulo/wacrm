@@ -2,9 +2,9 @@
 
 ### Requirement: Los controles de búsqueda permanecen accesibles durante todo el recorrido
 
-La vitrina SHALL mantener sus controles de búsqueda —buscador, filtros, atajos, conteo de resultados y orden— accesibles sin que el visitante tenga que volver al inicio de la página, en cualquier ancho de pantalla.
+La vitrina SHALL mantener sus controles de búsqueda —buscador, filtros, conteo de resultados y orden— accesibles sin que el visitante tenga que volver al inicio de la página, en cualquier ancho de pantalla.
 
-En pantallas anchas los controles SHALL quedar anclados al borde superior de la ventana mientras la grilla se desplaza. En pantallas angostas SHALL quedar anclados igual, y los que no quepan en la barra SHALL abrirse desde ella sin sacar al visitante de la lista de resultados ni perder su posición de scroll.
+En pantallas anchas los filtros SHALL permanecer anclados en pantalla mientras la grilla se desplaza —el mecanismo concreto, barra superior o columna lateral, es decisión de diseño—. En pantallas angostas SHALL alcanzarse desde un control anclado que viaje con el visitante, y el panel que abra SHALL montarse sobre la lista sin sacarlo de los resultados ni perder su posición de scroll.
 
 Ningún control de búsqueda SHALL quedar disponible únicamente en una zona que se pierde al hacer scroll.
 
@@ -65,17 +65,6 @@ Un vehículo sin kilometraje registrado NO SHALL desplazar a los demás al orden
 
 - **WHEN** el visitante ordena por menor precio y después selecciona una marca
 - **THEN** los resultados de esa marca siguen apareciendo de menor a mayor precio
-
-### Requirement: La vitrina ofrece atajos para las búsquedas frecuentes
-
-La vitrina SHALL ofrecer atajos de un solo toque que apliquen los criterios más pedidos, incluyendo al menos: solo vehículos con fotos, solo transmisión automática y recién ingresados.
-
-Cada atajo SHALL mostrar si está activo, SHALL poder apagarse con el mismo gesto que lo encendió, y SHALL combinarse con el resto de los controles.
-
-#### Scenario: El visitante enciende y apaga un atajo
-
-- **WHEN** el visitante toca el atajo de vehículos con fotos y luego lo vuelve a tocar
-- **THEN** en el primer toque desaparecen de la grilla los vehículos sin fotos y el atajo se ve activo; en el segundo, vuelven y el atajo se ve inactivo
 
 ### Requirement: El visitante siempre sabe cuántos resultados quedan y cómo deshacer
 

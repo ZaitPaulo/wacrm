@@ -26,11 +26,11 @@
 
 - [x] 4.1 Reescribir el estado de `Storefront` como un único objeto plano con `q`, `sort`, los seis filtros y los tres atajos, más una función que lo serialice a `Record<string, string>`
 - [x] 4.2 Implementar el filtrado combinado (texto + filtros + atajos) y el orden por menor precio, mayor precio, menor kilometraje y año más reciente, dejando los vehículos sin kilometraje al final de ese orden
-- [x] 4.3 Marcar como "recién ingresado" a los 12 vehículos más recientes por `created_at`, sin confundirlo con `condition = 'new'`
+- [x] ~~4.3 Marcar como "recién ingresado" a los 12 vehículos más recientes~~ — retirado por el negocio; solo quedan la insignia de `condition = 'new'` y el contador de fotos
 - [x] 4.4 Construir el contenedor `sticky top-0` con las tres filas: marca y buscador; los seis selectores; atajos, conteo y orden
 - [x] 4.5 Conservar `presentOptions` y `niceBudgetTiers`; eliminar el selector de modelo y la lógica que lo limpiaba al cambiar de marca
 - [x] 4.6 Implementar el conteo permanente ("N de M vehículos" con filtros, "M vehículos" sin ellos) y la acción de limpiar, que solo se muestra disponible cuando hay algo que limpiar
-- [x] 4.7 Reemplazar el hero por la banda de marca de altura fija y quitar el cálculo de `heroImage` de `page.tsx`
+- [x] 4.7 Quitar el hero y el cálculo de `heroImage` de `page.tsx` — la banda de marca que lo sustituía también se retiró después
 - [x] 4.8 Verificar que ningún ancestro entre `<body>` y la barra introduce `overflow` distinto de `visible`
 
 ## 5. Vitrina: tarjetas y estados

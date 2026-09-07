@@ -48,6 +48,12 @@ La barra lateral desaparece. En su lugar, un único contenedor `position: sticky
 
 *Por qué tres filas y no dos:* meter los atajos y el orden en la fila de selectores obliga a recortar filtros. Las tres filas caben en 1280 px y el bloque anclado sigue siendo menos del 18 % de una ventana de 900 px.
 
+**Tercera pasada — la cabecera queda con buscador y orden:** el "Ordenar por" sube a la cabecera fija, en la misma línea que el buscador y pegado con él al borde derecho; por debajo de `md` la fila se parte (orden junto al logo, buscador a lo ancho) porque los tres no caben en un teléfono. Con eso la cabecera concentra buscar y ordenar, el lateral concentra filtrar, y sobre la grilla no queda nada. Se retiró también la insignia "Recién ingresado" de las tarjetas, y con ella `getRecentVehicleIds` —que ya no tenía otro consumidor— y su prueba; la insignia de `condition = 'new'` y el contador de fotos se quedan. Decisión 8 anulada: ya no se marca ningún vehículo por antigüedad de alta.
+
+**Revisado por segunda vez — vuelve el lateral:** el negocio probó la barra superior y la encontró cargada, así que los siete selectores regresan a una columna izquierda de 280 px con `lg:sticky lg:top-24`, como en la maqueta original. Lo que NO vuelve es su defecto: por debajo de `lg` no hay lateral, y ahí los filtros siguen abriéndose desde la cabecera fija, que es lo que evita tener que volver arriba. La cabecera conserva marca y buscador; el orden pasa sobre la grilla y el conteo vive en el pie del lateral. Los siete campos se extrajeron a un `FilterFields` único —antes estaban escritos dos veces, una por vista—. La grilla baja de cuatro columnas a tres, que es lo que cabe junto al lateral.
+
+**Revisado tras la primera prueba con el negocio:** los atajos de un toque se retiraron de las dos vistas. La fila (c) queda con el conteo a la izquierda y el orden a la derecha, y en el teléfono el conteo pasa a la fila del botón "Filtros", donde antes no se veía en absoluto. Con siete selectores presentes, los atajos repetían criterios que los desplegables ya cubren. `getRecentVehicleIds` sobrevive porque alimenta la insignia "Recién ingresado" de la tarjeta, que no era un filtro.
+
 *Riesgo asumido:* 158 px anclados es bastante altura. Se compensa quitando el hero de `55vh` que hay hoy: la banda de marca nueva es de altura fija y modesta, y se pasa por alto con un scroll.
 
 ### 2. El estado de búsqueda sigue en el cliente, dentro de un solo componente
@@ -94,7 +100,9 @@ El layout raíz seguirá poniendo `data-theme` y `data-mode` en `<html>` —no s
 
 *Qué se mueve con ellas:* `loading.tsx`, `opengraph-image.tsx` y `vehiculo/[id]/*` acompañan a sus páginas. `robots.ts`, `sitemap.ts` e `icon.png` se quedan en la raíz, que es donde Next los espera.
 
-### 8. "Recién ingresado" son los N más nuevos, no una ventana de días
+### 8. ~~"Recién ingresado" son los N más nuevos, no una ventana de días~~ (anulada)
+
+*El negocio retiró la insignia de las tarjetas, así que ya no se marca nada por antigüedad de alta. Se conserva el razonamiento porque explica por qué un tope fijo era mejor que una ventana temporal, y volvería a aplicar si alguna vez se reintroduce.*
 
 `getShowcase()` ya ordena por `created_at` descendente; solo falta seleccionar la columna. El atajo marca los **12 más recientes**.
 
@@ -124,6 +132,8 @@ Se agrega `requestPhotosHref(number, vehicle)` en `src/lib/showcase/format.ts`, 
 
 Hoy `page.tsx` calcula `heroImage` con `vehicles.find(v => v.images?.[0])` y lo pinta a `100vw` con `priority`. Eso hace que el LCP de la portada sea una foto de WhatsApp de un vehículo cualquiera, elegido por orden de inserción. La banda de marca nueva es texto sobre color plano.
 
+**Revisado:** la banda tampoco sobrevivió. El negocio la quitó junto con el par "Contacto / Iniciar sesión" de la cabecera, así que la portada abre directamente en la cabecera fija —marca y buscador— y de ahí al inventario. Se retiraron con ella las claves `heroTitle`, `heroSubtitle`, `viewInventory` y `signIn` del namespace `Storefront`, que quedaban sin uso. El acceso al CRM sigue existiendo en el pie, como "Administración", y el WhatsApp general vive en el pie y en cada tarjeta; `StoreNav` —la cabecera de la ficha y de `/privacidad`— se alineó con el mismo criterio, porque `storefront-brand-identity` exige que portada y ficha no se sientan sitios distintos.
+
 *Beneficio medible:* desaparece una imagen `priority` a ancho completo del camino crítico.
 
 ## Risks / Trade-offs
@@ -149,5 +159,5 @@ Hoy `page.tsx` calcula `heroImage` con `vehicles.find(v => v.images?.[0])` y lo 
 
 - **¿Qué color exacto configura Lora Motors?** El prototipo usa `#e21b22`, tomado a ojo del logo. Antes de cargarlo en producción conviene confirmarlo con el negocio o muestrearlo del archivo original.
 - **¿"Vender mi carro" lleva a algún lado?** El botón aparece en el prototipo porque la barra lo pedía. Si no hay página ni flujo detrás, se quita o se convierte en un enlace de WhatsApp con un mensaje propio. Decidir antes de implementar la barra.
-- **¿El atajo "con fotos" debería venir encendido por defecto?** Escondería 53 vehículos vendibles de entrada, pero la primera pantalla se vería mucho mejor. Es una decisión comercial, no técnica.
+- ~~**¿El atajo "con fotos" debería venir encendido por defecto?**~~ Resuelta: no hay atajos. La pregunta de fondo sigue viva —si conviene que los vehículos sin foto aparezcan mezclados o al final del orden por defecto— y no se ha decidido.
 - **¿Los tramos de precio y kilometraje siguen derivándose o se fijan?** `niceBudgetTiers` funciona y es agnóstico de la moneda; se conserva. Queda por decidir si los tramos de kilometraje, que hoy están fijos en el código (`10.000 / 30.000 / 50.000 / 100.000 / 200.000`), deberían derivarse igual.
