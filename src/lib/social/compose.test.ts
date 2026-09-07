@@ -353,4 +353,33 @@ describe('composeVehiclePost', () => {
     expect(result.imageUrls[0]).toBe('https://cdn.example.com/0.jpg');
     expect(result.imageUrls.at(-1)).toBe('https://cdn.example.com/9.jpg');
   });
+
+  // El orden de `images` es el que eligió una persona arrastrando las
+  // fotos, no el de subida. Componer tiene que respetarlo tal cual:
+  // Instagram encuadra todo el carrusel según la primera.
+  it('respeta un orden reordenado en vez de reacomodar', () => {
+    const reordered = [...IMAGES].reverse();
+    const result = composeVehiclePost({ ...base, images: reordered });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.imageUrls).toEqual(reordered);
+  });
+
+  // Y como el recorte es por el final, ese orden decide CUÁLES fotos
+  // llegan a publicarse: mover una al frente la mete en el carrusel.
+  it('publica la foto que se movió al frente y descarta la que quedó última', () => {
+    const many = Array.from(
+      { length: 12 },
+      (_, i) => `https://cdn.example.com/${i}.jpg`
+    );
+    const promoted = [many[11], ...many.slice(0, 11)];
+    const result = composeVehiclePost({ ...base, images: promoted });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.imageUrls[0]).toBe('https://cdn.example.com/11.jpg');
+    expect(result.imageUrls).not.toContain('https://cdn.example.com/9.jpg');
+    expect(result.imageUrls).not.toContain('https://cdn.example.com/10.jpg');
+  });
 });

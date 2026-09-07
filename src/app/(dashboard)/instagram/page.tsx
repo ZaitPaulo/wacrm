@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/use-auth';
 import { formatPrice } from '@/lib/showcase/format';
 import { strictestLimits, type NetworkLimits } from '@/lib/social/limits';
+import { VehiclePhotoOrder } from '@/components/inventory/vehicle-photo-order';
+import { photoCutoff } from '@/lib/inventory/photo-order';
 
 /**
  * La cola de publicaciones, de todas las redes.
@@ -41,6 +43,13 @@ interface QueueVehicle {
   year: number;
   price: number;
   status: string;
+  /**
+   * TODAS las fotos del vehículo, no el carrusel recortado que guarda
+   * `QueuePost.image_urls`. Reordenar desde acá escribe sobre el
+   * vehículo, y hacerlo sobre la lista recortada borraría las fotos
+   * que quedaron fuera del máximo de la red.
+   */
+  images: string[] | null;
 }
 
 interface QueuePost {
@@ -168,8 +177,9 @@ export default function SocialQueuePage() {
   // Se descartan las 'discarded': fueron una decisión tomada y no hay
   // nada más que hacer con ellas.
   const groups = useMemo(() => {
-    const visible = (filter ? posts.filter((p) => p.network === filter) : posts)
-      .filter((p) => p.status !== 'discarded');
+    const visible = (
+      filter ? posts.filter((p) => p.network === filter) : posts
+    ).filter((p) => p.status !== 'discarded');
 
     const byVehicle = new Map<string, QueuePost[]>();
     for (const post of visible) {
@@ -342,6 +352,35 @@ function VehicleCard({
   const [dirty, setDirty] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(true);
 
+  // EL ORDEN DE LAS FOTOS ES DEL VEHÍCULO, no de esta publicación: se
+  // trabaja sobre `vehicle.images` —la lista completa— y se guarda con
+  // un PATCH al inventario. Por eso el estado arranca del vehículo y no
+  // de `source.image_urls`, que es el carrusel ya recortado.
+  //
+  // Si el vehículo ya no está, se cae al carrusel congelado: no se
+  // puede reordenar nada —no hay dónde guardarlo— pero se sigue viendo
+  // qué se publicó.
+  const vehicleImages = useMemo(
+    () => vehicle?.images ?? source.image_urls,
+    [vehicle, source.image_urls]
+  );
+  const [order, setOrder] = useState<string[]>(vehicleImages);
+  const [orderDirty, setOrderDirty] = useState(false);
+
+  // La tarjeta no se desmonta al recargar la cola, así que el orden
+  // guardado tiene que volver a entrar por acá. Nunca pisa cambios sin
+  // guardar: perder lo que alguien acaba de acomodar sería peor que
+  // mostrar un orden viejo.
+  useEffect(() => {
+    if (orderDirty) return;
+    setOrder((current) =>
+      current.length === vehicleImages.length &&
+      current.every((url, i) => url === vehicleImages[i])
+        ? current
+        : vehicleImages
+    );
+  }, [vehicleImages, orderDirty]);
+
   // Contra el límite MÁS ESTRICTO de las redes que siguen pendientes:
   // un texto que una de ellas rechazaría no sirve para un botón que
   // publica en todas. Es el mismo cálculo que hace el servidor.
@@ -379,6 +418,46 @@ function VehicleCard({
       }
       setDirty(false);
       toast.success(t('saved'));
+      await onDone();
+    } finally {
+      onBusy(null);
+    }
+  }
+
+  /**
+   * Guarda el orden de las fotos.
+   *
+   * Va al INVENTARIO, no a la cola: el orden es del vehículo (ver el
+   * comentario del estado). Ese PATCH dispara `syncVehiclePost`, que
+   * refresca el `image_urls` de todas las pendientes del auto — por eso
+   * una sola petición alcanza para las dos redes.
+   *
+   * Se guarda de una vez y no por movimiento: acomodar quince fotos es
+   * una decisión, no quince, y `RATE_LIMITS.adminAction` son treinta
+   * peticiones por minuto.
+   */
+  async function saveOrder() {
+    onBusy(group.vehicleId);
+    try {
+      const res = await fetch(`/api/inventory/${group.vehicleId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images: order }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(json.error ?? t('orderSaveFailed'));
+        // Volver al último orden guardado: dejar en pantalla un orden
+        // que no se guardó haría creer que se publicará así.
+        setOrder(vehicleImages);
+        setOrderDirty(false);
+        return;
+      }
+      setOrderDirty(false);
+      toast.success(t('orderSaved'));
+      // Recargar para que lo que se ve venga de las pendientes ya
+      // sincronizadas. `syncVehiclePost` es best-effort: si falló, acá
+      // reaparece el orden viejo, que es la verdad.
       await onDone();
     } finally {
       onBusy(null);
@@ -474,7 +553,22 @@ function VehicleCard({
     }
   }
 
-  const images = source.image_urls;
+  // Solo se reordena lo que todavía no salió. Un vehículo sin
+  // pendientes muestra sus fotos y nada más: el sistema no toca lo
+  // publicado.
+  // Y tampoco se reordena un vehículo que ya no existe: no hay fila
+  // del inventario donde guardar el orden.
+  const canReorder = pending.length > 0 && vehicle !== null;
+
+  // El corte, contra el máximo más estricto de las redes que siguen
+  // pendientes: una foto que una de ellas no publica ya está fuera de
+  // algo, y quien ordena tiene que verlo.
+  const cutoff = photoCutoff(
+    order.length,
+    pending
+      .map((p) => stateOf(p.network)?.limits.maxImages)
+      .filter((n): n is number => n !== undefined)
+  );
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
@@ -515,24 +609,39 @@ function VehicleCard({
         ))}
       </div>
 
-      {images.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto">
-          {images.map((url, i) => (
-            <div
-              key={url}
-              className="relative size-24 shrink-0 overflow-hidden rounded-md border"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="size-full object-cover" />
-              {i === 0 && (
-                // Instagram recorta todo el carrusel según la primera:
-                // conviene que se vea cuál manda.
-                <span className="bg-background/80 absolute bottom-0 left-0 px-1 text-[10px]">
-                  {t('firstImage')}
-                </span>
+      {order.length > 0 && (
+        <div className="space-y-2">
+          <VehiclePhotoOrder
+            images={order}
+            onChange={(next) => {
+              setOrder(next);
+              setOrderDirty(true);
+            }}
+            readOnly={!canReorder || busy}
+            cutoff={cutoff}
+          />
+          {canReorder ? (
+            <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-xs">
+              {/* El alcance se dice ANTES de guardar: quien reordena acá
+                  está pensando en la publicación, y el mismo gesto
+                  cambia la portada del auto en la vitrina pública. */}
+              <span>{t('orderAlsoShowcase')}</span>
+              {orderDirty && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={saveOrder}
+                  disabled={busy}
+                >
+                  {t('saveOrder')}
+                </Button>
               )}
             </div>
-          ))}
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              {t('orderLockedPublished')}
+            </p>
+          )}
         </div>
       )}
 
@@ -583,7 +692,9 @@ function VehicleCard({
           <div className="flex flex-wrap gap-2">
             <Button
               onClick={publishAll}
-              disabled={busy || dirty || publishable.length === 0}
+              // También con el orden sin guardar: aprobar mostrando un
+              // carrusel que todavía no se guardó publicaría otro.
+              disabled={busy || dirty || orderDirty || publishable.length === 0}
             >
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {/* El botón dice EN CUÁNTAS redes va a publicar, para que
@@ -595,7 +706,7 @@ function VehicleCard({
             <Button variant="outline" onClick={discard} disabled={busy}>
               {t('discard')}
             </Button>
-            {dirty && (
+            {(dirty || orderDirty) && (
               <span className="text-muted-foreground self-center text-xs">
                 {t('saveBeforePublishing')}
               </span>

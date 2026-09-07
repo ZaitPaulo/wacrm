@@ -99,6 +99,27 @@ describe("buildVehiclePayload — cierre de venta", () => {
     expect(v.sold_price).toBeUndefined();
     expect(v.sold_at).toBeUndefined();
   });
+
+  // Reordenar las fotos manda EXACTAMENTE esto, desde la ficha del
+  // inventario y desde la cola de publicaciones. Si el patch arrastrara
+  // otras columnas, acomodar fotos editaría el vehículo por la espalda.
+  it("acepta un patch que solo reordena las fotos", () => {
+    const images = ["b.jpg", "a.jpg", "c.jpg"];
+    const v = ok(buildVehiclePayload({ images }, { partial: true }));
+
+    expect(v.images).toEqual(images);
+    expect(Object.keys(v)).toEqual(["images"]);
+  });
+
+  it("conserva el orden recibido en vez de normalizarlo", () => {
+    // El orden ES el dato: es la portada de la vitrina y el encuadre
+    // del carrusel. Ordenarlo acá arruinaría justo lo que se guardó.
+    const v = ok(
+      buildVehiclePayload({ images: ["z.jpg", "a.jpg"] }, { partial: true }),
+    );
+
+    expect(v.images).toEqual(["z.jpg", "a.jpg"]);
+  });
 });
 
 describe("buildAcquisitionPayload", () => {

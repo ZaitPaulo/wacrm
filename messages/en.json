@@ -2197,10 +2197,8 @@
       "plateCityHint": "Where it is registered, not where the car is."
     },
     "images": {
-      "remove": "Remove",
-      "primary": "Primary",
       "upload": "Upload image",
-      "hint": "PNG, JPG or WEBP (max 5 MB each). The first image is the primary one."
+      "hint": "PNG, JPG or WEBP (max. 5 MB each). Drag the photos to reorder them: the first one is the vehicle's cover and the one that leads the social post."
     },
     "specs": {
       "transmission": {
@@ -2261,6 +2259,19 @@
       "noBuyer": "Not specified"
     },
     "confirmRevertSale": "This vehicle is marked as sold. Changing its status will clear the price, date and buyer. Continue?"
+  },
+  "PhotoOrder": {
+    "dragHandle": "Drag to reorder",
+    "remove": "Remove",
+    "cover": "Cover",
+    "makeCover": "Make cover",
+    "cutoffHint": "Social networks publish at most {max} photos: the {extra} dimmed ones are left out. Move them forward to publish them. The public showcase shows all of them.",
+    "a11y": {
+      "picked": "Photo picked up from position {position}. Use the arrow keys to move it and the space bar to drop it.",
+      "over": "Photo over position {position}.",
+      "dropped": "Photo dropped at position {position}.",
+      "cancelled": "Move cancelled. The photo returned to its position."
+    }
   },
   "SocialPost": {
     "title": "{vehicle} 🚗",
@@ -2572,7 +2583,6 @@
     "historyTitle": "History",
     "vehicleGone": "Vehicle no longer exists",
     "vehicleNotAvailable": "This vehicle is no longer available, so it will not publish. Discard it or set the vehicle back to available.",
-    "firstImage": "Cover",
     "charsLeft": "{count} characters left",
     "saveText": "Save text",
     "saved": "Text saved",
@@ -2610,7 +2620,12 @@
     "retryFailed": "Could not retry",
     "reviewHint": "We do not know whether this post went out. Check it on {network} before retrying — the system never retries on its own, so it cannot publish twice.",
     "onlyRetryLeft": "Nothing is pending for this vehicle. Send the network that failed back to the queue if you want to try again.",
-    "lastFailure": "The previous attempt failed: {reason}"
+    "lastFailure": "The previous attempt failed: {reason}",
+    "saveOrder": "Save order",
+    "orderSaved": "Photo order saved",
+    "orderSaveFailed": "Could not save the photo order",
+    "orderAlsoShowcase": "Drag the photos to reorder them. The first one leads the post, and the change also applies to the public showcase.",
+    "orderLockedPublished": "These photos were already published: their order can't be changed from here."
   },
   "Brand": {
     "description": "WhatsApp CRM for vehicle dealerships."

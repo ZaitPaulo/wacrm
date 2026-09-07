@@ -16,10 +16,16 @@ import { refreshPendingCaptions } from '@/lib/social/queue';
 // El vehículo se pide embebido para armar la vista previa sin una
 // segunda vuelta. Ni notas internas ni costo: esta pantalla decide qué
 // sale a un feed público.
+// `vehicle.images` va además de `image_urls`, y no es redundante: el
+// segundo es el carrusel congelado —ya recortado al máximo de la red—
+// y el primero son TODAS las fotos del vehículo. Reordenar desde esta
+// pantalla escribe sobre el vehículo, así que tiene que trabajar sobre
+// la lista completa: guardar el carrusel recortado como si fuera el
+// arreglo entero borraría las fotos que quedaron fuera del corte.
 const QUEUE_COLUMNS = `
   id, vehicle_id, network, status, proposed_caption, edited_caption, image_urls,
   external_post_id, published_at, failure_kind, failure_reason, created_at,
-  vehicle:inventory_vehicles(id, brand, model, year, price, status)
+  vehicle:inventory_vehicles(id, brand, model, year, price, status, images)
 `;
 
 interface QueueRow {

@@ -72,6 +72,14 @@ import {
   MEDIA_MAX_BYTES_BY_KIND,
 } from '@/lib/storage/upload-media';
 import { compressImage } from '@/lib/storage/compress-image';
+import { VehiclePhotoOrder } from '@/components/inventory/vehicle-photo-order';
+import { photoCutoff } from '@/lib/inventory/photo-order';
+// Solo los NÚMEROS de cada red, que son módulos de constantes puras:
+// acá no se sabe qué redes están conectadas —eso costaría una petición
+// más al abrir el formulario— así que el corte se señala contra el más
+// estricto de los máximos que el sistema conoce.
+import { INSTAGRAM_LIMITS } from '@/lib/social/instagram/limits';
+import { FACEBOOK_LIMITS } from '@/lib/social/facebook/limits';
 import {
   compareSortValues,
   matchesSearch,
@@ -1367,42 +1375,36 @@ export default function InventoryPage() {
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label>{t('fields.images')}</Label>
-              <div className="flex flex-wrap gap-2">
-                {draft.images.map((url, i) => (
-                  <div
-                    key={i}
-                    className="border-border relative size-20 overflow-hidden rounded-md border"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="size-full object-cover" />
+              {/* El orden de esta grilla ES el orden de publicación y el
+                  de la vitrina: la primera foto es la portada del auto y
+                  la que las redes usan para encuadrar el carrusel. Se
+                  arrastra sobre `draft.images` y se guarda con el resto
+                  del formulario — no hay petición por movimiento. */}
+              <div className="max-h-64 overflow-y-auto">
+                <VehiclePhotoOrder
+                  images={draft.images}
+                  onChange={(next) => setDraft((d) => ({ ...d, images: next }))}
+                  onRemove={removeImage}
+                  cutoff={photoCutoff(draft.images.length, [
+                    INSTAGRAM_LIMITS.maxImages,
+                    FACEBOOK_LIMITS.maxImages,
+                  ])}
+                  append={
                     <button
                       type="button"
-                      onClick={() => removeImage(i)}
-                      className="absolute top-0.5 right-0.5 rounded-full bg-black/60 p-0.5 text-white"
-                      title={t('images.remove')}
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={uploadingImages}
+                      className="text-muted-foreground border-border flex size-20 items-center justify-center rounded-md border border-dashed disabled:opacity-50"
+                      title={t('images.upload')}
                     >
-                      <X className="size-3" />
+                      {uploadingImages ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Plus className="size-4" />
+                      )}
                     </button>
-                    {i === 0 && (
-                      <span className="absolute inset-x-0 bottom-0 bg-black/60 text-center text-[10px] text-white">
-                        {t('images.primary')}
-                      </span>
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={uploadingImages}
-                  className="text-muted-foreground border-border flex size-20 items-center justify-center rounded-md border border-dashed disabled:opacity-50"
-                  title={t('images.upload')}
-                >
-                  {uploadingImages ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Plus className="size-4" />
-                  )}
-                </button>
+                  }
+                />
               </div>
               <input
                 ref={imageInputRef}

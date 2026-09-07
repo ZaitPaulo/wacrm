@@ -2197,10 +2197,8 @@
       "plateCityHint": "차량 위치가 아니라 등록된 도시입니다."
     },
     "images": {
-      "remove": "제거",
-      "primary": "대표",
       "upload": "이미지 업로드",
-      "hint": "PNG, JPG 또는 WEBP (각 최대 5MB). 첫 번째 이미지가 대표 이미지입니다."
+      "hint": "PNG, JPG 또는 WEBP(각 최대 5MB). 사진을 드래그하여 순서를 바꾸세요. 첫 번째 사진이 차량의 대표 사진이자 소셜 게시물의 첫 사진이 됩니다."
     },
     "specs": {
       "transmission": {
@@ -2261,6 +2259,19 @@
       "noBuyer": "지정 안 함"
     },
     "confirmRevertSale": "판매 완료로 등록된 차량입니다. 상태를 변경하면 판매가, 판매일, 구매자 정보가 삭제됩니다. 계속하시겠습니까?"
+  },
+  "PhotoOrder": {
+    "dragHandle": "드래그하여 순서 변경",
+    "remove": "제거",
+    "cover": "대표 사진",
+    "makeCover": "대표 사진으로 지정",
+    "cutoffHint": "소셜 네트워크는 최대 {max}장까지 게시합니다. 흐리게 표시된 {extra}장은 제외됩니다. 게시하려면 앞으로 옮기세요. 공개 쇼케이스에는 모두 표시됩니다.",
+    "a11y": {
+      "picked": "{position}번째 위치에서 사진을 집었습니다. 화살표 키로 이동하고 스페이스바로 놓으세요.",
+      "over": "사진이 {position}번째 위치 위에 있습니다.",
+      "dropped": "사진을 {position}번째 위치에 놓았습니다.",
+      "cancelled": "이동이 취소되었습니다. 사진이 원래 위치로 돌아갔습니다."
+    }
   },
   "SocialPost": {
     "title": "{vehicle} 🚗",
@@ -2572,7 +2583,6 @@
     "historyTitle": "기록",
     "vehicleGone": "차량이 더 이상 존재하지 않습니다",
     "vehicleNotAvailable": "이 차량은 더 이상 판매 가능 상태가 아니므로 게시되지 않습니다. 폐기하거나 차량을 다시 판매 가능으로 설정하세요.",
-    "firstImage": "대표",
     "charsLeft": "{count}자 남음",
     "saveText": "문구 저장",
     "saved": "문구가 저장되었습니다",
@@ -2610,7 +2620,12 @@
     "retryFailed": "다시 시도할 수 없습니다",
     "reviewHint": "이 게시물이 실제로 올라갔는지 알 수 없습니다. 다시 시도하기 전에 {network}에서 확인하세요 — 중복 게시를 막기 위해 시스템은 스스로 재시도하지 않습니다.",
     "onlyRetryLeft": "이 차량에 대기 중인 항목이 없습니다. 다시 시도하려면 실패한 네트워크를 대기열로 되돌리세요.",
-    "lastFailure": "이전 시도가 실패했습니다: {reason}"
+    "lastFailure": "이전 시도가 실패했습니다: {reason}",
+    "saveOrder": "순서 저장",
+    "orderSaved": "사진 순서를 저장했습니다",
+    "orderSaveFailed": "사진 순서를 저장하지 못했습니다",
+    "orderAlsoShowcase": "사진을 드래그하여 순서를 바꾸세요. 첫 번째 사진이 게시물의 처음에 나오며, 이 변경은 공개 쇼케이스에도 적용됩니다.",
+    "orderLockedPublished": "이미 게시된 사진입니다. 여기서는 순서를 바꿀 수 없습니다."
   },
   "Brand": {
     "description": "자동차 매매를 위한 WhatsApp CRM."

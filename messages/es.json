@@ -2190,10 +2190,8 @@
       "plateCityHint": "Dónde está matriculado, no dónde está el carro."
     },
     "images": {
-      "remove": "Quitar",
-      "primary": "Principal",
       "upload": "Subir imagen",
-      "hint": "PNG, JPG o WEBP (máx. 5 MB c/u). La primera imagen es la principal."
+      "hint": "PNG, JPG o WEBP (máx. 5 MB c/u). Arrastra las fotos para ordenarlas: la primera es la portada del vehículo y la que encabeza la publicación en redes."
     },
     "specs": {
       "transmission": {
@@ -2254,6 +2252,19 @@
       "noBuyer": "Sin especificar"
     },
     "confirmRevertSale": "Este vehículo figura como vendido. Si cambias el estado se borrarán el precio, la fecha y el comprador. ¿Continuar?"
+  },
+  "PhotoOrder": {
+    "dragHandle": "Arrastrar para reordenar",
+    "remove": "Quitar",
+    "cover": "Portada",
+    "makeCover": "Hacer portada",
+    "cutoffHint": "Las redes publican como máximo {max} fotos: las {extra} atenuadas quedan fuera. Muévelas hacia el frente si quieres publicarlas. En la vitrina pública se ven todas.",
+    "a11y": {
+      "picked": "Foto tomada de la posición {position}. Usa las flechas para moverla y la barra espaciadora para soltarla.",
+      "over": "Foto sobre la posición {position}.",
+      "dropped": "Foto soltada en la posición {position}.",
+      "cancelled": "Movimiento cancelado. La foto volvió a su posición."
+    }
   },
   "SocialPost": {
     "title": "{vehicle} 🚗",
@@ -2572,7 +2583,6 @@
     "historyTitle": "Historial",
     "vehicleGone": "El vehículo ya no existe",
     "vehicleNotAvailable": "Este vehículo ya no está disponible, así que no se va a publicar. Descártalo o vuelve a ponerlo como disponible.",
-    "firstImage": "Portada",
     "charsLeft": "Quedan {count} caracteres",
     "saveText": "Guardar texto",
     "saved": "Texto guardado",
@@ -2610,7 +2620,12 @@
     "retryFailed": "No se pudo reintentar",
     "reviewHint": "No sabemos si esta publicación salió. Revisala en {network} antes de reintentar — el sistema no reintenta solo para no publicar dos veces.",
     "onlyRetryLeft": "No queda nada pendiente de este vehículo. Devuelve a la cola la red que falló si quieres volver a intentarlo.",
-    "lastFailure": "El intento anterior falló: {reason}"
+    "lastFailure": "El intento anterior falló: {reason}",
+    "saveOrder": "Guardar orden",
+    "orderSaved": "Orden de las fotos guardado",
+    "orderSaveFailed": "No se pudo guardar el orden de las fotos",
+    "orderAlsoShowcase": "Arrastra las fotos para ordenarlas. La primera encabeza la publicación, y el cambio también aplica a la vitrina pública.",
+    "orderLockedPublished": "Estas fotos ya se publicaron: su orden no se puede cambiar desde aquí."
   },
   "Brand": {
     "description": "CRM de WhatsApp para la compraventa de vehículos."
