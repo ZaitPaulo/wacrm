@@ -11,7 +11,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 - [x] 0.7 Crear los registros DNS `@`, `www` y `supabase` de loramotors.co, y verificar la propagación con `dig` antes de tocar el proxy
 - [x] 0.8 Confirmar que nada más ocupa los puertos 80 y 443 en el host
 - [x] 0.9 Clonar el repositorio en `/opt/crm` con el usuario de trabajo
-- [ ] 0.10 Reunir credenciales: acceso al DNS, correo para Let's Encrypt, Meta App ID y App Secret, credenciales de WhatsApp Business
+- [x] 0.10 Reunir credenciales: acceso al DNS, correo para Let's Encrypt, Meta App ID y App Secret, credenciales de WhatsApp Business
 - [x] 0.11 Pasar la verificación final del runbook antes de continuar
 
 ## 1. Estructura y stack de Supabase
@@ -56,16 +56,16 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 ## 5. Verificación funcional
 
 - [x] 5.1 Crear el primer usuario y validar el inicio de sesión y la carga del panel
-- [ ] 5.2 Subir un avatar y una foto de vehículo, y comprobar que su URL pública responde 200 desde fuera del servidor con certificado válido
-- [ ] 5.3 Validar Realtime: insertar una fila en `messages` y confirmar que aparece en la bandeja abierta sin recargar
-- [ ] 5.4 Reiniciar el stack completo y confirmar que los archivos subidos siguen descargándose
+- [x] 5.2 Subir un avatar y una foto de vehículo, y comprobar que su URL pública responde 200 desde fuera del servidor con certificado válido
+- [x] 5.3 Validar Realtime: insertar una fila en `messages` y confirmar que aparece en la bandeja abierta sin recargar
+- [x] 5.4 Reiniciar el stack completo y confirmar que los archivos subidos siguen descargándose
 - [x] 5.5 Reiniciar el servidor y confirmar que todo vuelve solo, sin ejecutar comandos
 
 ## 6. Tareas programadas
 
 - [x] 6.1 Añadir al compose el contenedor de cron que invoca `/api/automations/cron` y `/api/flows/cron` por la red interna con la cabecera `x-cron-secret`
 - [x] 6.2 Definir y documentar la frecuencia de cada ruta
-- [ ] 6.3 Verificar de punta a punta que una automatización con paso Wait avanza sola al cumplirse la espera
+- [x] 6.3 Verificar de punta a punta que una automatización con paso Wait avanza sola al cumplirse la espera
 - [x] 6.4 Comprobar que las rutas de cron no quedan publicadas en el proxy
 
 ## 7. Respaldo y restauración
@@ -76,7 +76,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 - [x] 7.4 Programar el respaldo diario — en el crontab del host vía `scripts/install-backup-cron.sh`, NO dentro del compose: necesitaría el socket de Docker montado, que es acceso root al host
 - [x] 7.5 Escribir `scripts/restore.sh`
 - [x] 7.6 **Ejecutar la restauración de verdad** sobre un stack vacío y verificar login, conversaciones y descarga de archivos. Este paso no se salta ni se da por hecho
-- [ ] 7.7 Subir los respaldos fuera del proveedor (Google Drive vía rclone) y comprobar que uno bajado del remoto restaura
+- [x] 7.7 Subir los respaldos fuera del proveedor (Google Drive vía rclone) y comprobar que uno bajado del remoto restaura
 
 ## 8. Documentación
 
@@ -90,7 +90,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 
 ## 9. Corte de producción
 
-- [ ] 9.1 Repasar la lista de verificación completa sobre el VPS definitivo
+- [x] 9.1 Repasar la lista de verificación completa sobre el VPS definitivo
 - [x] 9.2 Reapuntar el webhook de Meta a `https://loramotors.co/api/whatsapp/webhook` y superar la verificación — el número se recuperó del proveedor anterior quitándole el acceso de socio a la WABA; `/register` y `subscribed_apps` a las 19:46 UTC del 2026-08-24
 - [x] 9.3 Confirmar con un mensaje real de WhatsApp entrante que llega a la bandeja — **el primer entrante disparó webhook 57 minutos después del registro**; hasta entonces Meta aceptaba los mensajes (doble check) sin generar ningún evento. Ver `docs/self-hosting.md` → "Cuando el webhook de WhatsApp no entrega"
 - [x] 9.4 Verificar el envío saliente y la recepción de estados de entrega — enviado desde la bandeja del CRM el 2026-08-24 y recibido en el celular; la fila del mensaje llegó a `status = read`, así que los webhooks de estado (enviado → entregado → leído) también entran
