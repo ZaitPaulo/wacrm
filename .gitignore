@@ -42,3 +42,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Insumos operativos de LoraMotors (listas de precios, revisiones de fichas).
+# Llegan por correo, se regeneran cada mes y no son documentacion del producto:
+# versionarlos engorda el historial para siempre sin aportar nada al repo.
+docs/*.xlsx
