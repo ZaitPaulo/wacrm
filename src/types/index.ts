@@ -194,10 +194,17 @@ export interface Conversation {
    *    checked against the account's per-conversation cap.
    *  - `ai_handoff_summary` — short internal note the bot wrote when it
    *    handed off, shown to whoever takes the thread over.
+   *  - `ai_handoff_attempts` — how many times the data gate rejected a
+   *    handoff the model asked for (migration 519). Only the urgent
+   *    escape reads it: a customer who won't give their name would
+   *    otherwise keep the bot asking forever, so the second urgent
+   *    attempt goes through regardless. Reset when the bot is
+   *    re-enabled on the thread.
    */
   ai_autoreply_disabled?: boolean;
   ai_reply_count?: number;
   ai_handoff_summary?: string | null;
+  ai_handoff_attempts?: number;
 }
 
 // ============================================================

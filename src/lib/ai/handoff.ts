@@ -1,4 +1,4 @@
-import type { ChatMessage } from './types'
+import type { ChatMessage, HandoffRequest } from './types'
 
 /** Longest the quoted customer message runs before we ellipsize it —
  *  keeps the internal note to a glanceable one-liner. */
@@ -20,8 +20,14 @@ const MAX_QUOTE_LEN = 160
 export function buildHandoffSummary(args: {
   messages: ChatMessage[]
   replyCount: number
+  /** Lo que el bot declaro haber recolectado. Ausente en el camino de
+   *  fallo (generacion vacia), donde no hay peticion que leer. */
+  request?: HandoffRequest
+  /** True cuando paso por la excepcion de urgencia, o sea que entra sin
+   *  los datos completos y el asesor debe saberlo. */
+  urgent?: boolean
 }): string {
-  const { messages, replyCount } = args
+  const { messages, replyCount, request, urgent } = args
 
   const lastCustomer = [...messages]
     .reverse()
@@ -32,12 +38,36 @@ export function buildHandoffSummary(args: {
       ? 'without replying'
       : `after ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
 
-  const base = `🤖 AI agent handed off ${replies}.`
+  const urgency = urgent ? ' (urgente)' : ''
+  const lines = [`🤖 AI agent handed off ${replies}${urgency}.`]
 
-  if (!lastCustomer) return base
+  if (request) {
+    lines.push(
+      `Motivo: ${request.motivo} · Nombre: ${orMissing(request.nombre)} · ` +
+        `Presupuesto: ${orMissing(request.presupuesto)} · ` +
+        `Interés: ${orMissing(request.interes)} · Crédito: ${credito(request.credito)}`,
+    )
+  }
 
-  const quote = truncate(lastCustomer.content.trim(), MAX_QUOTE_LEN)
-  return `${base} Last customer message: “${quote}”`
+  if (lastCustomer) {
+    const quote = truncate(lastCustomer.content.trim(), MAX_QUOTE_LEN)
+    lines.push(`Last customer message: “${quote}”`)
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Un dato que no se obtuvo se dice, no se omite: el asesor tiene que
+ * poder distinguir "no lo preguntamos" de "no aparece en la nota".
+ */
+function orMissing(value: string | null): string {
+  return value?.trim() ? value.trim() : '(falta)'
+}
+
+function credito(value: boolean | null): string {
+  if (value === null) return '(falta)'
+  return value ? 'sí' : 'no'
 }
 
 function truncate(text: string, max: number): string {

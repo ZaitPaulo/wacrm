@@ -85,12 +85,86 @@ export interface ProviderResult {
   usage: AiUsage | null
 }
 
+/**
+ * Why the model wants a human on the thread. Declared by the model in
+ * the handoff sentinel; anything it makes up falls back to `otro`.
+ *
+ * Two of these are urgent, and urgency is the whole reason this is an
+ * enum instead of free text: a customer who is complaining or who
+ * asked for a person outright must not be held back while the bot
+ * collects sales data.
+ */
+export type HandoffReason =
+  | 'reclamo'
+  | 'pide_humano'
+  | 'negociacion'
+  | 'permuta'
+  | 'credito'
+  | 'visita'
+  | 'papeles'
+  | 'otro'
+
+/** Every reason the parser accepts. Single source of truth for both the
+ *  prompt instructions and the runtime validation of model output. */
+export const HANDOFF_REASONS: readonly HandoffReason[] = [
+  'reclamo',
+  'pide_humano',
+  'negociacion',
+  'permuta',
+  'credito',
+  'visita',
+  'papeles',
+  'otro',
+] as const
+
+/** Reasons that skip the full data gate: only the name is required, and
+ *  even that gives way on the second attempt. */
+export const URGENT_HANDOFF_REASONS: readonly HandoffReason[] = [
+  'reclamo',
+  'pide_humano',
+] as const
+
+/** True when the reason means "a human is needed now", not "a human is
+ *  needed to close this sale". */
+export function isUrgentHandoff(reason: HandoffReason): boolean {
+  return (URGENT_HANDOFF_REASONS as readonly string[]).includes(reason)
+}
+
+/**
+ * What the model declares when it asks to hand the thread to an agent.
+ *
+ * Every field is what the model says it collected, NOT verified fact —
+ * the gate checks that the data is *there*, not that it's true. A field
+ * the model couldn't get is null (it writes `?` in the sentinel), which
+ * is the difference between "no budget given" and a made-up number.
+ */
+export interface HandoffRequest {
+  /** What the customer is called. WhatsApp's profile name doesn't count
+   *  — the model must have it from the conversation. */
+  nombre: string | null
+  /** Budget as the customer expressed it ("30 millones", "30000000").
+   *  Kept verbatim: normalizing it is reporting work, not gate work. */
+  presupuesto: string | null
+  /** Which vehicle, or at least which kind, the customer is after. */
+  interes: string | null
+  /** Whether they need financing. Null when the model didn't ask. */
+  credito: boolean | null
+  motivo: HandoffReason
+}
+
 /** Outcome of a generation call. */
 export interface GenerateResult {
   /** The reply text, with any handoff sentinel stripped. */
   text: string
-  /** True when the model asked to hand off to a human (auto-reply mode). */
-  handoff: boolean
+  /**
+   * The handoff the model asked for, or null when it didn't ask.
+   *
+   * Non-null is a *request*, never a decision: `evaluateHandoffGate`
+   * decides whether it goes through. A bare `[[HANDOFF]]` parses to a
+   * request with every field null, which is exactly a request that
+   * can't be granted.
+   */
+  handoff: HandoffRequest | null
   /** Provider token usage for this call, or null when unavailable. */
   usage: AiUsage | null
 }

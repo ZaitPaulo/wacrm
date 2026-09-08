@@ -3,9 +3,14 @@ import { loadAiConfig } from './config'
 import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { generateReply } from './generate'
-import { aiReplyDebounceMs, buildSystemPrompt } from './defaults'
+import {
+  aiReplyDebounceMs,
+  buildGateRetryInstruction,
+  buildSystemPrompt,
+} from './defaults'
 import { delay, hasNewerCustomerMessage, hasOutboundSince } from './reply-window'
 import { buildHandoffSummary } from './handoff'
+import { evaluateHandoffGate } from './handoff-gate'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { engineSendText } from '@/lib/flows/meta-send'
@@ -17,6 +22,9 @@ interface ConversationState {
   assigned_agent_id: string | null
   ai_autoreply_disabled: boolean
   ai_reply_count: number
+  /** Transferencias que el gate de datos ya rechazo en este hilo
+   *  (migracion 519). Solo la abre el escape por urgencia. */
+  ai_handoff_attempts: number
 }
 
 interface DispatchArgs {
@@ -96,7 +104,7 @@ export async function dispatchInboundToAiReply(
 
     const { data: convRow, error: convErr } = await db
       .from('conversations')
-      .select('assigned_agent_id, ai_autoreply_disabled, ai_reply_count')
+      .select('assigned_agent_id, ai_autoreply_disabled, ai_reply_count, ai_handoff_attempts')
       .eq('id', conversationId)
       .maybeSingle()
     if (convErr || !convRow) return
@@ -205,14 +213,75 @@ export async function dispatchInboundToAiReply(
       usage,
     })
 
-    if (handoff || !text) {
-      // The model can't (or shouldn't) answer — stop auto-replying on
-      // this thread and hand it to a human. We (a) pause the bot here
-      // (sticky until re-enabled), (b) route the conversation to the
-      // configured handoff agent — null leaves it in the shared queue —
-      // and (c) leave a short internal note so whoever picks it up has
-      // context. Assigning fires the `on_conversation_assigned` trigger,
-      // which notifies the agent.
+    // El modelo PIDE transferir; el gate decide. Antes bastaba con que
+    // lo pidiera, y por eso salian hilos sin un solo carro mostrado.
+    if (handoff) {
+      const gate = evaluateHandoffGate({
+        request: handoff,
+        attempts: conv.ai_handoff_attempts ?? 0,
+      })
+
+      if (!gate.transfer) {
+        // Nada de transferir: ni asignar asesor, ni apagar el bot, ni
+        // avisarle al cliente. El hilo sigue siendo nuestro y lo que
+        // toca es completar los datos que faltan.
+        await db
+          .from('conversations')
+          .update({ ai_handoff_attempts: (conv.ai_handoff_attempts ?? 0) + 1 })
+          .eq('id', conversationId)
+
+        // Casi siempre el modelo escribe algo junto al marcador; ese
+        // texto ya suele preguntar lo que falta y sale tal cual. Solo
+        // cuando manda el marcador pelado hay que volver a generar.
+        const reply =
+          text ||
+          (
+            await generateReply({
+              config,
+              systemPrompt: `${systemPrompt}\n\n${buildGateRetryInstruction({
+                missing: gate.missing,
+                urgent: gate.urgent,
+              })}`,
+              messages,
+            })
+          ).text
+
+        if (reply) {
+          await engineSendText({
+            accountId,
+            userId: configOwnerUserId,
+            conversationId,
+            contactId,
+            text: reply,
+            aiGenerated: true,
+          })
+        }
+        return
+      }
+
+      await handOffToHuman({
+        db,
+        accountId,
+        conversationId,
+        contactId,
+        configOwnerUserId,
+        handoffAgentId: config.handoffAgentId,
+        assignedAgentId: conv.assigned_agent_id,
+        summary: buildHandoffSummary({
+          messages,
+          replyCount: conv.ai_reply_count ?? 0,
+          request: handoff,
+          urgent: gate.urgent,
+        }),
+      })
+      return
+    }
+
+    if (!text) {
+      // Camino de FALLO, no decision del modelo: la generacion volvio
+      // vacia. El gate no aplica aqui a proposito — la alternativa es el
+      // silencio, que es justo lo que dejo a dos clientes esperando el
+      // 2026-08-26. Ante la duda, que entre un humano.
       await handOffToHuman({
         db,
         accountId,

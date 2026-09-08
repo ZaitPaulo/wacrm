@@ -43,20 +43,91 @@ describe('parseGeneration', () => {
   it('returns text with no handoff', () => {
     expect(parseGeneration('Hello there')).toEqual({
       text: 'Hello there',
-      handoff: false,
+      handoff: null,
       usage: null,
     })
   })
 
-  it('detects + strips the handoff sentinel', () => {
-    expect(parseGeneration('[[HANDOFF]]')).toEqual({
-      text: '',
-      handoff: true,
+  it('parses a full sentinel and strips it from the text', () => {
+    const raw =
+      'Ya te paso con un asesor. [[HANDOFF nombre=Carlos | presupuesto=30000000 | interes=Kia Sportage 2019 | credito=si | motivo=credito]]'
+    expect(parseGeneration(raw)).toEqual({
+      text: 'Ya te paso con un asesor.',
+      handoff: {
+        nombre: 'Carlos',
+        presupuesto: '30000000',
+        interes: 'Kia Sportage 2019',
+        credito: true,
+        motivo: 'credito',
+      },
       usage: null,
     })
-    expect(parseGeneration('Let me get a human [[HANDOFF]]')).toEqual({
-      text: 'Let me get a human',
-      handoff: true,
+  })
+
+  // `?` is how the model says "I didn't get this". It has to survive as
+  // null and never as the literal string, because the gate counts nulls.
+  it('reads ? as a missing field', () => {
+    const { handoff } = parseGeneration(
+      '[[HANDOFF nombre=Ana | presupuesto=? | interes=? | credito=no | motivo=visita]]',
+    )
+    expect(handoff).toEqual({
+      nombre: 'Ana',
+      presupuesto: null,
+      interes: null,
+      credito: false,
+      motivo: 'visita',
+    })
+  })
+
+  it('accepts fields in any order, with sloppy spacing', () => {
+    const { handoff } = parseGeneration(
+      '[[HANDOFF   motivo=permuta|nombre=Luis   |credito=?|  interes=camioneta | presupuesto=80 millones  ]]',
+    )
+    expect(handoff).toEqual({
+      nombre: 'Luis',
+      presupuesto: '80 millones',
+      interes: 'camioneta',
+      credito: null,
+      motivo: 'permuta',
+    })
+  })
+
+  // The bare marker is what a model trained on the old prompt emits, and
+  // what one that forgets the format falls back to. It must parse as a
+  // request with nothing in it — the gate refuses that on its own.
+  it('parses a bare sentinel as a request with every field missing', () => {
+    expect(parseGeneration('[[HANDOFF]]')).toEqual({
+      text: '',
+      handoff: {
+        nombre: null,
+        presupuesto: null,
+        interes: null,
+        credito: null,
+        motivo: 'otro',
+      },
+      usage: null,
+    })
+  })
+
+  it('falls back to otro for a reason it does not know', () => {
+    const { handoff } = parseGeneration('[[HANDOFF nombre=Ana | motivo=el cliente quiere rebaja]]')
+    expect(handoff?.motivo).toBe('otro')
+    expect(handoff?.nombre).toBe('Ana')
+  })
+
+  it('ignores junk fields instead of failing the whole parse', () => {
+    const { handoff } = parseGeneration(
+      '[[HANDOFF nombre=Ana | color=rojo | presupuesto=50000000 | motivo=reclamo]]',
+    )
+    expect(handoff?.nombre).toBe('Ana')
+    expect(handoff?.presupuesto).toBe('50000000')
+    expect(handoff?.motivo).toBe('reclamo')
+  })
+
+  it('treats an unterminated sentinel as plain text, not a handoff', () => {
+    expect(parseGeneration('Te paso con alguien [[HANDOFF nombre=Ana')).toEqual({
+      text: 'Te paso con alguien [[HANDOFF nombre=Ana',
+      handoff: null,
       usage: null,
     })
   })
@@ -65,7 +136,7 @@ describe('parseGeneration', () => {
     const usage = { promptTokens: 10, completionTokens: 5, totalTokens: 15 }
     expect(parseGeneration('Hi', usage)).toEqual({
       text: 'Hi',
-      handoff: false,
+      handoff: null,
       usage,
     })
   })
@@ -89,7 +160,7 @@ describe('generateReply — OpenAI', () => {
 
     expect(res).toEqual({
       text: 'Sure — happy to help!',
-      handoff: false,
+      handoff: null,
       usage: { promptTokens: 42, completionTokens: 8, totalTokens: 50 },
     })
     const [url, opts] = fetchMock.mock.calls[0]
@@ -148,7 +219,7 @@ describe('generateReply — Anthropic', () => {
     // Anthropic reports input/output only — total is summed by normalizeUsage.
     expect(res).toEqual({
       text: 'Hi there!',
-      handoff: false,
+      handoff: null,
       usage: { promptTokens: 30, completionTokens: 6, totalTokens: 36 },
     })
     const [url, opts] = fetchMock.mock.calls[0]
@@ -161,7 +232,14 @@ describe('generateReply — Anthropic', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        okResponse({ content: [{ type: 'text', text: '[[HANDOFF]]' }] }),
+        okResponse({
+          content: [
+            {
+              type: 'text',
+              text: '[[HANDOFF nombre=Ana | presupuesto=? | interes=? | credito=? | motivo=pide_humano]]',
+            },
+          ],
+        }),
       ),
     )
     const res = await generateReply({
@@ -169,7 +247,7 @@ describe('generateReply — Anthropic', () => {
       systemPrompt: 'sys',
       messages: [{ role: 'user', content: 'I want to speak to a person' }],
     })
-    expect(res.handoff).toBe(true)
+    expect(res.handoff).toMatchObject({ nombre: 'Ana', motivo: 'pide_humano' })
     expect(res.text).toBe('')
   })
 
@@ -216,7 +294,7 @@ describe('generateReply — OpenRouter', () => {
 
     expect(res).toEqual({
       text: 'Claro, con gusto.',
-      handoff: false,
+      handoff: null,
       usage: { promptTokens: 11, completionTokens: 4, totalTokens: 15 },
     })
     const [url, opts] = fetchMock.mock.calls[0]

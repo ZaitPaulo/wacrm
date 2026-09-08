@@ -12,7 +12,7 @@ describe('buildHandoffSummary', () => {
       replyCount: 2,
     })
     expect(summary).toBe(
-      '🤖 AI agent handed off after 2 replies. Last customer message: “I want a refund”',
+      '🤖 AI agent handed off after 2 replies.\nLast customer message: “I want a refund”',
     )
   })
 
@@ -62,5 +62,69 @@ describe('buildHandoffSummary', () => {
       replyCount: 0,
     })
     expect(summary).toBe('🤖 AI agent handed off without replying.')
+  })
+})
+
+describe('buildHandoffSummary — datos recolectados', () => {
+  const messages = [{ role: 'user' as const, content: 'me interesa la sportage' }]
+
+  it('lista los cuatro datos y el motivo', () => {
+    const summary = buildHandoffSummary({
+      messages,
+      replyCount: 3,
+      request: {
+        nombre: 'Carlos',
+        presupuesto: '30000000',
+        interes: 'Kia Sportage 2019',
+        credito: true,
+        motivo: 'credito',
+      },
+    })
+    expect(summary).toContain('Motivo: credito')
+    expect(summary).toContain('Nombre: Carlos')
+    expect(summary).toContain('Presupuesto: 30000000')
+    expect(summary).toContain('Interés: Kia Sportage 2019')
+    expect(summary).toContain('Crédito: sí')
+  })
+
+  // Un campo ausente tiene que verse. Si se omitiera, el asesor no
+  // podría distinguir "no lo preguntamos" de "la nota salió corta".
+  it('marca los faltantes de una transferencia urgente', () => {
+    const summary = buildHandoffSummary({
+      messages,
+      replyCount: 1,
+      urgent: true,
+      request: {
+        nombre: 'Ana',
+        presupuesto: null,
+        interes: null,
+        credito: null,
+        motivo: 'reclamo',
+      },
+    })
+    expect(summary).toContain('(urgente)')
+    expect(summary).toContain('Presupuesto: (falta)')
+    expect(summary).toContain('Interés: (falta)')
+    expect(summary).toContain('Crédito: (falta)')
+  })
+
+  it('distingue crédito no de crédito desconocido', () => {
+    const summary = buildHandoffSummary({
+      messages,
+      replyCount: 1,
+      request: {
+        nombre: 'Luis',
+        presupuesto: '50000000',
+        interes: 'sedán',
+        credito: false,
+        motivo: 'visita',
+      },
+    })
+    expect(summary).toContain('Crédito: no')
+  })
+
+  it('mantiene la nota corta cuando no hubo petición (camino de fallo)', () => {
+    const summary = buildHandoffSummary({ messages, replyCount: 0 })
+    expect(summary).not.toContain('Motivo:')
   })
 })
