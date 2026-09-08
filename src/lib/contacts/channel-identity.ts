@@ -75,7 +75,13 @@ export async function linkChannelIdentity(
   accountId: string,
   contactId: string,
   channel: MessageChannel,
-  externalId: string
+  externalId: string,
+  /**
+   * Nombre de usuario público de ESA identidad, cuando el canal lo
+   * informa. Se guarda para poder reconocer a un contacto que no tiene
+   * teléfono; no participa en la resolución. Ver migración 522.
+   */
+  username?: string | null
 ): Promise<void> {
   const { error } = await db.from('contact_channels').upsert(
     {
@@ -83,7 +89,11 @@ export async function linkChannelIdentity(
       contact_id: contactId,
       channel,
       external_id: externalId,
+      ...(username ? { username } : {}),
     },
+    // `ignoreDuplicates` mantiene el upsert idempotente: una identidad
+    // que ya existe no se toca. El nombre de usuario, que sí puede
+    // cambiar, se refresca aparte — ver `refreshUsername`.
     { onConflict: 'account_id,channel,external_id', ignoreDuplicates: true }
   );
 
@@ -107,6 +117,32 @@ export interface ResolveContactArgs {
   externalId: string;
   /** Nombre que informa la plataforma, cuando informa alguno. */
   name?: string | null;
+  /**
+   * Otra identidad de la misma persona en el mismo canal — el BSUID de
+   * WhatsApp. Se busca por ella si `externalId` no encuentra nada, y se
+   * vincula siempre. Ver `resolveContactByChannel`.
+   */
+  alsoKnownAs?: string | null;
+  /**
+   * Nombre de usuario público, cuando el canal lo informa. Se guarda
+   * para reconocer a un contacto sin teléfono; no resuelve nada.
+   */
+  username?: string | null;
+}
+
+/**
+ * ¿Este identificador es un teléfono?
+ *
+ * Un BSUID de WhatsApp tiene la forma `CO.4481978948757066` — código de
+ * país, punto, y hasta 128 alfanuméricos. La distinción importa porque
+ * las reglas de teléfonos (normalizar a dígitos, comparar por los
+ * últimos ocho, probar variantes de prefijo troncal) existen para
+ * números escritos por personas. Aplicarlas a un identificador opaco
+ * puede llegar a hacer coincidir a dos personas que no tienen nada que
+ * ver.
+ */
+export function isPhoneIdentity(externalId: string): boolean {
+  return /^\d+$/.test(externalId);
 }
 
 /**
@@ -132,8 +168,44 @@ export async function resolveContactByChannel(
   args: ResolveContactArgs
 ): Promise<ResolvedContact | null> {
   const { db, accountId, auditUserId, channel, externalId, name } = args;
+  const alsoKnownAs = args.alsoKnownAs || null;
 
   if (!externalId) return null;
+
+  const username = args.username || null;
+
+  /**
+   * Deja registradas TODAS las identidades que la plataforma informó.
+   *
+   * El nombre de usuario va en las dos: es de la persona en ese canal,
+   * y cuál de sus dos identidades traiga el próximo mensaje no se sabe
+   * de antemano.
+   */
+  const linkAll = async (contactId: string) => {
+    await linkChannelIdentity(
+      db,
+      accountId,
+      contactId,
+      channel,
+      externalId,
+      username
+    );
+    if (alsoKnownAs && alsoKnownAs !== externalId) {
+      await linkChannelIdentity(
+        db,
+        accountId,
+        contactId,
+        channel,
+        alsoKnownAs,
+        username
+      );
+    }
+    // El upsert de arriba no toca una identidad que ya existe, así que
+    // un nombre de usuario que cambió no entraría por ahí.
+    if (username) {
+      await refreshUsername(db, accountId, contactId, channel, username);
+    }
+  };
 
   // 1. Identidad exacta.
   const byIdentity = await findContactByIdentity(
@@ -143,28 +215,60 @@ export async function resolveContactByChannel(
     externalId
   );
   if (byIdentity) {
+    // Vincula por si esta es la primera vez que la plataforma manda la
+    // OTRA identidad: así el día que deje de mandar esta, se resuelve
+    // igual.
+    await linkAll(byIdentity);
     await updateNameIfChanged(db, byIdentity, name);
     return { contactId: byIdentity, created: false };
   }
 
-  // 2. Respaldo por teléfono, solo para WhatsApp.
-  if (channel === 'whatsapp') {
+  // 2. La otra identidad de la misma persona.
+  //
+  // Este es el paso que evita el duplicado cuando alguien cambia de
+  // forma de identificarse, en los DOS sentidos: un contacto conocido
+  // por su teléfono que empieza a llegar solo con BSUID, y uno creado
+  // por BSUID que después trae su número. Va ANTES del respaldo difuso
+  // porque es una coincidencia exacta y no admite ambigüedad.
+  if (alsoKnownAs && alsoKnownAs !== externalId) {
+    const byAlias = await findContactByIdentity(
+      db,
+      accountId,
+      channel,
+      alsoKnownAs
+    );
+    if (byAlias) {
+      await linkAll(byAlias);
+      await updateNameIfChanged(db, byAlias, name);
+      return { contactId: byAlias, created: false };
+    }
+  }
+
+  // 3. Respaldo difuso por teléfono, solo en WhatsApp y SOLO si lo que
+  // tenemos es de verdad un teléfono. `findExistingContact` compara por
+  // los últimos dígitos para tolerar prefijos troncales; correrlo sobre
+  // un BSUID compararía los dígitos de un identificador opaco contra
+  // números de teléfono, que es como se fusiona a dos personas
+  // distintas.
+  if (channel === 'whatsapp' && isPhoneIdentity(externalId)) {
     const byPhone = await findExistingContact(db, accountId, externalId);
     if (byPhone) {
-      await linkChannelIdentity(db, accountId, byPhone.id, channel, externalId);
+      await linkAll(byPhone.id);
       await updateNameIfChanged(db, byPhone.id, name, byPhone.name);
       return { contactId: byPhone.id, created: false };
     }
   }
 
-  // 3. Crear. El teléfono solo se puebla en WhatsApp: en los demás
-  // canales no lo hay, y desde la 513 la columna admite NULL.
+  // 4. Crear. El teléfono se puebla solo si el identificador ES un
+  // teléfono — no por ser WhatsApp. Sin esa condición, un BSUID
+  // terminaría en la columna `phone`, donde lo verían la ficha, la
+  // exportación y el índice único de teléfonos.
   const { data: created, error } = await db
     .from('contacts')
     .insert({
       account_id: accountId,
       user_id: auditUserId,
-      phone: channel === 'whatsapp' ? externalId : null,
+      phone: isPhoneIdentity(externalId) ? externalId : null,
       name: name || externalId,
     })
     .select('id')
@@ -182,8 +286,44 @@ export async function resolveContactByChannel(
     return null;
   }
 
-  await linkChannelIdentity(db, accountId, created.id, channel, externalId);
+  await linkAll(created.id);
   return { contactId: created.id, created: true };
+}
+
+/**
+ * Pone al día el nombre de usuario de las identidades de un contacto.
+ *
+ * Va aparte del vínculo porque `linkChannelIdentity` es idempotente a
+ * propósito —`ignoreDuplicates` no toca una fila que ya existe— y el
+ * nombre de usuario SÍ cambia: la persona puede cambiarlo cuando
+ * quiera, y un handle viejo en la ficha es peor que ninguno, porque
+ * manda al asesor a buscar a alguien que ya no se llama así.
+ *
+ * Se escribe SIN comparar contra el valor guardado. La comparación
+ * parecía el ahorro obvio, pero `neq` no alcanza a las filas donde la
+ * columna es NULL —en SQL, `NULL <> 'algo'` no es verdadero— y esas son
+ * justamente todas las identidades anteriores a la migración 522: nunca
+ * se llenarían. Una escritura de más sobre filas que ya estamos
+ * tocando cuesta mucho menos que un dato que no aparece jamás.
+ *
+ * Best-effort: un fallo acá no puede tumbar la recepción del mensaje.
+ */
+async function refreshUsername(
+  db: SupabaseClient,
+  accountId: string,
+  contactId: string,
+  channel: MessageChannel,
+  username: string
+): Promise<void> {
+  const { error } = await db
+    .from('contact_channels')
+    .update({ username })
+    .eq('account_id', accountId)
+    .eq('contact_id', contactId)
+    .eq('channel', channel);
+  if (error) {
+    console.error('[channel-identity] username update error:', error.message);
+  }
 }
 
 /** Re-resolución tras una carrera perdida, por los dos caminos. */
@@ -201,7 +341,9 @@ async function resolveAfterRace(
   );
   if (byIdentity) return byIdentity;
 
-  if (channel === 'whatsapp') {
+  // Mismo condicionamiento que en el camino normal: la comparación
+  // difusa por dígitos solo tiene sentido sobre teléfonos.
+  if (channel === 'whatsapp' && isPhoneIdentity(externalId)) {
     const byPhone = await findExistingContact(db, accountId, externalId);
     if (byPhone) {
       await linkChannelIdentity(db, accountId, byPhone.id, channel, externalId);

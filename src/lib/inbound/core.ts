@@ -46,10 +46,34 @@ import { recordVehicleInquiry } from '@/lib/inventory/inquiries';
 /** Quién escribió, en los términos de su canal. */
 export interface InboundSender {
   channel: MessageChannel;
-  /** `wa_id` en WhatsApp; el identificador de Meta en los otros. */
+  /**
+   * Con qué se identifica a esta persona. `wa_id` en WhatsApp; el
+   * identificador de Meta en los otros. Desde que WhatsApp tiene
+   * nombres de usuario puede ser un BSUID en vez de un teléfono — ver
+   * `alsoKnownAs`.
+   */
   externalId: string;
   /** Nombre que informa la plataforma, si informa alguno. */
   name: string | null;
+  /**
+   * Otra identidad de la MISMA persona en el MISMO canal, cuando la
+   * plataforma informa dos.
+   *
+   * En WhatsApp es el BSUID, que Meta manda en todos los mensajes
+   * entrantes aunque también mande el teléfono. Se vincula siempre, no
+   * solo cuando falta el número: es lo que hace que un contacto
+   * conocido que mañana active la privacidad se resuelva al mismo
+   * contacto en vez de aparecer como alguien nuevo con el historial
+   * partido en dos.
+   */
+  alsoKnownAs?: string | null;
+  /**
+   * Identificador público legible, cuando el canal lo informa
+   * (`profile.username` en WhatsApp). No es una llave y no se usa para
+   * resolver: sirve para que una persona reconozca a otra cuando no hay
+   * teléfono que mostrar.
+   */
+  username?: string | null;
 }
 
 /** Un mensaje ya traducido, sea del canal que sea. */
@@ -179,6 +203,8 @@ export async function persistInbound(
     channel: sender.channel,
     externalId: sender.externalId,
     name: sender.name,
+    alsoKnownAs: sender.alsoKnownAs ?? null,
+    username: sender.username ?? null,
   });
   if (!contactOutcome) {
     return { status: 'failed', reason: 'no se pudo resolver el contacto' };

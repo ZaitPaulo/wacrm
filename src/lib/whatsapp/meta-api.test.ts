@@ -267,3 +267,61 @@ describe("sendInteractiveList — validation", () => {
     });
   });
 });
+
+// ============================================================
+// El destinatario va en el campo que le corresponde
+// (openspec/changes/identidad-bsuid-whatsapp).
+//
+// Meta admite `to` con un teléfono y `recipient` con un BSUID, y NO son
+// intercambiables. Estos tests miran el cuerpo REAL que sale, no el
+// helper que lo decide: es lo único que prueba que las funciones de
+// envío lo están usando.
+// ============================================================
+
+describe("el campo del destinatario en el cuerpo que sale", () => {
+  let capturado: Record<string, unknown> | null = null;
+
+  beforeEach(() => {
+    capturado = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { body: string }) => {
+        capturado = JSON.parse(init.body);
+        return {
+          ok: true,
+          json: async () => ({ messages: [{ id: "wamid.X" }] }),
+        } as unknown as Response;
+      }),
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("un teléfono sale en `to`", async () => {
+    const { sendTextMessage } = await import("./meta-api");
+    await sendTextMessage({
+      phoneNumberId: "pn-1",
+      accessToken: "tok",
+      to: "573166220262",
+      text: "hola",
+    });
+
+    expect(capturado).toMatchObject({ to: "573166220262" });
+    expect(capturado).not.toHaveProperty("recipient");
+  });
+
+  it("un BSUID sale en `recipient`, nunca en `to`", async () => {
+    const { sendTextMessage } = await import("./meta-api");
+    await sendTextMessage({
+      phoneNumberId: "pn-1",
+      accessToken: "tok",
+      to: "CO.4481978948757066",
+      text: "hola",
+    });
+
+    expect(capturado).toMatchObject({ recipient: "CO.4481978948757066" });
+    // Mandar los dos tampoco funciona.
+    expect(capturado).not.toHaveProperty("to");
+  });
+});

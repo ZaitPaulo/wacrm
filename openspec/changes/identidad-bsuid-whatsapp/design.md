@@ -39,7 +39,7 @@ Restricciones:
 - **No** se unifican contactos ya duplicados por este motivo. Si alguien ya existe dos veces, este cambio no los fusiona; para eso está `contact_identity_links` (migración 514) y es otra conversación.
 - **No** se toca Instagram ni Messenger.
 - **No** se agrega búsqueda por nombre de usuario en la interfaz. Mostrarlo sí; buscar por él, después.
-- **No** se cambia el modelo de datos. Si hiciera falta una migración, es señal de que el alcance se desbordó.
+- **No** se cambia el modelo de identidad: la 513 ya lo dejó listo. (La 522 sí agrega una columna, pero es para el nombre de usuario, que es un dato de presentación — ver la corrección más abajo.)
 
 ## Decisions
 
@@ -86,23 +86,64 @@ La condición pasa a ser si el `externalId` **es** un teléfono, no si el canal 
 
 - **Fusionar personas distintas por un error en la resolución** → Es el riesgo más caro del cambio, y el más difícil de deshacer: un historial mezclado no se separa solo. La mitigación es que toda la resolución nueva es por coincidencia **exacta** de identificador, y que la difusa queda explícitamente prohibida para lo que no es teléfono.
 - **Duplicar a alguien que ya existe** → Menos grave y reversible con `contact_identity_links`. Aparece si el paso 2 de la decisión 3 falla o si el BSUID no se vinculó cuando debía.
-- **Que el envío por `recipient` no funcione como dice la documentación** → No está probado contra la API real. Hay que verificarlo con el caso de producción que ya tenemos (`CO.4481978948757066`) antes de dar el cambio por bueno; si Meta lo rechaza, la mitad del envío cambia de forma y conviene saberlo temprano.
+- **Que el envío por `recipient` no funcione como dice la documentación** → Establecido por contraste de errores contra la API real, pero NO por un envío exitoso a un BSUID de verdad. Sigue pendiente de la verificación de punta a punta (tarea 6.4); si Meta lo rechazara, la mitad del envío cambia de forma.
 - **Varias filas por contacto en `contact_channels`** → Cualquier lectura que asuma "una identidad por canal por contacto" empieza a devolver dos. Hay que buscar esas lecturas, no suponer que no existen.
 - **El nombre de usuario puede cambiar** → No es una llave y no se usa como tal; es solo para mostrar. Se refresca en cada mensaje, igual que el nombre de perfil.
 
 ## Migration Plan
 
-Sin migración de base: la 513 dejó `contacts.phone` nulable y `contact_channels` con la forma necesaria.
+**Migración `522_channel_username.sql`**, que agrega `contact_channels.username` (nullable) y corrige el comentario de `external_id`. No toca datos existentes y es idempotente. La identidad en sí no necesitó nada: la 513 ya había dejado `contacts.phone` nulable y `contact_channels` con la forma necesaria.
 
-Despliegue: reconstrucción normal. Se puede desplegar solo, sin depender de nada más.
+Despliegue: **aplicar la migración ANTES de reconstruir.** Al revés, el código nuevo intentaría escribir una columna que no existe cada vez que llegue un mensaje de alguien con nombre de usuario. El mensaje se guardaría igual —`linkChannelIdentity` registra el error y sigue, no lanza—, pero su identidad NO quedaría vinculada, y sin identidad cada mensaje siguiente de esa persona crearía un contacto nuevo. Duplicados en silencio, que es justo lo que este cambio existe para evitar.
+
+Se puede desplegar solo, sin depender de nada más.
 
 Verificación: el caso de producción está disponible y es reproducible a voluntad —basta que esa persona escriba— así que la prueba de punta a punta es real y no simulada. Hay que verificar las dos mitades: que el mensaje entre, y que la respuesta llegue.
 
 Reversión: revertir el commit. Deja atrás los contactos creados por BSUID y sus filas en `contact_channels`; no estorban, pero esos contactos vuelven a quedar sin poder recibir mensajes.
 
-## Open Questions
+## Hallazgos del grupo 1 (2026-09-08)
 
-- ¿`contact_channels` tiene alguna restricción que impida dos filas del mismo canal para un contacto? Hay que leer la 513 antes de escribir código, no después.
-- ¿Qué muestra la interfaz hoy donde va el teléfono, y qué debería mostrar cuando no hay? Afecta la bandeja, la ficha del contacto y la lista.
-- ¿Se puede mandar una **plantilla** a un BSUID? Importa para las difusiones y para reabrir una conversación fuera de la ventana de 24 horas. La documentación consultada cubre el envío en general, no este caso puntual.
-- ¿Qué pasa con la carga masiva y la exportación de contactos, que hoy giran alrededor del teléfono?
+Lo que la lectura y las pruebas dejaron establecido, para no volver a averiguarlo:
+
+- **`contact_channels` admite dos filas del mismo canal por contacto.** El único índice único es `(account_id, channel, external_id)`; no hay unicidad por `(cuenta, canal, contacto)`. La decisión 2 es viable sin migración.
+- **Meta acepta `recipient`.** Verificado por contraste: un envío con `recipient` y un BSUID inexistente devuelve `(#100) Invalid parameter`, mientras que un envío SIN destinatario devuelve `The parameter to is required`. Si el campo fuera desconocido, el primero habría dado el segundo error. Reconoce el campo y rechaza el valor.
+- **Las plantillas funcionan con BSUID**, salvo las de autenticación *one-tap*, *zero-tap* y *copy-code*, que exigen teléfono. Las difusiones, entonces, los alcanzan.
+- **El comentario de `contact_channels.external_id` en la 513 quedó desactualizado**: dice que para WhatsApp es el teléfono normalizado. Corregirlo pide una migración de solo comentario, que este cambio evita a propósito; queda anotado para la próxima que toque el esquema.
+
+### El hallazgo que cambia el diseño: el BSUID NO es permanente
+
+La documentación dice que **los BSUID se regeneran cuando la persona cambia de número de teléfono**, y que eso dispara un webhook `user_id_update`.
+
+Eso golpea a la decisión 2. Vincular el BSUID para todos sigue siendo lo correcto —resuelve el caso frecuente—, pero deja de ser suficiente por sí solo: si el identificador cambia y no lo seguimos, la identidad guardada queda vieja y la persona vuelve a aparecer como alguien nuevo. Es exactamente el duplicado que este cambio quiere evitar, solo que por otra puerta.
+
+No se encontró documentación pública del payload de ese webhook, así que la forma exacta está sin confirmar.
+
+### Decisión: `user_id_update` queda FUERA de este cambio
+
+Se cubre el salto teléfono↔BSUID, que es lo que está rompiendo hoy. La regeneración del identificador exige que la persona cambie de número — algo poco frecuente, y que **hoy, con identidad por teléfono, ya produce un contacto nuevo**. No manejarlo no es una regresión: es dejar como está algo que ya estaba así.
+
+Pesó además que el payload no esté documentado: escribir el manejador a ciegas arriesga tener que rehacerlo cuando aparezca la forma real, y suscribir el campo es configuración del lado de Meta.
+
+**Limitación conocida, entonces:** si un contacto cambia de número de teléfono, su BSUID se regenera y volverá a aparecer como un contacto nuevo. Merece su propio change.
+
+Nótese que esto NO afecta al requisito de la spec sobre no duplicar: ese requisito habla del salto entre teléfono y BSUID, que sí queda cubierto.
+
+### Limitación: las difusiones no alcanzan a un contacto sin teléfono
+
+`broadcast-core.ts` recibe del llamador una **lista de teléfonos**, los sanea y descarta lo que no sea E.164. Un contacto identificado por BSUID no tiene número, así que no puede estar en esa lista — aunque Meta sí acepte plantillas dirigidas a un BSUID.
+
+Incluirlos exigiría que la difusión se arme con ids de contacto en vez de teléfonos, lo que toca la interfaz de selección, la carga por CSV y el modelo de la difusión entera. Queda fuera de este cambio, anotado para el que lo aborde.
+
+### Corrección al diseño: SÍ hay una migración
+
+El diseño afirmaba «sin migración», y era cierto para la identidad — la 513 dejó todo listo. Lo que no previó es que el **nombre de usuario no tiene dónde vivir**: `contacts` no tiene esa columna ni campos libres.
+
+La 522 agrega `contact_channels.username`, nullable. Va en la identidad y no en la persona porque el handle es de un canal: la misma persona puede tener uno en WhatsApp y otro en Instagram, y ponerlo en `contacts` obligaría a una columna por canal — justo lo que la 513 decidió no hacer. De paso corrige el comentario de `external_id`, que la 513 describía como «el teléfono normalizado» y ya no lo es siempre.
+
+No sirve reusar el nombre de perfil que ya guardamos: ese lo elige cada quien y se repite, así que dos «Juan» sin teléfono serían indistinguibles. El nombre de usuario es único y estable, y es el dato que la propia persona puede dictar para que la encuentren.
+
+## Open Questions
+- ~~¿Qué muestra la interfaz donde va el teléfono?~~ **Resuelto.** La lista y la bandeja no se rompían: usan `contact.name || contact.phone`, y el nombre de perfil siempre llega. Lo que se cambió es la fila del teléfono en la barra lateral, que quedaba en blanco: ahora dice «Sin teléfono», muestra el `@usuario` y explica por qué no hay número. Un hueco se lee como un dato por completar, y manda a alguien a buscar algo que no existe.
+- ¿Qué pasa con la carga masiva y la exportación de contactos? **Sin abordar.** Ninguna se rompe —un contacto sin teléfono sale con la celda vacía—, pero no hay forma de cargar uno por su identificador ni la exportación dice cuál es.
+- **Verificación pendiente contra la API real.** Que Meta acepta `recipient` está establecido por contraste de errores, no por un envío exitoso a un BSUID de verdad. La tarea 6.4 lo cubre y requiere desplegar.

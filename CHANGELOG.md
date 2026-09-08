@@ -11,6 +11,36 @@ and polish.
 
 ## [Unreleased]
 
+### Los clientes que escriben sin dar su número ya no se pierden
+
+> **Migración requerida:** aplica `522_channel_username.sql` antes de
+> desplegar. Agrega una columna nullable y corrige un comentario del
+> esquema; no toca datos existentes.
+
+- WhatsApp dejó de entregar el teléfono de quien adopta un **nombre de
+  usuario**: en su lugar manda un identificador con alcance de negocio.
+  El CRM asumía en todas partes que quien escribe ES un teléfono, así
+  que esos mensajes se descartaban — y hasta hace poco, en silencio:
+  no quedaba ni el contacto, ni la conversación, ni un error a la
+  vista.
+- Ocurre cuando la persona tiene nombre de usuario, no ha interactuado
+  en 30 días, no está en la libreta del negocio y el negocio no le ha
+  escrito hace poco. Es decir: **prospectos nuevos**, justo a quien
+  menos se puede perder. Por eso parecía aleatorio.
+- Ahora esos mensajes entran, crean su contacto sin teléfono, y **se
+  les puede responder** por todos los caminos: asesor, bot, flujos y
+  automatizaciones.
+- La ficha de un contacto así muestra su nombre de usuario y dice
+  explícitamente que no tiene teléfono, en vez de dejar el campo en
+  blanco como si faltara por completar.
+- Un cliente que ya escribía con su número y mañana active la
+  privacidad **no se duplica**: se reconoce como el mismo contacto y
+  conserva su historial.
+- **Dos limitaciones conocidas.** Las difusiones no alcanzan a estos
+  contactos, porque se arman con una lista de teléfonos. Y si un
+  cliente cambia de número de teléfono, su identificador se regenera y
+  volverá a aparecer como un contacto nuevo.
+
 ### Se perdían mensajes entrantes de WhatsApp por el DNS del contenedor
 
 > **Solo afecta al despliegue autoalojado.** No hay migración. Requiere

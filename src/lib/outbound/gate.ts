@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { MessageChannel } from '@/lib/contacts/channel-identity';
 import { sanitizePhoneForMeta, isValidE164 } from '@/lib/whatsapp/phone-utils';
+import { isPhoneRecipient } from '@/lib/whatsapp/recipient';
 import {
   evaluateWindow,
   type OutsideWindowOption,
@@ -195,12 +196,18 @@ async function lastInboundAt(
 /**
  * El identificador de destino del contacto en ese canal.
  *
- * En WhatsApp se toma de `contacts.phone` y no de `contact_channels`: es
- * la columna que los tres caminos de envío ya usaban, la que el
- * formulario y la importación mantienen, y la que puede corregirse a
- * mano cuando un número está mal escrito. La identidad de canal existe
- * para RECONOCER a quien escribe; para escribirle, el teléfono editable
- * sigue siendo la fuente.
+ * En WhatsApp el teléfono de `contacts.phone` va PRIMERO, y no es
+ * arbitrario: es la columna que los tres caminos de envío ya usaban, la
+ * que el formulario y la importación mantienen, y la que puede
+ * corregirse a mano cuando un número está mal escrito. La identidad de
+ * canal existe para RECONOCER a quien escribe; para escribirle, el
+ * teléfono editable sigue siendo la fuente preferida.
+ *
+ * Lo que cambió es el caso en que NO hay teléfono. Desde que WhatsApp
+ * tiene nombres de usuario, hay personas de las que nunca vamos a
+ * recibir el número: para ellas la identidad de canal es el único
+ * camino, y sin este respaldo entrarían a la bandeja sin que nadie
+ * pudiera contestarles.
  */
 async function resolveRecipientId(
   db: SupabaseClient,
@@ -218,25 +225,43 @@ async function resolveRecipientId(
       .eq('id', contactId)
       .maybeSingle<{ id: string; phone: string | null }>();
 
-    if (!contact?.phone) return { ok: false, reason: 'no_recipient' };
-
-    const sanitized = sanitizePhoneForMeta(contact.phone);
-    if (!isValidE164(sanitized)) {
-      return { ok: false, reason: 'invalid_recipient' };
+    if (contact?.phone) {
+      const sanitized = sanitizePhoneForMeta(contact.phone);
+      if (!isValidE164(sanitized)) {
+        return { ok: false, reason: 'invalid_recipient' };
+      }
+      return { ok: true, recipientId: sanitized };
     }
-    return { ok: true, recipientId: sanitized };
+    // Sin teléfono, el BSUID. Cae al camino común de abajo.
   }
 
-  const { data: identity } = await db
+  // OJO: acá NO se puede usar `.maybeSingle()`. Un contacto de WhatsApp
+  // tiene hasta DOS identidades del mismo canal —su teléfono y su
+  // BSUID—, porque ambas se registran para reconocerlo cuando cambia de
+  // forma de identificarse. `.maybeSingle()` da error con dos filas, y
+  // el envío fallaría justo para los contactos mejor identificados.
+  const { data: identities } = await db
     .from('contact_channels')
     .select('external_id')
     .eq('account_id', accountId)
     .eq('contact_id', contactId)
     .eq('channel', channel)
-    .maybeSingle<{ external_id: string }>();
+    .returns<{ external_id: string }[]>();
 
-  if (!identity?.external_id) return { ok: false, reason: 'no_recipient' };
-  return { ok: true, recipientId: identity.external_id };
+  const candidatas = identities ?? [];
+  if (candidatas.length === 0) return { ok: false, reason: 'no_recipient' };
+
+  // En WhatsApp se llega acá solo sin teléfono, así que entre las
+  // identidades hay que quedarse con la que NO es un número: un teléfono
+  // guardado como identidad pero ausente de `contacts.phone` es un dato
+  // viejo, no un destino.
+  const elegida =
+    channel === 'whatsapp'
+      ? candidatas.find((i) => !isPhoneRecipient(i.external_id))
+      : candidatas[0];
+
+  if (!elegida) return { ok: false, reason: 'no_recipient' };
+  return { ok: true, recipientId: elegida.external_id };
 }
 
 /** True si ese canal ya sabe enviar. Para la UI, que oculta lo que no. */
