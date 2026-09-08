@@ -4,25 +4,25 @@
 - [x] 1.2 Buscar toda lectura que asuma "una identidad por canal por contacto" — dos hallazgos: `outbound/gate.ts:229` usa `.maybeSingle()` y revienta con dos filas (hay que arreglarlo, tareas del grupo 4), y `api/contacts/identity-links/route.ts:42,58,74` listaría `whatsapp` repetido (cosmético, deduplicar)
 - [x] 1.3 Verificar que Meta acepta `recipient` — **sí**, establecido por contraste de errores; ver los hallazgos del diseño. Queda sin probar con un BSUID REAL, que exige mandarle un mensaje a una persona de verdad
 - [x] 1.4 Averiguar si se puede mandar una plantilla a un BSUID — **sí**, salvo plantillas de autenticación one-tap, zero-tap y copy-code
-- [ ] 1.5 **NUEVO** — Decidir si el manejo del webhook `user_id_update` entra en este cambio. El BSUID se regenera cuando la persona cambia de número, y sin seguir ese cambio el requisito de no duplicar queda con un agujero conocido
+- [x] 1.5 Decidir si el webhook `user_id_update` entra en este cambio — **queda FUERA**, con la limitación anotada en el diseño. No es una regresión: hoy un cambio de número ya produce un contacto nuevo
 
 ## 2. Reconocer la identidad al recibir
 
-- [ ] 2.1 Extraer del sobre de WhatsApp el BSUID (`contacts[].user_id`) y el nombre de usuario (`contacts[].profile.username`)
-- [ ] 2.2 Armar `sender.externalId` en cascada: teléfono normalizado si lo hay, BSUID si no
-- [ ] 2.3 Pasar el BSUID por separado, además del `externalId`, para poder vincularlo aunque la identidad haya salido del teléfono
-- [ ] 2.4 Quitar el guardia de diagnóstico que hoy vuelca el sobre: deja de tener sentido cuando el caso está resuelto
-- [ ] 2.5 Tests: mensaje sin teléfono con BSUID, mensaje con ambos, mensaje con teléfono y sin BSUID (instalación vieja)
+- [x] 2.1 Extraer del sobre de WhatsApp el BSUID (`contacts[].user_id`) y el nombre de usuario (`contacts[].profile.username`)
+- [x] 2.2 Armar `sender.externalId` en cascada: teléfono normalizado si lo hay, BSUID si no
+- [x] 2.3 Pasar el BSUID por separado, además del `externalId`, para poder vincularlo aunque la identidad haya salido del teléfono
+- [x] 2.4 Quitar el guardia de diagnóstico que hoy vuelca el sobre: deja de tener sentido cuando el caso está resuelto
+- [x] 2.5 Tests: mensaje sin teléfono con BSUID, mensaje con ambos, mensaje con teléfono y sin BSUID (instalación vieja)
 
 ## 3. Resolver el contacto sin duplicarlo ni fusionarlo
 
-- [ ] 3.1 En `resolveContactByChannel`, buscar por el BSUID cuando la identidad exacta del mensaje no encuentra nada
-- [ ] 3.2 Condicionar el respaldo difuso por teléfono a que el `externalId` SEA un teléfono — hoy corre siempre en WhatsApp
-- [ ] 3.3 Vincular el BSUID como identidad adicional en todos los mensajes que lo traigan, también cuando el contacto se resolvió por teléfono
-- [ ] 3.4 Corregir la creación del contacto: `phone` se puebla solo si el `externalId` es un teléfono, no por ser WhatsApp
-- [ ] 3.5 Guardar y refrescar el nombre de usuario junto al nombre de perfil
-- [ ] 3.6 Tests de los dos sentidos del cambio de identificación: conocido que deja de traer teléfono, y creado por BSUID que empieza a traerlo
-- [ ] 3.7 Test de que dos BSUID distintos son dos contactos, y de que un BSUID no coincide con un teléfono por sus dígitos
+- [x] 3.1 En `resolveContactByChannel`, buscar por el BSUID cuando la identidad exacta del mensaje no encuentra nada
+- [x] 3.2 Condicionar el respaldo difuso por teléfono a que el `externalId` SEA un teléfono — hoy corre siempre en WhatsApp
+- [x] 3.3 Vincular el BSUID como identidad adicional en todos los mensajes que lo traigan, también cuando el contacto se resolvió por teléfono
+- [x] 3.4 Corregir la creación del contacto: `phone` se puebla solo si el `externalId` es un teléfono, no por ser WhatsApp
+- [ ] 3.5 Guardar y refrescar el nombre de usuario junto al nombre de perfil — **BLOQUEADA**: `contacts` no tiene columna para eso ni campos libres, así que guardarlo pide una migración que el diseño descartó. Decisión pendiente
+- [x] 3.6 Tests de los dos sentidos del cambio de identificación: conocido que deja de traer teléfono, y creado por BSUID que empieza a traerlo
+- [x] 3.7 Test de que dos BSUID distintos son dos contactos, y de que un BSUID no coincide con un teléfono por sus dígitos
 
 ## 4. Responder a un contacto sin teléfono
 
@@ -44,5 +44,5 @@
 - [ ] 6.1 Suite completa y `tsc --noEmit`
 - [ ] 6.2 Entrada en `CHANGELOG.md`
 - [ ] 6.3 Resolver las preguntas abiertas de `design.md` o dejar anotado lo que se decidió
-- [ ] 6.4 Verificar de punta a punta con el caso real: que el mensaje entre Y que la respuesta llegue
+- [ ] 6.4 Verificar de punta a punta con el caso real (`CO.4481978948757066`, autorizado por el usuario): que el mensaje entre Y que la respuesta llegue
 - [ ] 6.5 Revisar si quedaron contactos duplicados por este motivo y decidir qué hacer con ellos — está fuera del alcance, pero no debería descubrirse solo

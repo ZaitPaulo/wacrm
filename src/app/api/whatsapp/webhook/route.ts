@@ -115,6 +115,33 @@ interface MetaWebhookBody {
 /** Los valores de `object` que sabemos procesar hoy. */
 const WHATSAPP_OBJECT = 'whatsapp_business_account';
 
+/**
+ * Quién escribió, según el sobre de Meta.
+ *
+ * `wa_id` (el teléfono) es OPCIONAL desde que existen los nombres de
+ * usuario de WhatsApp: cuando alguien adopta uno, Meta deja de
+ * entregarle el número al negocio y manda en su lugar `user_id`, un
+ * identificador con alcance de negocio (BSUID) con la forma
+ * `CO.4481978948757066`.
+ *
+ * Ocurre cuando se cumplen a la vez que la persona tiene nombre de
+ * usuario, no interactuó en 30 días, no está en la libreta del negocio,
+ * y el negocio no le escribió recientemente — es decir, con PROSPECTOS
+ * NUEVOS, que es justamente a quien menos se puede perder. Hasta que se
+ * contempló este caso, esos mensajes se descartaban en silencio.
+ *
+ * `user_id` viene en TODOS los mensajes entrantes, tenga la persona
+ * nombre de usuario o no, y eso es lo que permite reconocerla cuando
+ * cambia de forma de identificarse.
+ *
+ * https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/
+ */
+interface WhatsAppContact {
+  profile: { name: string; username?: string };
+  wa_id?: string;
+  user_id?: string;
+}
+
 interface WhatsAppWebhookEntry {
   id: string;
   changes: Array<{
@@ -124,10 +151,23 @@ interface WhatsAppWebhookEntry {
         display_phone_number: string;
         phone_number_id: string;
       };
-      contacts?: Array<{
-        profile: { name: string };
-        wa_id: string;
-      }>;
+      /**
+       * Quién escribió.
+       *
+       * `wa_id` (el teléfono) es OPCIONAL desde que existen los nombres
+       * de usuario de WhatsApp: cuando alguien adopta uno, Meta deja de
+       * entregarle el número al negocio y manda en su lugar `user_id`,
+       * un identificador con alcance de negocio (BSUID) con la forma
+       * `CO.4481978948757066`. Ocurre cuando se cumplen a la vez que la
+       * persona tiene nombre de usuario, no interactuó en 30 días, no
+       * está en la libreta del negocio, y el negocio no le escribió
+       * recientemente — es decir, con prospectos nuevos.
+       *
+       * `user_id` viene en TODOS los mensajes entrantes, tenga la
+       * persona nombre de usuario o no, y eso es lo que permite
+       * reconocerla cuando cambia de forma de identificarse.
+       */
+      contacts?: WhatsAppContact[];
       messages?: WhatsAppMessage[];
       statuses?: Array<{
         id: string;
@@ -648,7 +688,7 @@ async function handleStatusUpdate(status: {
  */
 async function persistMessage(
   message: WhatsAppMessage,
-  contact: { profile: { name: string }; wa_id: string },
+  contact: WhatsAppContact,
   // Tenancy. Resolved from the matched whatsapp_config row.
   accountId: string,
   // Sender-of-record for inserts that need a NOT NULL user_id FK.
@@ -658,32 +698,29 @@ async function persistMessage(
   // pudo guardar y por lo tanto exige reentrega.
   batch: InboundBatch
 ) {
+  // La identidad se resuelve EN CASCADA: el teléfono cuando lo hay, y
+  // el BSUID cuando Meta no lo entrega.
+  //
+  // El teléfono conserva la prioridad a propósito. Es la forma con la
+  // que la 513 pobló `contact_channels` en todas las instalaciones que
+  // funcionan; invertir el orden obligaría a repoblar la identidad de
+  // cada contacto existente, y equivocarse ahí parte historiales. La
+  // garantía de reconocer a la misma persona cuando cambia de forma de
+  // identificarse no sale de acá, sino de vincular SIEMPRE el BSUID
+  // (`alsoKnownAs`, abajo).
+  const phone = normalizePhone(message.from ?? contact.wa_id ?? '');
+  const bsuid = contact.user_id || null;
+
   const sender: InboundSender = {
     channel: 'whatsapp',
-    // La identidad de WhatsApp es el número normalizado, que es la
-    // misma forma con la que la 513 pobló `contact_channels`.
-    externalId: normalizePhone(message.from),
+    externalId: phone || bsuid || '',
     name: contact.profile.name || null,
+    // Se manda SIEMPRE que Meta lo informe, también cuando la identidad
+    // salió del teléfono: es lo que evita que la persona se duplique el
+    // día que active la privacidad del número.
+    alsoKnownAs: bsuid && bsuid !== phone ? bsuid : null,
+    username: contact.profile.username || null,
   };
-
-  // DIAGNÓSTICO — no hay contacto que resolver y el mensaje se va a
-  // descartar. Pasa con remitentes cuya identidad NO es un teléfono
-  // (vistos en producción como `CO.4481978948757066` dentro del wamid),
-  // y hasta hoy ocurría en silencio: no quedaba ni la fila ni el log,
-  // así que los mensajes de esas personas desaparecían sin que nadie
-  // pudiera enterarse. Se vuelca el sobre completo para poder darle a
-  // la identidad el tratamiento que corresponda en vez de adivinarlo.
-  if (!sender.externalId) {
-    console.error(
-      '[webhook] remitente sin teléfono utilizable — sobre completo:',
-      JSON.stringify({
-        from: message.from,
-        type: message.type,
-        id: message.id,
-        contact,
-      })
-    );
-  }
 
   const common = {
     db: supabaseAdmin(),

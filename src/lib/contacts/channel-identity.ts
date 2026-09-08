@@ -107,6 +107,27 @@ export interface ResolveContactArgs {
   externalId: string;
   /** Nombre que informa la plataforma, cuando informa alguno. */
   name?: string | null;
+  /**
+   * Otra identidad de la misma persona en el mismo canal — el BSUID de
+   * WhatsApp. Se busca por ella si `externalId` no encuentra nada, y se
+   * vincula siempre. Ver `resolveContactByChannel`.
+   */
+  alsoKnownAs?: string | null;
+}
+
+/**
+ * ¿Este identificador es un teléfono?
+ *
+ * Un BSUID de WhatsApp tiene la forma `CO.4481978948757066` — código de
+ * país, punto, y hasta 128 alfanuméricos. La distinción importa porque
+ * las reglas de teléfonos (normalizar a dígitos, comparar por los
+ * últimos ocho, probar variantes de prefijo troncal) existen para
+ * números escritos por personas. Aplicarlas a un identificador opaco
+ * puede llegar a hacer coincidir a dos personas que no tienen nada que
+ * ver.
+ */
+export function isPhoneIdentity(externalId: string): boolean {
+  return /^\d+$/.test(externalId);
 }
 
 /**
@@ -132,8 +153,17 @@ export async function resolveContactByChannel(
   args: ResolveContactArgs
 ): Promise<ResolvedContact | null> {
   const { db, accountId, auditUserId, channel, externalId, name } = args;
+  const alsoKnownAs = args.alsoKnownAs || null;
 
   if (!externalId) return null;
+
+  /** Deja registradas TODAS las identidades que la plataforma informó. */
+  const linkAll = async (contactId: string) => {
+    await linkChannelIdentity(db, accountId, contactId, channel, externalId);
+    if (alsoKnownAs && alsoKnownAs !== externalId) {
+      await linkChannelIdentity(db, accountId, contactId, channel, alsoKnownAs);
+    }
+  };
 
   // 1. Identidad exacta.
   const byIdentity = await findContactByIdentity(
@@ -143,28 +173,60 @@ export async function resolveContactByChannel(
     externalId
   );
   if (byIdentity) {
+    // Vincula por si esta es la primera vez que la plataforma manda la
+    // OTRA identidad: así el día que deje de mandar esta, se resuelve
+    // igual.
+    await linkAll(byIdentity);
     await updateNameIfChanged(db, byIdentity, name);
     return { contactId: byIdentity, created: false };
   }
 
-  // 2. Respaldo por teléfono, solo para WhatsApp.
-  if (channel === 'whatsapp') {
+  // 2. La otra identidad de la misma persona.
+  //
+  // Este es el paso que evita el duplicado cuando alguien cambia de
+  // forma de identificarse, en los DOS sentidos: un contacto conocido
+  // por su teléfono que empieza a llegar solo con BSUID, y uno creado
+  // por BSUID que después trae su número. Va ANTES del respaldo difuso
+  // porque es una coincidencia exacta y no admite ambigüedad.
+  if (alsoKnownAs && alsoKnownAs !== externalId) {
+    const byAlias = await findContactByIdentity(
+      db,
+      accountId,
+      channel,
+      alsoKnownAs
+    );
+    if (byAlias) {
+      await linkAll(byAlias);
+      await updateNameIfChanged(db, byAlias, name);
+      return { contactId: byAlias, created: false };
+    }
+  }
+
+  // 3. Respaldo difuso por teléfono, solo en WhatsApp y SOLO si lo que
+  // tenemos es de verdad un teléfono. `findExistingContact` compara por
+  // los últimos dígitos para tolerar prefijos troncales; correrlo sobre
+  // un BSUID compararía los dígitos de un identificador opaco contra
+  // números de teléfono, que es como se fusiona a dos personas
+  // distintas.
+  if (channel === 'whatsapp' && isPhoneIdentity(externalId)) {
     const byPhone = await findExistingContact(db, accountId, externalId);
     if (byPhone) {
-      await linkChannelIdentity(db, accountId, byPhone.id, channel, externalId);
+      await linkAll(byPhone.id);
       await updateNameIfChanged(db, byPhone.id, name, byPhone.name);
       return { contactId: byPhone.id, created: false };
     }
   }
 
-  // 3. Crear. El teléfono solo se puebla en WhatsApp: en los demás
-  // canales no lo hay, y desde la 513 la columna admite NULL.
+  // 4. Crear. El teléfono se puebla solo si el identificador ES un
+  // teléfono — no por ser WhatsApp. Sin esa condición, un BSUID
+  // terminaría en la columna `phone`, donde lo verían la ficha, la
+  // exportación y el índice único de teléfonos.
   const { data: created, error } = await db
     .from('contacts')
     .insert({
       account_id: accountId,
       user_id: auditUserId,
-      phone: channel === 'whatsapp' ? externalId : null,
+      phone: isPhoneIdentity(externalId) ? externalId : null,
       name: name || externalId,
     })
     .select('id')
@@ -182,7 +244,7 @@ export async function resolveContactByChannel(
     return null;
   }
 
-  await linkChannelIdentity(db, accountId, created.id, channel, externalId);
+  await linkAll(created.id);
   return { contactId: created.id, created: true };
 }
 
@@ -201,7 +263,9 @@ async function resolveAfterRace(
   );
   if (byIdentity) return byIdentity;
 
-  if (channel === 'whatsapp') {
+  // Mismo condicionamiento que en el camino normal: la comparación
+  // difusa por dígitos solo tiene sentido sobre teléfonos.
+  if (channel === 'whatsapp' && isPhoneIdentity(externalId)) {
     const byPhone = await findExistingContact(db, accountId, externalId);
     if (byPhone) {
       await linkChannelIdentity(db, accountId, byPhone.id, channel, externalId);

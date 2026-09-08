@@ -117,8 +117,16 @@ Eso golpea a la decisión 2. Vincular el BSUID para todos sigue siendo lo correc
 
 No se encontró documentación pública del payload de ese webhook, así que la forma exacta está sin confirmar.
 
-## Open Questions
+### Decisión: `user_id_update` queda FUERA de este cambio
 
-- **¿Se incluye el manejo de `user_id_update` en este cambio?** Sin él, el requisito de no duplicar tiene un agujero conocido. Con él, hace falta la forma del payload, que no está documentada: habría que suscribirse al campo y observar uno real, o escribir un manejador defensivo que tolere una forma que todavía no vimos. **Decisión pendiente del usuario.**
+Se cubre el salto teléfono↔BSUID, que es lo que está rompiendo hoy. La regeneración del identificador exige que la persona cambie de número — algo poco frecuente, y que **hoy, con identidad por teléfono, ya produce un contacto nuevo**. No manejarlo no es una regresión: es dejar como está algo que ya estaba así.
+
+Pesó además que el payload no esté documentado: escribir el manejador a ciegas arriesga tener que rehacerlo cuando aparezca la forma real, y suscribir el campo es configuración del lado de Meta.
+
+**Limitación conocida, entonces:** si un contacto cambia de número de teléfono, su BSUID se regenera y volverá a aparecer como un contacto nuevo. Merece su propio change.
+
+Nótese que esto NO afecta al requisito de la spec sobre no duplicar: ese requisito habla del salto entre teléfono y BSUID, que sí queda cubierto.
+
+## Open Questions
 - ¿Qué muestra la interfaz hoy donde va el teléfono, y qué debería mostrar cuando no hay? Afecta la bandeja, la ficha del contacto y la lista.
 - ¿Qué pasa con la carga masiva y la exportación de contactos, que hoy giran alrededor del teléfono?

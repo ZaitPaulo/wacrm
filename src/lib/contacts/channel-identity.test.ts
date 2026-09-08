@@ -367,3 +367,191 @@ describe('el mismo identificador en dos cuentas', () => {
     expect(rec.insertedContacts[0].account_id).toBe('acct-2');
   });
 });
+
+// ============================================================
+// Identidad por BSUID (openspec/changes/identidad-bsuid-whatsapp).
+//
+// WhatsApp dejó de entregar el teléfono de quien adopta un nombre de
+// usuario: manda un identificador con alcance de negocio con la forma
+// `CO.4481978948757066`. Hasta que se contempló, esos mensajes se
+// descartaban en silencio.
+// ============================================================
+
+const BSUID = 'CO.4481978948757066';
+const OTRO_BSUID = 'CO.9999888877776666';
+
+describe('resolveContactByChannel — WhatsApp sin teléfono', () => {
+  it('crea el contacto con el BSUID como identidad y SIN teléfono', async () => {
+    const { db, rec } = fakeDb({ identities: new Map(), contacts: [] });
+
+    const out = await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: BSUID,
+      name: 'HumbertoR',
+    });
+
+    expect(out).toEqual({ contactId: 'nuevo-1', created: true });
+    // Lo esencial: el BSUID NO puede terminar en la columna del
+    // teléfono, donde lo verían la ficha, la exportación y el índice
+    // único de teléfonos.
+    expect(rec.insertedContacts[0]).toMatchObject({
+      phone: null,
+      name: 'HumbertoR',
+    });
+    expect(rec.linkedIdentities).toContainEqual(
+      expect.objectContaining({ channel: 'whatsapp', external_id: BSUID })
+    );
+  });
+
+  it('reconoce a la misma persona cuando vuelve a escribir', async () => {
+    const { db, rec } = fakeDb({
+      identities: new Map([[`whatsapp:${BSUID}`, 'contacto-7']]),
+      contacts: [],
+    });
+
+    const out = await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: BSUID,
+      name: 'HumbertoR',
+    });
+
+    expect(out).toEqual({ contactId: 'contacto-7', created: false });
+    expect(rec.insertedContacts).toHaveLength(0);
+  });
+
+  it('NO compara un BSUID contra teléfonos por sus dígitos', async () => {
+    // El respaldo difuso compara los últimos ocho dígitos para tolerar
+    // prefijos troncales. Si corriera sobre un BSUID, estos dígitos
+    // harían coincidir a dos personas que no tienen nada que ver — y un
+    // historial fusionado no se separa solo.
+    const { db, rec } = fakeDb({
+      identities: new Map(),
+      contacts: [{ id: 'otra-persona', phone: '573248757066' }],
+    });
+
+    const out = await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: BSUID,
+      name: 'HumbertoR',
+    });
+
+    expect(out?.contactId).not.toBe('otra-persona');
+    expect(out?.created).toBe(true);
+    expect(rec.insertedContacts[0]).toMatchObject({ phone: null });
+  });
+
+  it('dos BSUID distintos son dos contactos', async () => {
+    const { db } = fakeDb({
+      identities: new Map([[`whatsapp:${BSUID}`, 'contacto-7']]),
+      contacts: [],
+    });
+
+    const out = await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: OTRO_BSUID,
+      name: 'Otra',
+    });
+
+    expect(out?.contactId).not.toBe('contacto-7');
+    expect(out?.created).toBe(true);
+  });
+});
+
+describe('resolveContactByChannel — la persona no se duplica al cambiar de identificación', () => {
+  it('vincula el BSUID aunque la identidad haya salido del teléfono', async () => {
+    // Meta manda el BSUID en TODOS los mensajes entrantes. Registrarlo
+    // desde ya es lo único que evita el duplicado del día que esa
+    // persona active la privacidad del número.
+    const { db, rec } = fakeDb({
+      identities: new Map([['whatsapp:573166220262', 'contacto-3']]),
+      contacts: [],
+    });
+
+    await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: '573166220262',
+      alsoKnownAs: BSUID,
+      name: 'Zait',
+    });
+
+    expect(rec.linkedIdentities).toContainEqual(
+      expect.objectContaining({ external_id: BSUID, contact_id: 'contacto-3' })
+    );
+  });
+
+  it('un conocido que deja de traer teléfono entra en su mismo contacto', async () => {
+    const { db, rec } = fakeDb({
+      identities: new Map([[`whatsapp:${BSUID}`, 'contacto-3']]),
+      contacts: [],
+    });
+
+    const out = await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: BSUID,
+      alsoKnownAs: BSUID,
+      name: 'Zait',
+    });
+
+    expect(out).toEqual({ contactId: 'contacto-3', created: false });
+    expect(rec.insertedContacts).toHaveLength(0);
+  });
+
+  it('uno creado por BSUID que empieza a traer teléfono NO se duplica', async () => {
+    // El sentido contrario: la identidad de este mensaje es el
+    // teléfono, que no conocemos, pero el BSUID sí lo conocemos.
+    const { db, rec } = fakeDb({
+      identities: new Map([[`whatsapp:${BSUID}`, 'contacto-3']]),
+      contacts: [],
+    });
+
+    const out = await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: '573166220262',
+      alsoKnownAs: BSUID,
+      name: 'Zait',
+    });
+
+    expect(out).toEqual({ contactId: 'contacto-3', created: false });
+    expect(rec.insertedContacts).toHaveLength(0);
+    // Y de paso queda registrado el teléfono como identidad suya.
+    expect(rec.linkedIdentities).toContainEqual(
+      expect.objectContaining({
+        external_id: '573166220262',
+        contact_id: 'contacto-3',
+      })
+    );
+  });
+
+  it('sin BSUID se comporta exactamente como antes', async () => {
+    // Una instalación cuyo Meta todavía no manda `user_id`.
+    const { db, rec } = fakeDb({
+      identities: new Map(),
+      contacts: [{ id: 'contacto-5', phone: '573166220262' }],
+    });
+
+    const out = await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: '573166220262',
+      name: 'Zait',
+    });
+
+    expect(out).toEqual({ contactId: 'contacto-5', created: false });
+    expect(rec.insertedContacts).toHaveLength(0);
+  });
+});
