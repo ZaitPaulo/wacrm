@@ -256,6 +256,8 @@ export async function dispatchInboundToAiReply(
 
         if (reply) {
           await engineSendText({
+      // La IA y el handoff solo hablan porque el cliente escribio.
+      initiative: 'reply',
             accountId,
             userId: configOwnerUserId,
             conversationId,
@@ -307,6 +309,8 @@ export async function dispatchInboundToAiReply(
     }
 
     await engineSendText({
+      // La IA y el handoff solo hablan porque el cliente escribio.
+      initiative: 'reply',
       accountId,
       userId: configOwnerUserId,
       conversationId,

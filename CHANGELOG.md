@@ -11,6 +11,34 @@ and polish.
 
 ## [Unreleased]
 
+### El sistema ya no le escribe a nadie fuera de horario
+
+> **Migración requerida:** aplica `523_business_hours.sql`. Llega
+> **apagado**: una instalación que no lo configure se comporta igual
+> que antes.
+
+- La regla es una sola: **responder a quien escribió se puede siempre;
+  escribir por iniciativa propia, solo en horario.** Un cliente que
+  manda un mensaje a las 11 de la noche recibe respuesta — para eso
+  escribió. Lo que ya no puede pasar es que un seguimiento programado
+  despierte a alguien a las 3 de la mañana.
+- El horario se configura **por día de la semana**, y un día puede
+  estar cerrado entero. Una franja única no habría podido expresar
+  «domingo cerrado», y un seguimiento habría salido el domingo a
+  mediodía como si fuera un martes.
+- Lo que cae fuera de horario **no se descarta: se aplaza** hasta la
+  próxima apertura, conservando el paso siguiente de la automatización,
+  su contexto y su rama. Un seguimiento que vencía a las 3 a. m. sale a
+  las 8.
+- El freno vive en el **único punto por el que pasan todos los envíos**,
+  no en cada automatización. No depende de acordarse de poner una
+  condición.
+- **Un asesor puede escribir a cualquier hora.** El freno es para lo
+  automático; si una persona decide escribir de noche, es su decisión.
+- Si no se puede leer la configuración del horario, **se deja pasar**.
+  Quedarse callado por un fallo de base convertiría un problema técnico
+  en clientes sin respuesta, que es peor y más difícil de notar.
+
 ### Las difusiones alcanzan a los clientes que no dan su número
 
 - Un contacto sin teléfono —quien escribe con su nombre de usuario de

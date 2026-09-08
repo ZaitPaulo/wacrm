@@ -13,7 +13,10 @@ import {
   resolveTemplateRow,
   templateContentText,
 } from '@/lib/whatsapp/template-body'
-import { resolveOutboundTarget } from '@/lib/outbound/gate'
+import {
+  resolveOutboundTarget,
+  type Initiative,
+} from '@/lib/outbound/gate'
 import { supabaseAdmin } from './admin-client'
 
 // ------------------------------------------------------------
@@ -27,7 +30,17 @@ import { supabaseAdmin } from './admin-client'
 // converge in a later refactor.
 // ------------------------------------------------------------
 
-interface SendTextArgs {
+/**
+ * Comun a los tres envios: si esto responde al cliente o si el sistema
+ * arranco por su cuenta. Lo decide el disparador de la automatizacion
+ * (`iniciativaDe`) y viaja intacto hasta la puerta de salida, que es
+ * quien aplica el horario de atencion.
+ */
+interface ConIniciativa {
+  initiative: Initiative
+}
+
+interface SendTextArgs extends ConIniciativa {
   /** Account-level tenancy key. Drives contact + whatsapp_config
    *  lookups so an automation authored by user A still sends through
    *  the WhatsApp number user B saved on the same account. */
@@ -41,7 +54,7 @@ interface SendTextArgs {
   text: string
 }
 
-interface SendTemplateArgs {
+interface SendTemplateArgs extends ConIniciativa {
   accountId: string
   userId: string
   conversationId: string
@@ -61,7 +74,7 @@ export async function engineSendTemplate(
   return sendViaMeta({ ...args, kind: 'template' })
 }
 
-interface SendInteractiveArgs {
+interface SendInteractiveArgs extends ConIniciativa {
   accountId: string
   userId: string
   conversationId: string
@@ -84,7 +97,13 @@ export async function engineSendInteractive(
   args: SendInteractiveArgs,
 ): Promise<{ whatsapp_message_id: string }> {
   const { payload, accountId, userId, conversationId, contactId } = args
-  const common = { accountId, userId, conversationId, contactId }
+  const common = {
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    initiative: args.initiative,
+  }
   if (payload.kind === 'buttons') {
     return engineSendInteractiveButtons({
       ...common,
@@ -123,7 +142,11 @@ async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: str
     db,
     input.accountId,
     input.conversationId,
-    { senderKind: 'automated', isTemplate: input.kind === 'template' },
+    {
+      senderKind: 'automated',
+      initiative: input.initiative,
+      isTemplate: input.kind === 'template',
+    },
   )
   if (!resolution.ok) {
     if (resolution.reason === 'channel_unsupported') {

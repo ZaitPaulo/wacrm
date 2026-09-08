@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { isSendableChannel, resolveOutboundTarget } from './gate';
@@ -18,6 +18,11 @@ interface FakeRows {
   identities?: { external_id: string }[] | null;
   /** Último mensaje del cliente. Por defecto, recién llegado. */
   lastInbound?: { created_at: string } | null;
+  /** Horario de atención de la cuenta. Por defecto, apagado. */
+  account?: {
+    quiet_hours_enabled: boolean;
+    business_hours: unknown;
+  } | null;
 }
 
 /**
@@ -55,6 +60,15 @@ function fakeDb(rows: FakeRows) {
           if (table === 'contacts') {
             return { data: rows.contact ?? null, error: null };
           }
+          if (table === 'accounts') {
+            return {
+              data: rows.account ?? {
+                quiet_hours_enabled: false,
+                business_hours: {},
+              },
+              error: null,
+            };
+          }
           return { data: null, error: null };
         },
       };
@@ -84,6 +98,7 @@ describe('resolveOutboundTarget — el canal sale de la conversación', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out.ok).toBe(true);
@@ -104,7 +119,7 @@ describe('resolveOutboundTarget — el canal sale de la conversación', () => {
       contact: { id: 'ct-1', phone: '+15551234567' },
     });
 
-    await resolveOutboundTarget(db, 'acct-1', 'cv-1', { senderKind: 'human' });
+    await resolveOutboundTarget(db, 'acct-1', 'cv-1', { senderKind: 'human', initiative: 'reply' });
 
     expect(touched).toContain('contacts');
     expect(touched).not.toContain('contact_channels');
@@ -118,6 +133,7 @@ describe('resolveOutboundTarget — el canal sale de la conversación', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-2', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out.ok).toBe(false);
@@ -135,6 +151,7 @@ describe('resolveOutboundTarget — lo que impide enviar', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-ajena', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out).toEqual({ ok: false, reason: 'conversation_not_found' });
@@ -149,6 +166,7 @@ describe('resolveOutboundTarget — lo que impide enviar', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out).toEqual({ ok: false, reason: 'no_recipient' });
@@ -162,6 +180,7 @@ describe('resolveOutboundTarget — lo que impide enviar', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out).toEqual({ ok: false, reason: 'invalid_recipient' });
@@ -192,6 +211,7 @@ describe('la puerta también decide la ventana', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out.ok).toBe(false);
@@ -209,6 +229,7 @@ describe('la puerta también decide la ventana', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
       isTemplate: true,
     });
 
@@ -224,6 +245,7 @@ describe('la puerta también decide la ventana', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out.ok).toBe(false);
@@ -238,6 +260,7 @@ describe('la puerta también decide la ventana', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out.ok).toBe(true);
@@ -267,6 +290,7 @@ describe('resolveOutboundTarget — WhatsApp sin teléfono', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out.ok).toBe(true);
@@ -287,6 +311,7 @@ describe('resolveOutboundTarget — WhatsApp sin teléfono', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out.ok).toBe(true);
@@ -305,6 +330,7 @@ describe('resolveOutboundTarget — WhatsApp sin teléfono', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out.ok).toBe(true);
@@ -319,6 +345,7 @@ describe('resolveOutboundTarget — WhatsApp sin teléfono', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out.ok).toBe(true);
@@ -337,8 +364,118 @@ describe('resolveOutboundTarget — WhatsApp sin teléfono', () => {
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
       senderKind: 'human',
+      initiative: 'reply',
     });
 
     expect(out).toEqual({ ok: false, reason: 'no_recipient' });
+  });
+});
+
+// ============================================================
+// Horario de atención.
+//
+// La regla, en una línea: RESPONDER siempre; ESCRIBIR por iniciativa
+// propia, solo en horario.
+// ============================================================
+
+const HORARIO_LORAMOTORS = {
+  quiet_hours_enabled: true,
+  business_hours: {
+    sun: null,
+    mon: ['08:00', '18:00'],
+    tue: ['08:00', '18:00'],
+    wed: ['08:00', '18:00'],
+    thu: ['08:00', '18:00'],
+    fri: ['08:00', '18:00'],
+    sat: ['08:00', '14:00'],
+  },
+};
+
+describe('resolveOutboundTarget — horario de atención', () => {
+  const enHorario = () => {
+    // Martes 10:00 en el reloj del proceso.
+    vi.setSystemTime(new Date('2026-09-08T10:00:00'));
+  };
+  const deMadrugada = () => {
+    vi.setSystemTime(new Date('2026-09-09T03:00:00'));
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const puerta = (account: unknown, opts: Record<string, unknown>) =>
+    resolveOutboundTarget(
+      fakeDb({
+        conversation: CONV_WHATSAPP,
+        contact: { id: 'ct-1', phone: '+15551234567' },
+        account: account as never,
+        lastInbound: { created_at: new Date().toISOString() },
+      }).db,
+      'acct-1',
+      'cv-1',
+      opts as never,
+    );
+
+  it('DE MADRUGADA, una respuesta SÍ sale', async () => {
+    // El caso que no se puede romper. Si un cliente escribe a las 3 de
+    // la mañana es porque espera respuesta, y callarse sería peor que
+    // contestar.
+    deMadrugada();
+    const out = await puerta(HORARIO_LORAMOTORS, {
+      senderKind: 'automated',
+      initiative: 'reply',
+    });
+    expect(out.ok).toBe(true);
+  });
+
+  it('DE MADRUGADA, un envío por iniciativa propia NO sale', async () => {
+    deMadrugada();
+    const out = await puerta(HORARIO_LORAMOTORS, {
+      senderKind: 'automated',
+      initiative: 'unprompted',
+    });
+    expect(out).toEqual({ ok: false, reason: 'quiet_hours' });
+  });
+
+  it('EN HORARIO, el envío por iniciativa propia sale normal', async () => {
+    enHorario();
+    const out = await puerta(HORARIO_LORAMOTORS, {
+      senderKind: 'automated',
+      initiative: 'unprompted',
+    });
+    expect(out.ok).toBe(true);
+  });
+
+  it('una persona puede escribir a cualquier hora', async () => {
+    // El freno es para lo automático. Si un asesor decide escribir a
+    // las 3 de la mañana, es su decisión.
+    deMadrugada();
+    const out = await puerta(HORARIO_LORAMOTORS, {
+      senderKind: 'human',
+      initiative: 'unprompted',
+    });
+    expect(out.ok).toBe(true);
+  });
+
+  it('con el horario apagado no frena nada', async () => {
+    deMadrugada();
+    const out = await puerta(
+      { quiet_hours_enabled: false, business_hours: {} },
+      { senderKind: 'automated', initiative: 'unprompted' },
+    );
+    expect(out.ok).toBe(true);
+  });
+
+  it('el domingo a mediodía tampoco sale', async () => {
+    vi.setSystemTime(new Date('2026-09-13T12:00:00'));
+    const out = await puerta(HORARIO_LORAMOTORS, {
+      senderKind: 'automated',
+      initiative: 'unprompted',
+    });
+    expect(out).toEqual({ ok: false, reason: 'quiet_hours' });
   });
 });
