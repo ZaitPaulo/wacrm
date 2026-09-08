@@ -38,6 +38,37 @@ services:
     # escribe sus reglas de iptables antes en la cadena.
     ports: !reset []
 
+    # Resolvers externos explícitos. NO es una optimización: sin esto se
+    # pierden mensajes de WhatsApp en silencio.
+    #
+    # El host resuelve por el stub de systemd-resolved (127.0.0.53), que
+    # reenvía a los DNS del proveedor del VPS. Una dirección de loopback no
+    # sirve dentro de un contenedor —ahí el 127.0.0.53 es el contenedor
+    # mismo—, así que Docker no la copia: su DNS embebido (127.0.0.11) la
+    # usa como reenviador a través del netns del host. Ese salto de más,
+    # sumado a que los resolvers del proveedor responden mal de a ratos,
+    # hace que la resolución externa falle de forma intermitente. Medido en
+    # el servidor el 2026-09-08: `graph.facebook.com` devolvía `bad address`
+    # mientras resolvía sin problema desde fuera, y `supabase.loramotors.co`
+    # alternaba entre resolver y dar EAI_AGAIN / ConnectTimeoutError.
+    #
+    # Por qué eso PIERDE mensajes y no solo los retrasa: el webhook le
+    # responde 200 a Meta antes de procesar (src/app/api/whatsapp/webhook/
+    # route.ts) y hace el trabajo dentro de `after()`. Si la resolución
+    # falla ahí, Meta ya tiene su confirmación y no reintenta nunca — el
+    # mensaje no queda en ninguna parte, ni siquiera como error del que
+    # alguien pueda enterarse.
+    #
+    # Esto va en el servicio y no en /etc/docker/daemon.json a propósito:
+    # daemon.json obliga a reiniciar Docker entero, y aquí queda versionado
+    # junto al resto del despliegue en vez de vivir suelto en el servidor.
+    # El DNS embebido de Docker sigue resolviendo los nombres de
+    # contenedor (`api-gw`, `db`); esto solo cambia a quién le pregunta por
+    # los de afuera.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+
     networks:
       - default
 

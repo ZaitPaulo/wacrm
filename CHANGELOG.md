@@ -11,6 +11,30 @@ and polish.
 
 ## [Unreleased]
 
+### Se perdían mensajes entrantes de WhatsApp por el DNS del contenedor
+
+> **Solo afecta al despliegue autoalojado.** No hay migración. Requiere
+> recrear el contenedor del app para que tome la nueva configuración.
+
+- El contenedor del app no resolvía nombres externos de forma
+  confiable, y cada fallo **perdía un mensaje entrante para siempre**:
+  el webhook le responde 200 a Meta antes de procesar, así que cuando
+  la primera consulta a la base fallaba, Meta ya tenía su confirmación
+  y no reintentaba. El síntoma era que a algunos clientes se les
+  respondía y a otros no, sin ningún patrón visible ni error a la
+  vista.
+- La causa: el host resuelve por el stub de systemd-resolved
+  (`127.0.0.53`). Una dirección de loopback no sirve dentro de un
+  contenedor, así que Docker no la copia y su DNS embebido la usa como
+  reenviador a través del netns del host. Ese salto de más, con
+  resolvers de proveedor que responden mal de a ratos, hacía fallar la
+  resolución de forma intermitente.
+- El servicio `app` ahora declara resolvers externos explícitos
+  (`1.1.1.1`, `8.8.8.8`) en `deploy/docker-compose.app.yml`. Los
+  nombres de contenedor (`api-gw`, `db`) los sigue resolviendo el DNS
+  embebido de Docker: esto solo cambia a quién se le pregunta por los
+  nombres de afuera.
+
 ### Inventario alineado con la lista de precios del cliente
 
 > **Migraciones requeridas:** aplica `510_inventory_lora_fields.sql` y
