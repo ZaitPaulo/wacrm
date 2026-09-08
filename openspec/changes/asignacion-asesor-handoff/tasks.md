@@ -22,7 +22,7 @@
 
 ## 5. Notificación al asesor con el resumen
 
-- [x] 5.1 Migración `520_ai_handoff_notification.sql` que redefine `notify_conversation_assigned`: si `auth.uid()` es NULL y hay `ai_handoff_summary`, el cuerpo es el resumen; si no, el texto actual
+- [x] 5.1 Migración `521_ai_handoff_notification.sql` que redefine `notify_conversation_assigned`: si `auth.uid()` es NULL y hay `ai_handoff_summary`, el cuerpo es el resumen; si no, el texto actual
 - [x] 5.2 Título propio para la asignación por IA, distinguible en la campana
 
 ## 6. Cierre

@@ -1,5 +1,5 @@
 -- ============================================================
--- 520_ai_handoff_notification.sql
+-- 521_ai_handoff_notification.sql
 --
 -- La notificación de asignación dice de qué va la conversación.
 --

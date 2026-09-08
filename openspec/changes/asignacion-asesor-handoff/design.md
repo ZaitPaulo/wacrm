@@ -79,7 +79,7 @@ No hace falta que la aplicación escriba la notificación: sigue siendo trabajo 
 
 ## Migration Plan
 
-1. Migración `520_ai_handoff_notification.sql`: redefine `notify_conversation_assigned`, idempotente.
+1. Migración `521_ai_handoff_notification.sql`: redefine `notify_conversation_assigned`, idempotente. El 520 lo ocupó `restrict_inbox_by_assignment`, que entró en paralelo; el script de despliegue deriva la versión del prefijo numérico (`${base%%_*}`) y habría saltado en silencio una segunda 520.
 2. Desplegar el código.
 3. Vaciar `ai_configs.handoff_agent_id` para activar el reparto.
 4. Rollback: revertir el despliegue y, si hace falta, volver a configurar el asesor fijo desde Ajustes. La migración anterior de la función se restaura reaplicando la 027.
