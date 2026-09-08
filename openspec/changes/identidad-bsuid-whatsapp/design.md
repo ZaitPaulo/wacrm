@@ -86,7 +86,7 @@ La condición pasa a ser si el `externalId` **es** un teléfono, no si el canal 
 
 - **Fusionar personas distintas por un error en la resolución** → Es el riesgo más caro del cambio, y el más difícil de deshacer: un historial mezclado no se separa solo. La mitigación es que toda la resolución nueva es por coincidencia **exacta** de identificador, y que la difusa queda explícitamente prohibida para lo que no es teléfono.
 - **Duplicar a alguien que ya existe** → Menos grave y reversible con `contact_identity_links`. Aparece si el paso 2 de la decisión 3 falla o si el BSUID no se vinculó cuando debía.
-- **Que el envío por `recipient` no funcione como dice la documentación** → Establecido por contraste de errores contra la API real, pero NO por un envío exitoso a un BSUID de verdad. Sigue pendiente de la verificación de punta a punta (tarea 6.4); si Meta lo rechazara, la mitad del envío cambia de forma.
+- ~~Que el envío por `recipient` no funcione como dice la documentación~~ → **Descartado.** Verificado en producción con un BSUID real: Meta aceptó el envío y devolvió wamid.
 - **Varias filas por contacto en `contact_channels`** → Cualquier lectura que asuma "una identidad por canal por contacto" empieza a devolver dos. Hay que buscar esas lecturas, no suponer que no existen.
 - **El nombre de usuario puede cambiar** → No es una llave y no se usa como tal; es solo para mostrar. Se refresca en cada mensaje, igual que el nombre de perfil.
 
@@ -146,4 +146,4 @@ No sirve reusar el nombre de perfil que ya guardamos: ese lo elige cada quien y 
 ## Open Questions
 - ~~¿Qué muestra la interfaz donde va el teléfono?~~ **Resuelto.** La lista y la bandeja no se rompían: usan `contact.name || contact.phone`, y el nombre de perfil siempre llega. Lo que se cambió es la fila del teléfono en la barra lateral, que quedaba en blanco: ahora dice «Sin teléfono», muestra el `@usuario` y explica por qué no hay número. Un hueco se lee como un dato por completar, y manda a alguien a buscar algo que no existe.
 - ¿Qué pasa con la carga masiva y la exportación de contactos? **Sin abordar.** Ninguna se rompe —un contacto sin teléfono sale con la celda vacía—, pero no hay forma de cargar uno por su identificador ni la exportación dice cuál es.
-- **Verificación pendiente contra la API real.** Que Meta acepta `recipient` está establecido por contraste de errores, no por un envío exitoso a un BSUID de verdad. La tarea 6.4 lo cubre y requiere desplegar.
+- ~~Verificación pendiente contra la API real.~~ **Resuelto en producción el 2026-09-08.** El envío por `recipient` a un BSUID real fue aceptado: las respuestas del bot volvieron con wamid de Meta. Ya no queda ningún supuesto del cambio sin comprobar.

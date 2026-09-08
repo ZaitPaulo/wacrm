@@ -44,5 +44,5 @@
 - [x] 6.1 Suite completa y `tsc --noEmit`
 - [x] 6.2 Entrada en `CHANGELOG.md`
 - [x] 6.3 Resolver las preguntas abiertas de `design.md` o dejar anotado lo que se decidió
-- [ ] 6.4 Verificar de punta a punta con el caso real (`CO.4481978948757066`, autorizado por el usuario): que el mensaje entre Y que la respuesta llegue
+- [x] 6.4 Verificado de punta a punta en producción el 2026-09-08 21:19 UTC con `CO.4481978948757066`: entró el mensaje, se creó el contacto sin teléfono con su `username`, y el bot **respondió** — los mensajes salientes traen wamid real de Meta, así que el envío por `recipient` quedó confirmado contra la API
 - [x] 6.5 Revisar si quedaron contactos duplicados por este motivo — **ninguno**: producción tiene 6 contactos, todos con identidad por teléfono y ninguno sin número. Estos contactos nunca llegaron a crearse, así que se arranca en limpio
