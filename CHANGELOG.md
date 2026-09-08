@@ -35,6 +35,32 @@ and polish.
   embebido de Docker: esto solo cambia a quién se le pregunta por los
   nombres de afuera.
 
+### Un mensaje entrante ya no se pierde cuando falla el procesamiento
+
+> Sin migración. Cambia el **contrato con Meta**: un fallo al guardar
+> ahora se responde con `500` para que Meta reentregue, en vez de
+> confirmarse como si el mensaje hubiera entrado.
+
+- El webhook respondía `200` y procesaba después. Cuando ese trabajo
+  fallaba —la base inalcanzable, el DNS caído— el mensaje desaparecía
+  sin dejar rastro: Meta ya lo daba por entregado y no reintenta lo que
+  confirmamos. No quedaba ni el contacto, ni la conversación, ni un
+  error que alguien pudiera ver.
+- Ahora la recepción va en dos fases. **Se guarda antes de confirmar**:
+  contacto, conversación y mensaje, que es solo base y es rápido. La
+  difusión —flujos, automatizaciones, IA y webhooks públicos— sigue
+  corriendo después de la respuesta, porque es lenta y habla con
+  terceros, y su fallo ya no puede costar el mensaje.
+- Reintentar es seguro: el índice único `(conversation_id, message_id)`
+  hace que una reentrega se reconozca como repetición, así que no
+  duplica la bandeja ni le vuelve a hablar al cliente.
+- Un fallo **permanente** —un número que no está configurado, o que
+  está dos veces— se sigue confirmando con `200`. Reintentarlo daría lo
+  mismo y solo llenaría de ruido el panel de entregas de Meta.
+- La verificación de fotos y documentos contra Meta gana un tiempo
+  límite: si no responde, el mensaje se guarda igual con su texto. Antes
+  podía retener la respuesta.
+
 ### El servidor le habla a Supabase por la red interna
 
 > **Solo afecta al despliegue autoalojado.** No hay migración. Requiere

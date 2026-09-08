@@ -3,7 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
 import { getMediaUrl } from '@/lib/whatsapp/meta-api';
 import { normalizePhone } from '@/lib/whatsapp/phone-utils';
-import { processInboundMessage, type InboundSender } from '@/lib/inbound/core';
+import {
+  persistInbound,
+  fanOutInbound,
+  type InboundSender,
+  type InboundFanout,
+  type InboundOutcome,
+} from '@/lib/inbound/core';
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature';
 import { serverSupabaseUrl } from '@/lib/supabase/server-url';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
@@ -12,10 +18,13 @@ import {
   isTemplateWebhookField,
 } from '@/lib/whatsapp/template-webhook';
 
-// The `after()` callback in POST runs within this route's max duration.
-// Inbound processing can fan out to per-media Meta verification calls, so
-// give it headroom beyond the platform default (Vercel clamps this to the
-// plan's ceiling). Tune as needed.
+// Cubre las DOS fases: lo que se guarda dentro de la petición y lo que
+// se difunde después, en el `after()`. La holgura sigue haciendo falta
+// por la difusión, que es la parte lenta —flujos, automatizaciones, IA,
+// webhooks de terceros—; la persistencia es solo base y no mueve la
+// aguja. La verificación de medios, que antes era la razón principal de
+// pedir margen, ahora tiene su propio tiempo límite y no puede estirar
+// la respuesta (ver MEDIA_VERIFY_TIMEOUT_MS).
 export const maxDuration = 60;
 
 // Lazy-initialized to avoid build-time crash when env vars are missing
@@ -235,49 +244,123 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  // Process AFTER the response so we ack Meta within their ~20s timeout
-  // (a slow ack triggers Meta retries + duplicate inserts), while still
-  // guaranteeing the work runs to completion.
+  // La recepción va en dos fases, y el corte no es cosmético.
   //
-  // This MUST use `after()` rather than a detached `processWebhook(body)`
-  // promise: on serverless platforms (we run on Vercel) the function can
-  // be frozen or terminated the moment the response is sent, so a floating
-  // promise's DB writes are not guaranteed to finish. That dropped a
-  // non-deterministic *subset* of inbound messages — contacts/conversations
-  // were created but the message insert never landed, leaving conversations
-  // that show in the inbox with an empty thread, and no logs to explain it
-  // (see issue #301). `after()` hands the callback to the runtime, which
-  // keeps the function alive until it resolves (within the route's
-  // maxDuration).
-  after(async () => {
-    try {
-      await processWebhook(body);
-    } catch (error) {
-      console.error('Error processing webhook:', error);
-    }
-  });
+  // PRIMERO se guarda, y solo entonces se confirma. Antes se respondía
+  // 200 y se procesaba todo dentro de `after()`; cuando ese trabajo
+  // fallaba —el DNS del contenedor cayéndose de a ratos, el 2026-09-08—
+  // el mensaje se perdía para siempre, porque Meta ya tenía su
+  // confirmación y no reintenta lo que dio por entregado. No quedaba ni
+  // la fila ni forma de enterarse.
+  //
+  // DESPUÉS se difunde. Lo lento y lo que habla con terceros —flujos,
+  // automatizaciones, IA, webhooks públicos— sigue en `after()`, y por
+  // la misma razón de siempre: sostener la respuesta mientras corre se
+  // sale de la ventana de Meta y provoca reentregas por timeout.
+  //
+  // `after()` y no una promesa suelta: en serverless el proceso puede
+  // congelarse apenas sale la respuesta, y las escrituras de una promesa
+  // flotante no llegaban a completarse (issue #301). `after()` le entrega
+  // la promesa al runtime, que mantiene viva la función hasta que
+  // resuelve, dentro del `maxDuration` de la ruta.
+  let batch: InboundBatch;
+  try {
+    batch = await persistWebhook(body);
+  } catch (error) {
+    // Una excepción acá no se sabe si dejó algo a medias: se pide
+    // reentrega, que la idempotencia hace segura.
+    console.error('[webhook] error inesperado persistiendo el lote:', error);
+    return NextResponse.json({ error: 'Persist failed' }, { status: 500 });
+  }
+
+  // La difusión se agenda incluso cuando el lote va a responder 500: lo
+  // que SÍ se guardó merece su respuesta automática, y la reentrega de
+  // Meta reconocerá esas filas como replay sin volver a difundirlas.
+  if (batch.fanouts.length > 0) {
+    after(async () => {
+      for (const ctx of batch.fanouts) {
+        try {
+          await fanOutInbound(ctx);
+        } catch (error) {
+          // Nunca cambia la respuesta, que además ya salió. Un reintento
+          // por esto no arreglaría nada: el mensaje volvería, se
+          // reconocería como replay y la difusión no correría igual.
+          console.error('[webhook] error difundiendo un entrante:', error);
+        }
+      }
+    });
+  }
+
+  if (batch.transientFailures.length > 0) {
+    console.error(
+      `[webhook] ${batch.transientFailures.length} entrante(s) sin guardar, se pide reentrega:`,
+      batch.transientFailures.join('; ')
+    );
+    return NextResponse.json({ error: 'Persist failed' }, { status: 500 });
+  }
 
   return NextResponse.json({ status: 'received' }, { status: 200 });
 }
 
 /**
- * Enruta el cuerpo entrante al manejador de su canal.
+ * Lo que la fase de persistencia deja listo para el resto de la petición.
  *
- * Un `object` que no reconocemos se REGISTRA Y SE DESCARTA, nunca lanza.
- * La respuesta ya salió con 200 antes de llegar acá, así que Meta no
- * reintenta; pero dejar que un evento inesperado propague una excepción
- * abortaría el resto del lote y llenaría los logs sin que nadie sepa qué
- * llegó.
+ * `transientFailures` no vacío significa que hay que responder no-200 y
+ * que Meta reentregue el lote ENTERO. Es seguro: lo que ya se guardó se
+ * reconoce como replay en la reentrega y no se duplica ni se vuelve a
+ * difundir. Perder solo el mensaje que falló, que es lo que pasaba antes,
+ * es justamente el agujero que esto cierra.
  */
-async function processWebhook(body: MetaWebhookBody) {
+interface InboundBatch {
+  fanouts: InboundFanout[];
+  transientFailures: string[];
+}
+
+/**
+ * Cuánto se espera a que Meta confirme un medio antes de seguir sin él.
+ *
+ * Valor conservador, no medido: se eligió holgado para no descartar
+ * medios que hoy verifican bien, y su único trabajo es impedir que una
+ * llamada colgada retenga la confirmación a Meta. Si alguna vez se mide
+ * el caso normal, este número puede bajar.
+ */
+const MEDIA_VERIFY_TIMEOUT_MS = 5000;
+
+/** Rechaza si la promesa no resuelve a tiempo. El temporizador se limpia. */
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label}: se agotaron ${ms}ms`)),
+      ms
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() =>
+    clearTimeout(timer)
+  ) as Promise<T>;
+}
+
+/**
+ * Enruta el cuerpo entrante al manejador de su canal y devuelve lo que
+ * la persistencia dejó lista.
+ *
+ * Un `object` que no reconocemos se REGISTRA Y SE DESCARTA, nunca lanza,
+ * y NO pide reentrega: es un fallo permanente, y reintentarlo daría lo
+ * mismo hasta que Meta se rinda, llenando su panel de entregas fallidas
+ * con ruido que taparía los fallos que sí importan.
+ */
+async function persistWebhook(body: MetaWebhookBody): Promise<InboundBatch> {
   // Sin `object` se asume WhatsApp: es lo que mandaban las
   // instalaciones existentes antes de que este enrutador existiera, y
   // ninguna debe dejar de funcionar por un campo que no mirábamos.
   const object = body.object ?? WHATSAPP_OBJECT;
 
   if (object === WHATSAPP_OBJECT) {
-    await processWhatsAppWebhook(body);
-    return;
+    return persistWhatsAppWebhook(body);
   }
 
   // Instagram y Messenger todavía no tienen manejador — llegan en
@@ -286,12 +369,14 @@ async function processWebhook(body: MetaWebhookBody) {
   console.info(
     `[webhook] evento de '${object}' recibido y descartado: todavía no hay manejador para ese canal`
   );
+  return { fanouts: [], transientFailures: [] };
 }
 
-async function processWhatsAppWebhook(body: {
+async function persistWhatsAppWebhook(body: {
   entry?: WhatsAppWebhookEntry[];
-}) {
-  if (!body.entry) return;
+}): Promise<InboundBatch> {
+  const batch: InboundBatch = { fanouts: [], transientFailures: [] };
+  if (!body.entry) return batch;
 
   for (const entry of body.entry) {
     for (const change of entry.changes ?? []) {
@@ -300,17 +385,26 @@ async function processWhatsAppWebhook(body: {
       // esto, una excepción a mitad del recorrido descartaba en
       // silencio todos los mensajes que venían después en el mismo
       // lote.
+      //
+      // Lo que SÍ cambió es qué se hace con ese fallo: ya no se traga.
+      // Se sigue procesando el resto del lote y al final se pide
+      // reentrega del lote entero, que la idempotencia hace segura.
       try {
-        await processWhatsAppChange(change);
+        await persistWhatsAppChange(change, batch);
       } catch (error) {
         console.error('[webhook] error procesando un evento del lote:', error);
+        batch.transientFailures.push(
+          `evento del lote: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
   }
+  return batch;
 }
 
-async function processWhatsAppChange(
-  change: WhatsAppWebhookEntry['changes'][number]
+async function persistWhatsAppChange(
+  change: WhatsAppWebhookEntry['changes'][number],
+  batch: InboundBatch
 ) {
   // Template-lifecycle events (status / quality / components
   // updates from Meta) come in on a different change.field and
@@ -355,9 +449,18 @@ async function processWhatsAppChange(
       phoneNumberId,
       configError
     );
+    // TRANSITORIO: la base no respondió. Es el primer punto del camino
+    // de entrada que tocaba la base, y por lo tanto el primero que
+    // fallaba cuando la red se caía. Que Meta reentregue.
+    batch.transientFailures.push(
+      `whatsapp_config no consultable para ${phoneNumberId}`
+    );
     return;
   }
 
+  // PERMANENTE de acá en adelante: un número que no está configurado, o
+  // que está dos veces, va a dar el mismo resultado en cada reintento.
+  // Se descarta con 200 y queda en el log.
   if (!configRows || configRows.length === 0) {
     console.error('No config found for phone_number_id:', phoneNumberId);
     return;
@@ -385,7 +488,7 @@ async function processWhatsAppChange(
     const message = value.messages[i];
     const contact = value.contacts[i] || value.contacts[0];
 
-    await processMessage(
+    await persistMessage(
       message,
       contact,
       // Tenancy — drives every contact / conversation lookup
@@ -395,7 +498,8 @@ async function processWhatsAppChange(
       // inserts that need it for NOT NULL FK compliance. Always
       // the admin who saved the WhatsApp config.
       config.user_id,
-      decryptedAccessToken
+      decryptedAccessToken,
+      batch
     );
   }
 }
@@ -542,14 +646,17 @@ async function handleStatusUpdate(status: {
  * automatizaciones, IA y webhooks— es igual en los tres canales y vive
  * en `src/lib/inbound/core.ts`.
  */
-async function processMessage(
+async function persistMessage(
   message: WhatsAppMessage,
   contact: { profile: { name: string }; wa_id: string },
   // Tenancy. Resolved from the matched whatsapp_config row.
   accountId: string,
   // Sender-of-record for inserts that need a NOT NULL user_id FK.
   configOwnerUserId: string,
-  accessToken: string
+  accessToken: string,
+  // Recoge lo que hay que difundir después de responder, y lo que no se
+  // pudo guardar y por lo tanto exige reentrega.
+  batch: InboundBatch
 ) {
   const sender: InboundSender = {
     channel: 'whatsapp',
@@ -570,14 +677,18 @@ async function processMessage(
   // mensajes y no hace falta bajar nada para procesarlas.
   if (message.type === 'reaction') {
     if (!message.reaction?.message_id) return;
-    await processInboundMessage({
-      ...common,
-      inbound: {
-        kind: 'reaction',
-        targetExternalId: message.reaction.message_id,
-        emoji: message.reaction.emoji || null,
-      },
-    });
+    collect(
+      await persistInbound({
+        ...common,
+        inbound: {
+          kind: 'reaction',
+          targetExternalId: message.reaction.message_id,
+          emoji: message.reaction.emoji || null,
+        },
+      }),
+      batch,
+      message.id
+    );
     return;
   }
 
@@ -612,20 +723,54 @@ async function processMessage(
         ? 'interactive' // template quick-reply tap (issue #478)
         : 'text'; // unknown → text fallback
 
-  await processInboundMessage({
-    ...common,
-    inbound: {
-      kind: 'message',
-      externalMessageId: message.id,
-      sentAt: new Date(parseInt(message.timestamp) * 1000),
-      contentType,
-      contentText,
-      mediaUrl,
-      interactiveReplyId,
-      replyToExternalId: message.context?.id ?? null,
-      typeLabel: message.type,
-    },
-  });
+  collect(
+    await persistInbound({
+      ...common,
+      inbound: {
+        kind: 'message',
+        externalMessageId: message.id,
+        sentAt: new Date(parseInt(message.timestamp) * 1000),
+        contentType,
+        contentText,
+        mediaUrl,
+        interactiveReplyId,
+        replyToExternalId: message.context?.id ?? null,
+        typeLabel: message.type,
+      },
+    }),
+    batch,
+    message.id
+  );
+}
+
+/**
+ * Traduce el desenlace de la persistencia a lo que el lote necesita
+ * recordar: qué difundir, y qué exige reentrega.
+ *
+ * `duplicate` y `dropped` no agregan nada a ninguna de las dos listas, y
+ * eso es exactamente lo correcto: en el primer caso el mensaje ya estaba
+ * y su difusión ya ocurrió (issue #367); en el segundo, reintentar daría
+ * el mismo resultado.
+ */
+function collect(
+  outcome: InboundOutcome,
+  batch: InboundBatch,
+  externalMessageId: string
+) {
+  if (outcome.status === 'persisted') {
+    batch.fanouts.push(outcome.fanout);
+    return;
+  }
+  if (outcome.status === 'failed') {
+    batch.transientFailures.push(`${externalMessageId}: ${outcome.reason}`);
+    return;
+  }
+  if (outcome.status === 'dropped') {
+    console.warn(
+      `[webhook] entrante descartado (${outcome.reason}):`,
+      externalMessageId
+    );
+  }
 }
 
 async function parseMessageContent(
@@ -650,7 +795,18 @@ async function parseMessageContent(
   // why images showed up as empty bubbles in the inbox.
   const verifyAndBuildUrl = async (mediaId: string): Promise<string | null> => {
     try {
-      await getMediaUrl({ mediaId, accessToken });
+      // Con tiempo límite: esta verificación corre AHORA dentro de la
+      // petición, porque el mensaje se guarda antes de confirmarle a
+      // Meta. Es una llamada de red a un tercero, y no puede ser lo que
+      // decida si Meta reentrega — si tarda, se sigue por el mismo
+      // camino que ya existía para cuando falla, y el mensaje queda
+      // guardado con su texto. Perder el pie de foto es mucho menos
+      // grave que perder el mensaje entero.
+      await withTimeout(
+        getMediaUrl({ mediaId, accessToken }),
+        MEDIA_VERIFY_TIMEOUT_MS,
+        `verificación del medio ${mediaId}`
+      );
       return `/api/whatsapp/media/${mediaId}`;
     } catch (error) {
       console.error(

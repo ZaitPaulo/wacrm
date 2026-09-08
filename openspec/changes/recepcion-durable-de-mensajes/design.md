@@ -86,5 +86,6 @@ Reversión: revertir el commit y reconstruir. No deja estado que limpiar.
 
 ## Open Questions
 
-- ¿Cuál es el tiempo límite de la verificación de medios? Hay que medir cuánto tarda hoy `getMediaUrl` en el caso normal antes de fijar el número.
-- ¿Conviene registrar de forma distinguible los `500` de persistencia, para poder alertar sobre ellos sin que se confundan con cualquier otro error del servidor?
+- **El tiempo límite de la verificación de medios — resuelto provisionalmente, sin medir.** Se fijó en 5 s (`MEDIA_VERIFY_TIMEOUT_MS`). El número se eligió holgado a propósito: su único trabajo es impedir que una llamada colgada retenga la confirmación, y errar por largo solo cuesta latencia en un caso raro, mientras que errar por corto descartaría medios que hoy verifican bien. Queda pendiente medir el caso normal en producción para poder bajarlo con un dato; la tarea 1.1 sigue abierta a propósito.
+- **La ventana de respuesta de Meta — sin verificar contra la documentación vigente.** El diseño no depende de conocer el número exacto: la fase de persistencia es solo base y se mueve en milisegundos, muy por debajo de cualquier ventana razonable. La tarea 1.2 queda abierta para confirmarlo y dejarlo anotado.
+- **Registrar los `500` de persistencia de forma distinguible — resuelto.** Cada fallo transitorio se acumula con su `externalMessageId` y su motivo, y se emite una sola línea antes de responder, con el prefijo `[webhook]` y el conteo. Alcanza para alertar sin confundirlo con cualquier otro error del servidor. No se agregó métrica ni instrumentación aparte: no hay hoy dónde mandarla.

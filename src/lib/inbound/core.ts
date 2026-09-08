@@ -25,6 +25,22 @@ import { recordVehicleInquiry } from '@/lib/inventory/inquiries';
 // comportamiento. Los comentarios que traían número de issue se
 // conservan a propósito: cada uno explica por qué una línea que parece
 // arbitraria no lo es.
+//
+// LA RECEPCIÓN VA EN DOS FASES, y dónde cae la frontera importa:
+//
+//   persistInbound()  — contacto, conversación, guardado. Solo base,
+//                       rápido. Corre ANTES de confirmarle a la
+//                       plataforma, y su fallo se traduce en no-200
+//                       para que la plataforma reentregue.
+//   fanOutInbound()   — flujos, automatizaciones, IA y webhooks
+//                       públicos. Lento y con terceros de por medio.
+//                       Corre DESPUÉS de la respuesta, y su fallo no
+//                       la cambia.
+//
+// El orden viejo era confirmar primero y hacer todo después, y eso
+// perdía mensajes en silencio: cuando el trabajo fallaba, la plataforma
+// ya lo daba por entregado y no volvía a intentarlo. Ver
+// `openspec/specs/inbound-message-durability`.
 // ============================================================
 
 /** Quién escribió, en los términos de su canal. */
@@ -81,17 +97,81 @@ export interface ProcessInboundArgs {
 }
 
 /**
- * Procesa un mensaje entrante ya normalizado.
+ * Lo que la fase de difusión necesita saber de la de persistencia.
  *
- * No lanza por un fallo esperable: registra y sale. El llamador está
- * dentro del `after()` del webhook y una excepción acá no debe llevarse
- * el resto del lote.
+ * Cruza la frontera entre las dos fases, así que lleva únicamente datos
+ * ya resueltos: nada que obligue a volver a consultar.
  */
-export async function processInboundMessage(
+export interface InboundFanout {
+  db: SupabaseClient;
+  accountId: string;
+  auditUserId: string;
+  conversationId: string;
+  contactId: string;
+  /** El hilo se abrió en ESTA entrega. Decide `conversation.created`. */
+  conversationCreated: boolean;
+  /**
+   * Ausente en las reacciones, que no son mensajes: para ellas la
+   * difusión se reduce al evento de conversación creada.
+   */
+  message?: {
+    inbound: NormalizedMessage;
+    insertedMessageId: string;
+    insertedCreatedAt: string;
+    isFirstInboundMessage: boolean;
+    contactCreated: boolean;
+  };
+}
+
+/**
+ * Cómo terminó la fase de persistencia.
+ *
+ * Los cuatro desenlaces piden respuestas distintas de la plataforma, y
+ * por eso un booleano no alcanza — «replay» y «descartado» también son
+ * «no se guardó nada nuevo», pero ninguno de los dos es un fallo:
+ *
+ *   persisted  → guardado. Confirmar, y difundir.
+ *   duplicate  → la plataforma reentregó algo que ya teníamos.
+ *                Confirmar sin volver a difundir (issue #367).
+ *   dropped    → fallo PERMANENTE. Reintentar daría lo mismo, así que
+ *                confirmar y dejar constancia en el log.
+ *   failed     → fallo TRANSITORIO. NO confirmar: que la plataforma
+ *                reentregue con su propio backoff.
+ */
+export type InboundOutcome =
+  | { status: 'persisted'; fanout: InboundFanout }
+  | { status: 'duplicate' }
+  | { status: 'dropped'; reason: string }
+  | { status: 'failed'; reason: string };
+
+/**
+ * FASE 1 — Persistencia. Corre ANTES de confirmarle a la plataforma.
+ *
+ * Solo toca la base y no habla con nadie de afuera, así que es rápida y
+ * puede sostenerse dentro de la petición. Ese es justamente el punto:
+ * confirmar antes de guardar convierte cualquier fallo en una pérdida
+ * definitiva y silenciosa, porque la plataforma da el mensaje por
+ * entregado y no vuelve a intentarlo. Pasó en producción el 2026-09-08.
+ *
+ * No lanza: traduce cada desenlace a un `InboundOutcome` para que el
+ * llamador decida qué responder. Ver `openspec/specs/
+ * inbound-message-durability`.
+ */
+export async function persistInbound(
   args: ProcessInboundArgs
-): Promise<void> {
+): Promise<InboundOutcome> {
   const { db, accountId, auditUserId, sender, inbound } = args;
 
+  // Sin identidad no hay a quién atribuirle el mensaje, y el siguiente
+  // intento daría exactamente lo mismo: es permanente, no transitorio.
+  if (!sender.externalId) {
+    return { status: 'dropped', reason: 'remitente sin identidad de canal' };
+  }
+
+  // De acá en adelante un `null` significa que la consulta falló. El
+  // único camino que devolvía `null` sin error era el externalId vacío,
+  // ya descartado arriba — así que se clasifica como transitorio y la
+  // plataforma reentrega, en vez de perderse el mensaje.
   const contactOutcome = await resolveContactByChannel({
     db,
     accountId,
@@ -100,7 +180,9 @@ export async function processInboundMessage(
     externalId: sender.externalId,
     name: sender.name,
   });
-  if (!contactOutcome) return;
+  if (!contactOutcome) {
+    return { status: 'failed', reason: 'no se pudo resolver el contacto' };
+  }
   const contactId = contactOutcome.contactId;
 
   const convResult = await findOrCreateConversation(
@@ -110,26 +192,31 @@ export async function processInboundMessage(
     contactId,
     sender.channel
   );
-  if (!convResult) return;
+  if (!convResult) {
+    return { status: 'failed', reason: 'no se pudo resolver la conversación' };
+  }
   const conversation = convResult.conversation;
 
-  // Emit conversation.created as soon as the thread is opened — BEFORE
-  // the reaction short-circuit below — so a conversation first opened by
-  // a reaction still fires the event, and a subscriber always sees the
-  // thread open before its first message.received.
-  if (convResult.created) {
-    await dispatchWebhookEvent(db, accountId, 'conversation.created', {
-      conversation_id: conversation.id,
-      contact_id: contactId,
-    });
-  }
+  // `conversation.created` YA NO se despacha acá. Es una llamada HTTP a
+  // un suscriptor y no puede demorar la confirmación a la plataforma, así
+  // que se fue a la difusión — donde sale de PRIMERO, que es lo que
+  // conserva la garantía original: quien escucha ve el hilo abierto antes
+  // de su primer `message.received`. La bandera cruza la frontera acá.
+  const fanout: InboundFanout = {
+    db,
+    accountId,
+    auditUserId,
+    conversationId: conversation.id,
+    contactId,
+    conversationCreated: convResult.created,
+  };
 
   // Reactions short-circuit here — they aren't messages. We never insert
   // into `messages`, never bump unread_count, never update
   // last_message_text.
   if (inbound.kind === 'reaction') {
     await applyReaction(db, inbound, conversation.id, contactId);
-    return;
+    return { status: 'persisted', fanout };
   }
 
   // Resolve swipe-reply context if present. A missing parent is fine —
@@ -194,7 +281,9 @@ export async function processInboundMessage(
 
   if (msgError) {
     console.error('[inbound] error inserting message:', msgError);
-    return;
+    // Transitorio: es exactamente el fallo que perdía mensajes cuando la
+    // respuesta ya había salido. Que la plataforma reentregue.
+    return { status: 'failed', reason: 'no se pudo guardar el mensaje' };
   }
 
   // Replayed delivery: the message already exists, so acknowledge it as a
@@ -206,7 +295,9 @@ export async function processInboundMessage(
       '[inbound] duplicate inbound message ignored (idempotent replay):',
       inbound.externalMessageId
     );
-    return;
+    // Es lo que hace seguro reentregar un lote entero tras un fallo
+    // parcial: lo que ya estaba se reconoce y no vuelve a hacer nada.
+    return { status: 'duplicate' };
   }
 
   // Update conversation. The unread bump is done DB-side (migration 037's
@@ -239,6 +330,59 @@ export async function processInboundMessage(
     inbound.contentText
   );
 
+  // ============================================================
+  // FIN DE LA PERSISTENCIA. El mensaje ya está guardado, así que a
+  // partir de acá nada puede costar el mensaje: la plataforma recibe su
+  // confirmación y lo que sigue corre después de la respuesta.
+  // ============================================================
+  const insertedMessage = insertedRows[0];
+  return {
+    status: 'persisted',
+    fanout: {
+      ...fanout,
+      message: {
+        inbound,
+        insertedMessageId: insertedMessage.id,
+        insertedCreatedAt: insertedMessage.created_at,
+        isFirstInboundMessage,
+        contactCreated: contactOutcome.created,
+      },
+    },
+  };
+}
+
+/**
+ * FASE 2 — Difusión. Corre DESPUÉS de confirmarle a la plataforma.
+ *
+ * Todo lo lento y todo lo que habla con terceros: flujos,
+ * automatizaciones, respuesta de IA y webhooks públicos. Meterlo antes
+ * de la respuesta se saldría de la ventana de la plataforma y provocaría
+ * reentregas por timeout, que es el problema que el `after()` del
+ * webhook vino a resolver en primer lugar.
+ *
+ * No lanza y su fallo NO cambia la respuesta. Pedir una reentrega por
+ * algo de acá no arreglaría nada: el mensaje volvería, se reconocería
+ * como replay y la difusión no se reintentaría igual.
+ */
+export async function fanOutInbound(ctx: InboundFanout): Promise<void> {
+  const { db, accountId, auditUserId, conversationId, contactId } = ctx;
+
+  // De primero, siempre: quien escucha tiene que ver el hilo abierto
+  // antes de su primer `message.received`. Una conversación abierta por
+  // una reacción también dispara el evento, igual que antes.
+  if (ctx.conversationCreated) {
+    await dispatchWebhookEvent(db, accountId, 'conversation.created', {
+      conversation_id: conversationId,
+      contact_id: contactId,
+    });
+  }
+
+  // Las reacciones no son mensajes: su difusión termina acá.
+  if (!ctx.message) return;
+
+  const { inbound, insertedMessageId, insertedCreatedAt } = ctx.message;
+  const { isFirstInboundMessage, contactCreated } = ctx.message;
+
   const inboundText = inbound.contentText ?? '';
 
   // ============================================================
@@ -257,7 +401,7 @@ export async function processInboundMessage(
     accountId,
     userId: auditUserId,
     contactId,
-    conversationId: conversation.id,
+    conversationId,
     message: inbound.interactiveReplyId
       ? {
           kind: 'interactive_reply',
@@ -293,7 +437,7 @@ export async function processInboundMessage(
   // row. first_inbound_message fires whenever this is the contact's
   // first-ever customer-sent message — a superset that also catches
   // manually-imported contacts sending for the first time.
-  if (contactOutcome.created) automationTriggers.unshift('new_contact_created');
+  if (contactCreated) automationTriggers.unshift('new_contact_created');
   if (isFirstInboundMessage)
     automationTriggers.unshift('first_inbound_message');
 
@@ -309,7 +453,7 @@ export async function processInboundMessage(
       contactId,
       context: {
         message_text: inboundText,
-        conversation_id: conversation.id,
+        conversation_id: conversationId,
         interactive_reply_id: inbound.interactiveReplyId ?? undefined,
       },
     }).catch((err) => console.error('[automations] dispatch failed:', err));
@@ -318,20 +462,14 @@ export async function processInboundMessage(
   // AI auto-reply. Runs only for plain-text inbound the deterministic
   // flow runner did NOT consume (flows win over the LLM), and only when
   // the account has enabled it.
-  const insertedMessage = insertedRows[0];
-  if (
-    !flowConsumed &&
-    !inbound.interactiveReplyId &&
-    inboundText.trim() &&
-    insertedMessage
-  ) {
+  if (!flowConsumed && !inbound.interactiveReplyId && inboundText.trim()) {
     await dispatchInboundToAiReply({
       accountId,
-      conversationId: conversation.id,
+      conversationId,
       contactId,
       configOwnerUserId: auditUserId,
-      inboundMessageId: insertedMessage.id,
-      inboundCreatedAt: insertedMessage.created_at,
+      inboundMessageId: insertedMessageId,
+      inboundCreatedAt: insertedCreatedAt,
     });
   }
 
@@ -343,7 +481,7 @@ export async function processInboundMessage(
   // suscriptores consumiendo. Renombrarlo por precisión les rompería el
   // integrador sin avisar.
   await dispatchWebhookEvent(db, accountId, 'message.received', {
-    conversation_id: conversation.id,
+    conversation_id: conversationId,
     contact_id: contactId,
     whatsapp_message_id: inbound.externalMessageId,
     content_type: inbound.contentType,

@@ -10,6 +10,19 @@ const h = vi.hoisted(() => ({
     // Result the message upsert's .select() resolves to. A genuine insert
     // returns the row; a replayed delivery conflicts and returns [].
     messageUpsertResult: [{ id: 'msg-1' }] as { id: string }[],
+    /** Error que devuelve el upsert del mensaje. La base caída. */
+    messageUpsertError: null as { message: string } | null,
+    /** Falla el upsert solo para este message_id, para lotes mixtos. */
+    failUpsertForMessageId: null as string | null,
+    /** Lo que resuelve la búsqueda de `whatsapp_config`. */
+    configResult: {
+      data: [
+        { account_id: 'acc-1', user_id: 'user-1', access_token: 'enc' },
+      ] as Record<string, unknown>[] | null,
+      error: null as { message: string } | null,
+    },
+    /** Con qué responde la verificación de firma. */
+    signatureValid: true,
     priorCustomerMsgCount: 0,
     /** Row `lookupInternalIdByMetaId` resolves for a `context.id`. */
     replyContextParent: null as { id: string } | null,
@@ -38,17 +51,7 @@ vi.mock('@supabase/supabase-js', () => ({
         case 'whatsapp_config':
           return {
             select: () => ({
-              eq: () =>
-                Promise.resolve({
-                  data: [
-                    {
-                      account_id: 'acc-1',
-                      user_id: 'user-1',
-                      access_token: 'enc',
-                    },
-                  ],
-                  error: null,
-                }),
+              eq: () => Promise.resolve(h.state.configResult),
             }),
           };
         case 'contact_channels':
@@ -141,11 +144,20 @@ vi.mock('@supabase/supabase-js', () => ({
             // Idempotent insert: upsert(...).select('id')
             upsert: (row: Record<string, unknown>, options: unknown) => {
               h.state.upsertCalls.push({ row, options });
+              // Un lote puede traer un mensaje que guarda bien y otro
+              // que no: por eso el fallo se puede dirigir a un id
+              // concreto, además del interruptor global.
+              const error =
+                h.state.messageUpsertError ??
+                (h.state.failUpsertForMessageId &&
+                row.message_id === h.state.failUpsertForMessageId
+                  ? { message: 'TypeError: fetch failed' }
+                  : null);
               return {
                 select: () =>
                   Promise.resolve({
-                    data: h.state.messageUpsertResult,
-                    error: null,
+                    data: error ? null : h.state.messageUpsertResult,
+                    error,
                   }),
               };
             },
@@ -179,7 +191,7 @@ vi.mock('@/lib/contacts/dedupe', () => ({
   isUniqueViolation: () => false,
 }));
 vi.mock('@/lib/whatsapp/webhook-signature', () => ({
-  verifyMetaWebhookSignature: () => true,
+  verifyMetaWebhookSignature: () => h.state.signatureValid,
 }));
 vi.mock('@/lib/whatsapp/template-webhook', () => ({
   isTemplateWebhookField: () => false,
@@ -241,6 +253,13 @@ async function runWebhook(message?: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.messageUpsertResult = [{ id: 'msg-1' }];
+  h.state.messageUpsertError = null;
+  h.state.failUpsertForMessageId = null;
+  h.state.configResult = {
+    data: [{ account_id: 'acc-1', user_id: 'user-1', access_token: 'enc' }],
+    error: null,
+  };
+  h.state.signatureValid = true;
   h.state.priorCustomerMsgCount = 0;
   h.state.replyContextParent = null;
   h.state.conversation = { id: 'conv-1', unread_count: 0, account_id: 'acc-1' };
@@ -488,5 +507,190 @@ describe('webhook: un evento roto no se lleva el lote', () => {
     await expect(
       runRaw({ object: 'whatsapp_business_account', entry: [{}] })
     ).resolves.toBeDefined();
+  });
+});
+
+// ============================================================
+// Recepción durable (openspec/specs/inbound-message-durability).
+//
+// El webhook respondía 200 y procesaba después, así que un fallo dentro
+// de after() perdía el mensaje para siempre: Meta ya lo daba por
+// entregado y no reintentaba. Estos tests fijan el contrato nuevo —
+// guardar antes de confirmar, y traducir el fallo en reentrega.
+// ============================================================
+
+/** El código HTTP con el que respondió la ruta. */
+function status(res: unknown): number | undefined {
+  return (res as { init?: { status?: number } }).init?.status;
+}
+
+describe('recepción durable: un fallo al guardar pide reentrega', () => {
+  it('responde 500 cuando el insert del mensaje falla', async () => {
+    h.state.messageUpsertError = { message: 'TypeError: fetch failed' };
+
+    const res = await runWebhook();
+
+    expect(status(res)).toBe(500);
+    // Nada se difundió: no hay mensaje que difundir.
+    expect(h.dispatchInboundToFlows).not.toHaveBeenCalled();
+    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled();
+    expect(h.dispatchWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('responde 500 cuando la base no deja consultar la configuración', async () => {
+    h.state.configResult = {
+      data: null,
+      error: { message: 'TypeError: fetch failed' },
+    };
+
+    const res = await runWebhook();
+
+    expect(status(res)).toBe(500);
+    expect(h.state.upsertCalls).toHaveLength(0);
+  });
+
+  it('la reentrega tras ese fallo guarda una sola vez y responde una sola vez', async () => {
+    // Primer intento: la base está caída.
+    h.state.messageUpsertError = { message: 'TypeError: fetch failed' };
+    expect(status(await runWebhook())).toBe(500);
+
+    // Meta reentrega. La base ya respondió, y el mensaje entra.
+    h.state.messageUpsertError = null;
+    h.state.upsertCalls = [];
+    h.state.afterCallbacks = [];
+    expect(status(await runWebhook())).toBe(200);
+
+    expect(h.state.upsertCalls).toHaveLength(1);
+    expect(h.dispatchInboundToAiReply).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('recepción durable: un fallo al difundir NO pide reentrega', () => {
+  it('responde 200 aunque la respuesta de IA falle', async () => {
+    h.dispatchInboundToAiReply.mockRejectedValue(new Error('IA caída'));
+
+    const res = await runWebhook();
+
+    expect(status(res)).toBe(200);
+    // El mensaje quedó guardado: una persona lo ve en la bandeja.
+    expect(h.state.upsertCalls).toHaveLength(1);
+  });
+
+  it('responde 200 aunque el webhook público del cliente falle', async () => {
+    h.dispatchWebhookEvent.mockRejectedValue(new Error('suscriptor caído'));
+
+    const res = await runWebhook();
+
+    expect(status(res)).toBe(200);
+    expect(h.state.upsertCalls).toHaveLength(1);
+  });
+});
+
+describe('recepción durable: los fallos permanentes se confirman', () => {
+  it('responde 200 cuando el número no está configurado, sin reintento', async () => {
+    h.state.configResult = { data: [], error: null };
+
+    const res = await runWebhook();
+
+    expect(status(res)).toBe(200);
+    expect(h.state.upsertCalls).toHaveLength(0);
+  });
+
+  it('responde 200 cuando hay configuraciones duplicadas para el número', async () => {
+    h.state.configResult = {
+      data: [
+        { account_id: 'acc-1', user_id: 'user-1', access_token: 'enc' },
+        { account_id: 'acc-2', user_id: 'user-2', access_token: 'enc' },
+      ],
+      error: null,
+    };
+
+    const res = await runWebhook();
+
+    expect(status(res)).toBe(200);
+    expect(h.state.upsertCalls).toHaveLength(0);
+  });
+});
+
+describe('recepción durable: un lote con un fallo parcial', () => {
+  const loteMixto = {
+    object: 'whatsapp_business_account',
+    entry: [
+      {
+        changes: [whatsappChange('wamid.BUENO'), whatsappChange('wamid.MALO')],
+      },
+    ],
+  };
+
+  it('pide reentrega del lote entero, pero difunde lo que sí se guardó', async () => {
+    h.state.failUpsertForMessageId = 'wamid.MALO';
+
+    const res = await runRaw(loteMixto);
+
+    expect(status(res)).toBe(500);
+    // Los dos se intentaron: el fallo de uno no aborta el recorrido.
+    expect(h.state.upsertCalls).toHaveLength(2);
+    // El que sí entró recibe su difusión igual — no tiene por qué
+    // esperar a que Meta reentregue.
+    expect(h.dispatchInboundToFlows).toHaveBeenCalledTimes(1);
+  });
+
+  it('la reentrega del lote no duplica el que ya estaba', async () => {
+    h.state.failUpsertForMessageId = 'wamid.MALO';
+    expect(status(await runRaw(loteMixto))).toBe(500);
+
+    // Meta reentrega el lote completo. El que ya estaba choca contra el
+    // índice único y vuelve sin fila; el otro entra por primera vez.
+    h.state.failUpsertForMessageId = null;
+    h.state.upsertCalls = [];
+    h.state.afterCallbacks = [];
+    h.dispatchInboundToFlows.mockClear();
+    h.state.messageUpsertResult = [];
+
+    expect(status(await runRaw(loteMixto))).toBe(200);
+    // Ninguno de los dos volvió a difundirse: el corte de replay
+    // (issue #367) sigue cubriendo todo lo que cubría.
+    expect(h.dispatchInboundToFlows).not.toHaveBeenCalled();
+  });
+});
+
+describe('recepción durable: la firma sigue siendo la primera puerta', () => {
+  it('rechaza sin procesar cuando la firma no valida', async () => {
+    h.state.signatureValid = false;
+
+    const res = await runWebhook();
+
+    expect(status(res)).toBe(401);
+    expect(h.state.upsertCalls).toHaveLength(0);
+    expect(h.state.afterCallbacks).toHaveLength(0);
+  });
+});
+
+describe('recepción durable: el medio no decide la respuesta', () => {
+  it('guarda la foto con su pie de foto aunque la verificación falle', async () => {
+    // La verificación contra Meta es una llamada de red a un tercero. Si
+    // fuera ella la que decide, un problema de red del lado de Meta haría
+    // reentregar el mensaje en vez de guardarlo — y el texto que lo
+    // acompaña, que suele ser lo que el asesor necesita leer, se iría con
+    // él. El tiempo límite de `verifyAndBuildUrl` desemboca en este mismo
+    // camino.
+    const { getMediaUrl } = await import('@/lib/whatsapp/meta-api');
+    vi.mocked(getMediaUrl).mockRejectedValue(new Error('Meta no responde'));
+
+    const res = await runWebhook({
+      id: 'wamid.FOTO',
+      from: '15551230000',
+      timestamp: '1700000000',
+      type: 'image',
+      image: { id: 'media-1', mime_type: 'image/jpeg', caption: 'mira este' },
+    });
+
+    expect(status(res)).toBe(200);
+    expect(h.state.upsertCalls).toHaveLength(1);
+    expect(h.state.upsertCalls[0].row).toMatchObject({
+      content_type: 'image',
+      content_text: 'mira este',
+      media_url: null,
+    });
   });
 });
