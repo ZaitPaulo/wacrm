@@ -127,6 +127,12 @@ Pesó además que el payload no esté documentado: escribir el manejador a ciega
 
 Nótese que esto NO afecta al requisito de la spec sobre no duplicar: ese requisito habla del salto entre teléfono y BSUID, que sí queda cubierto.
 
+### Limitación: las difusiones no alcanzan a un contacto sin teléfono
+
+`broadcast-core.ts` recibe del llamador una **lista de teléfonos**, los sanea y descarta lo que no sea E.164. Un contacto identificado por BSUID no tiene número, así que no puede estar en esa lista — aunque Meta sí acepte plantillas dirigidas a un BSUID.
+
+Incluirlos exigiría que la difusión se arme con ids de contacto en vez de teléfonos, lo que toca la interfaz de selección, la carga por CSV y el modelo de la difusión entera. Queda fuera de este cambio, anotado para el que lo aborde.
+
 ## Open Questions
 - ¿Qué muestra la interfaz hoy donde va el teléfono, y qué debería mostrar cuando no hay? Afecta la bandeja, la ficha del contacto y la lista.
 - ¿Qué pasa con la carga masiva y la exportación de contactos, que hoy giran alrededor del teléfono?

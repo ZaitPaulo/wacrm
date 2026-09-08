@@ -26,12 +26,12 @@
 
 ## 4. Responder a un contacto sin teléfono
 
-- [ ] 4.1 Definir el tipo de destinatario que distingue teléfono de BSUID, y traducirlo a `to` o `recipient` en UN solo punto
-- [ ] 4.2 Migrar las siete funciones de envío de `meta-api.ts` a ese tipo
-- [ ] 4.3 En `send-message.ts`, resolver el destinatario desde las identidades del contacto en vez de exigir `contact.phone`
-- [ ] 4.4 Saltar el reintento por variantes cuando el destinatario es un BSUID
-- [ ] 4.5 Revisar los otros caminos de envío: IA, flujos, automatizaciones y difusiones
-- [ ] 4.6 Tests: envío a BSUID usa `recipient` y no `to`; envío a teléfono no cambia en nada; sin variantes para BSUID
+- [x] 4.1 Definir el tipo de destinatario que distingue teléfono de BSUID, y traducirlo a `to` o `recipient` en UN solo punto
+- [x] 4.2 Migrar las siete funciones de envío de `meta-api.ts` a ese tipo
+- [x] 4.3 En `send-message.ts`, resolver el destinatario desde las identidades del contacto en vez de exigir `contact.phone`
+- [x] 4.4 Saltar el reintento por variantes cuando el destinatario es un BSUID
+- [x] 4.5 Revisar los otros caminos de envío — IA (`engineSendText`), flujos y automatizaciones pasan todos por `resolveOutboundTarget`, así que el arreglo del gate los cubre. **Las difusiones NO**: `broadcast-core.ts` recibe una lista de teléfonos del llamador y descarta lo que no sea E.164, así que un contacto sin número no puede estar en ella. Limitación anotada en el diseño
+- [x] 4.6 Tests: envío a BSUID usa `recipient` y no `to`; envío a teléfono no cambia en nada; sin variantes para BSUID
 
 ## 5. Que el asesor lo pueda reconocer
 

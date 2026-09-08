@@ -10,7 +10,12 @@ interface FakeRows {
     channel: string;
   } | null;
   contact?: { id: string; phone: string | null } | null;
-  identity?: { external_id: string } | null;
+  /**
+   * Identidades del contacto en el canal. Son VARIAS a propósito: un
+   * contacto de WhatsApp puede tener su teléfono y su BSUID, y la
+   * puerta tiene que elegir bien entre los dos.
+   */
+  identities?: { external_id: string }[] | null;
   /** Último mensaje del cliente. Por defecto, recién llegado. */
   lastInbound?: { created_at: string } | null;
 }
@@ -40,15 +45,15 @@ function fakeDb(rows: FakeRows) {
               : [rows.lastInbound ?? { created_at: new Date().toISOString() }],
           error: null,
         }),
+        // Las identidades se leen en LISTA, no con maybeSingle: con dos
+        // filas del mismo canal, maybeSingle da error.
+        returns: async () => ({ data: rows.identities ?? [], error: null }),
         maybeSingle: async () => {
           if (table === 'conversations') {
             return { data: rows.conversation ?? null, error: null };
           }
           if (table === 'contacts') {
             return { data: rows.contact ?? null, error: null };
-          }
-          if (table === 'contact_channels') {
-            return { data: rows.identity ?? null, error: null };
           }
           return { data: null, error: null };
         },
@@ -108,7 +113,7 @@ describe('resolveOutboundTarget — el canal sale de la conversación', () => {
   it('rechaza un canal que todavía no sabe enviar', async () => {
     const { db, touched } = fakeDb({
       conversation: { id: 'cv-2', contact_id: 'ct-1', channel: 'instagram' },
-      identity: { external_id: 'ig-abc' },
+      identities: [{ external_id: 'ig-abc' }],
     });
 
     const out = await resolveOutboundTarget(db, 'acct-1', 'cv-2', {
@@ -238,5 +243,102 @@ describe('la puerta también decide la ventana', () => {
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.target.humanAgentTag).toBe(false);
+  });
+});
+
+// ============================================================
+// Destinatarios sin teléfono (openspec/changes/identidad-bsuid-whatsapp).
+//
+// Desde que WhatsApp tiene nombres de usuario hay personas de las que
+// nunca vamos a recibir el número. Para ellas la identidad de canal es
+// el único camino de salida: sin este respaldo entrarían a la bandeja
+// sin que nadie pudiera contestarles.
+// ============================================================
+
+const BSUID = 'CO.4481978948757066';
+
+describe('resolveOutboundTarget — WhatsApp sin teléfono', () => {
+  it('cae al BSUID cuando el contacto no tiene número', async () => {
+    const { db, touched } = fakeDb({
+      conversation: CONV_WHATSAPP,
+      contact: { id: 'ct-1', phone: null },
+      identities: [{ external_id: BSUID }],
+    });
+
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.target.recipientId).toBe(BSUID);
+    expect(touched).toContain('contact_channels');
+  });
+
+  it('elige el BSUID y no un teléfono viejo guardado como identidad', async () => {
+    // Un contacto identificado tiene DOS filas: su teléfono y su BSUID.
+    // Si `contacts.phone` está vacío, ese teléfono de `contact_channels`
+    // es un dato viejo, no un destino — mandarle ahí fallaría.
+    const { db } = fakeDb({
+      conversation: CONV_WHATSAPP,
+      contact: { id: 'ct-1', phone: null },
+      identities: [{ external_id: '573166220262' }, { external_id: BSUID }],
+    });
+
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.target.recipientId).toBe(BSUID);
+  });
+
+  it('dos identidades no rompen la consulta', async () => {
+    // Con `.maybeSingle()` esto daba error: el envío fallaba justo para
+    // los contactos MEJOR identificados.
+    const { db } = fakeDb({
+      conversation: CONV_WHATSAPP,
+      contact: { id: 'ct-1', phone: null },
+      identities: [{ external_id: BSUID }, { external_id: '573166220262' }],
+    });
+
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
+
+    expect(out.ok).toBe(true);
+  });
+
+  it('el teléfono sigue teniendo prioridad cuando existe', async () => {
+    const { db, touched } = fakeDb({
+      conversation: CONV_WHATSAPP,
+      contact: { id: 'ct-1', phone: '+15551234567' },
+      identities: [{ external_id: BSUID }],
+    });
+
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.target.recipientId).toBe('15551234567');
+    // Ni siquiera se consulta: el teléfono editable es la fuente.
+    expect(touched).not.toContain('contact_channels');
+  });
+
+  it('sin teléfono y sin identidades, no hay a quién escribirle', async () => {
+    const { db } = fakeDb({
+      conversation: CONV_WHATSAPP,
+      contact: { id: 'ct-1', phone: null },
+      identities: [],
+    });
+
+    const out = await resolveOutboundTarget(db, 'acct-1', 'cv-1', {
+      senderKind: 'human',
+    });
+
+    expect(out).toEqual({ ok: false, reason: 'no_recipient' });
   });
 });

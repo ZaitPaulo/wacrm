@@ -41,6 +41,7 @@ import {
   phoneVariants,
   isRecipientNotAllowedError,
 } from '@/lib/whatsapp/phone-utils';
+import { isPhoneRecipient } from '@/lib/whatsapp/recipient';
 import type { MessageTemplate } from '@/types';
 import {
   resolveTemplateRow,
@@ -443,7 +444,13 @@ export async function sendMessageToConversation(
   let waMessageId = '';
   let workingPhone = sanitizedPhone;
   try {
-    const variants = phoneVariants(sanitizedPhone);
+    // Las variantes existen para corregir prefijos troncales de un
+    // TELÉFONO. Sobre un BSUID no hay nada que corregir: es un
+    // identificador opaco que emite Meta y llega siempre igual, así que
+    // recortarle dígitos solo produce identificadores de nadie.
+    const variants = isPhoneRecipient(sanitizedPhone)
+      ? phoneVariants(sanitizedPhone)
+      : [sanitizedPhone];
     let lastError: unknown = null;
 
     for (const variant of variants) {
