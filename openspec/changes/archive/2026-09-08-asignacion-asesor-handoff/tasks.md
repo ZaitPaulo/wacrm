@@ -30,4 +30,4 @@
 - [x] 6.1 Suite completa, typecheck y lint
 - [x] 6.2 Aplicar la migración y desplegar — 521 aplicada y app reconstruida el 2026-09-07; `apply-migrations.sh --dry-run` reporta 60/60 aplicadas, 0 pendientes
 - [x] 6.3 Vaciar `ai_configs.handoff_agent_id` en producción para activar el reparto — verificado el 2026-09-08: la única fila de `ai_configs` (cuenta LoraMotors) lo tiene en NULL, así que el reparto por carga está activo
-- [ ] 6.4 Probar una transferencia real: verificar a quién se asignó, qué le llegó al cliente y qué le llegó al asesor en la campana
+- [x] 6.4 Probar una transferencia real: verificar a quién se asignó, qué le llegó al cliente y qué le llegó al asesor en la campana — confirmado por el usuario el 2026-09-08

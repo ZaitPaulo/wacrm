@@ -25,4 +25,4 @@
 - [x] 5.1 Suite completa, typecheck y lint
 - [x] 5.2 Verificado contra el inventario real: 123 vehículos, 9.670 caracteres (~2.760 tokens), entran completos bajo el tope de 400
 - [x] 5.3 Desplegar — hecho el 2026-09-07 22:29 en el VPS: imagen `wacrm-app` reconstruida sobre `e819243`, con el bloque de inventario dentro de `/app/.next`
-- [ ] 5.4 Probar el caso que falló: pedir un carro de 25 millones y confirmar que ofrece el Sandero de $22.000.000
+- [x] 5.4 Probar el caso que falló: pedir un carro de 25 millones y confirmar que ofrece el Sandero de $22.000.000 — confirmado por el usuario el 2026-09-08

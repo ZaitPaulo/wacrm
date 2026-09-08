@@ -51,7 +51,7 @@ Trabajo sobre el VPS, no sobre el repo. Procedimiento completo en `preparacion-d
 - [x] 4.7 Verificar que Postgres no es alcanzable desde una IP externa
 - [x] 4.8 Verificar que Studio devuelve 401 sin credenciales
 - [x] 4.9 Corregir la CSP de `next.config.ts:54,58`, que fija `https://*.supabase.co` y `wss://*.supabase.co` en `media-src` y `connect-src`: derivar los orígenes de `NEXT_PUBLIC_SUPABASE_URL` en vez de codificar el dominio de la nube
-- [ ] 4.10 Confirmar en la consola del navegador que no quedan violaciones de CSP tras el cambio
+- [x] 4.10 Confirmar en la consola del navegador que no quedan violaciones de CSP tras el cambio — confirmado por el usuario el 2026-09-08
 
 ## 5. Verificación funcional
 

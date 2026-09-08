@@ -26,7 +26,7 @@
 - [x] 3.1 Escribir la migración 513: tabla `facebook_config` (una por cuenta, `page_id`, token cifrado, `token_expires_at`, `status`, RLS de `admin`) con el mismo trato que `instagram_config`
 - [x] 3.2 En la misma migración, ampliar el `CHECK` de `social_posts.network` a `('instagram', 'facebook')`
 - [x] 3.3 Verificar que la migración es idempotente y que no modifica ninguna fila existente
-- [ ] 3.4 Aplicar la migración en el VPS de desarrollo y comprobar que la cola de Instagram sigue funcionando igual — la migración 517 **ya está aplicada** (verificado el 2026-09-08 en `schema_migrations`); falta solo comprobar la cola de Instagram
+- [x] 3.4 Aplicar la migración en el VPS de desarrollo y comprobar que la cola de Instagram sigue funcionando igual — la migración 517 **ya está aplicada** (verificado el 2026-09-08 en `schema_migrations`); falta solo comprobar la cola de Instagram — confirmado por el usuario el 2026-09-08
 
 ## 4. Cliente de Facebook
 
@@ -83,11 +83,11 @@
 
 - [x] 9.1 Correr `npm run lint` y `npx tsc --noEmit` sin errores
 - [x] 9.2 Correr toda la suite de pruebas
-- [ ] 9.3 Probar en desarrollo el ciclo completo de Instagram, confirmando que no cambió nada
-- [ ] 9.4 Publicar de prueba en Facebook un vehículo de una sola foto y verificar la entrada en la página
-- [ ] 9.5 Publicar de prueba en Facebook un vehículo de varias fotos y verificar que salen agrupadas en una sola entrada
-- [ ] 9.6 Probar el caso de las dos redes: aprobar una, dejar la otra pendiente, y confirmar que los estados son independientes
-- [ ] 9.7 Probar la desconexión de una red y confirmar que la otra sigue publicando
+- [x] 9.3 Probar en desarrollo el ciclo completo de Instagram, confirmando que no cambió nada — confirmado por el usuario el 2026-09-08
+- [x] 9.4 Publicar de prueba en Facebook un vehículo de una sola foto y verificar la entrada en la página — confirmado por el usuario el 2026-09-08
+- [x] 9.5 Publicar de prueba en Facebook un vehículo de varias fotos y verificar que salen agrupadas en una sola entrada — evidencia en `social_posts` (2026-09-08): 2 filas `facebook/published` del 2026-09-03 y 2026-09-07, cada una con 10 fotos, un solo `external_post_id` y `approved_by` puesto
+- [x] 9.6 Probar el caso de las dos redes: aprobar una, dejar la otra pendiente, y confirmar que los estados son independientes — confirmado por el usuario el 2026-09-08
+- [x] 9.7 Probar la desconexión de una red y confirmar que la otra sigue publicando — confirmado por el usuario el 2026-09-08
 - [x] 9.8 Documentar en `docs/` cómo conectar la página, para el cliente
 
 ## 10. Un botón por vehículo (pedido del cliente, 2026-09-01)

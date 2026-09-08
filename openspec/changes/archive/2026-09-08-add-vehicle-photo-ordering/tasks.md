@@ -51,10 +51,10 @@
 
 ## 6. Verificación en real
 
-- [ ] 6.1 Probar el arrastre en un teléfono real: el gesto no debe pelear con el scroll de la página (riesgo principal del change) — **PENDIENTE: necesita navegador.** La extensión de Chrome no está conectada en esta sesión
-- [ ] 6.2 Probar el reordenamiento completo con teclado, sin mouse, y confirmar que los anuncios se leen en español — **PENDIENTE: necesita navegador**
+- [x] 6.1 Probar el arrastre en un teléfono real: el gesto no debe pelear con el scroll de la página (riesgo principal del change) — **PENDIENTE: necesita navegador.** La extensión de Chrome no está conectada en esta sesión — confirmado por el usuario el 2026-09-08
+- [x] 6.2 Probar el reordenamiento completo con teclado, sin mouse, y confirmar que los anuncios se leen en español — **PENDIENTE: necesita navegador** — confirmado por el usuario el 2026-09-08
 - [x] 6.3 Reordenar un vehículo con pendientes en las dos redes y verificar en `social_posts.image_urls` que ambas quedaron con el orden nuevo — verificado contra la app real (Supabase local + `npm run dev`, admin autenticado): un `PATCH /api/inventory/[id]` de 273 ms dejó a Facebook e Instagram con el mismo orden nuevo, y el vehículo conservó sus 12 fotos
 - [x] 6.4 Reordenar un vehículo con más de 10 fotos y confirmar que la publicación sale con las 10 primeras del orden elegido — con 12 fotos, mover la 12 al frente la metió en el carrusel de ambas redes y sacó del corte a la 10 y la 11
 - [x] 6.5 Verificar que la portada nueva aparece en el catálogo público y en el detalle del vehículo — `/vehiculo/[id]` servido por el servidor de desarrollo: al hacer portada la foto 7, la ficha pública pasó a encabezar con esa; al restaurar, volvió a la 1
-- [ ] 6.6 Verificar que un vehículo sin pendientes muestra sus fotos en modo lectura en la pantalla de publicaciones — **PENDIENTE: necesita navegador**
+- [x] 6.6 Verificar que un vehículo sin pendientes muestra sus fotos en modo lectura en la pantalla de publicaciones — **PENDIENTE: necesita navegador** — confirmado por el usuario el 2026-09-08
 - [x] 6.7 Comprobar que acomodar una grilla de quince fotos no dispara un `429` (una sola petición al guardar) — guardar el orden es exactamente un `PATCH`, contra un presupuesto de 30/min

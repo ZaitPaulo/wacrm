@@ -40,4 +40,4 @@
 - [x] 7.1 Correr la suite completa y el lint
 - [x] 7.2 Aplicar la migración en el VPS — 519 aplicada el 2026-09-07, confirmada en `supabase_migrations.schema_migrations`
 - [x] 7.3 Ajustar el `system_prompt` de LoraMotors para nombrar los motivos con los valores del parser — verificado el 2026-09-08: la sección «CUÁNDO PASAS A UN ASESOR» lista los 8 valores exactos de `HANDOFF_REASONS` (`negociacion`, `permuta`, `credito`, `visita`, `papeles`, `reclamo`, `pide_humano`, `otro`) y explica que con `reclamo` y `pide_humano` basta el nombre
-- [ ] 7.4 Probar en producción el guion que falló: saludo, presupuesto, y confirmar que muestra vehículos en vez de transferir
+- [x] 7.4 Probar en producción el guion que falló: saludo, presupuesto, y confirmar que muestra vehículos en vez de transferir — confirmado por el usuario el 2026-09-08

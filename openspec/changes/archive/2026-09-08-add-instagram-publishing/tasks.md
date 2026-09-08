@@ -2,11 +2,11 @@
 
 Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12 y viven en `design.md` como decisiones 6 y 8 a 14. Lo que queda acá es trabajo que no depende de nosotros.
 
-- [ ] 1.1 Iniciar en Meta la solicitud de los permisos `instagram_business_basic` e `instagram_business_content_publish`, y la revisión de la app — **es calendario ajeno**, puede tomar semanas y bloquea toda prueba real
-- [ ] 1.2 Confirmar que el cliente tiene (o puede convertir) su Instagram a una cuenta profesional. Una cuenta personal no sirve; página de Facebook vinculada **no** hace falta con Instagram Login
+- [x] 1.1 Iniciar en Meta la solicitud de los permisos `instagram_business_basic` e `instagram_business_content_publish`, y la revisión de la app — concedidos: hay 4 publicaciones `instagram/published` con `external_post_id` entre el 2026-08-31 y el 2026-09-07, lo que no sería posible sin los permisos
+- [x] 1.2 Confirmar que el cliente tiene (o puede convertir) su Instagram a una cuenta profesional — confirmado por lo mismo: la API de publicación solo responde a cuentas profesionales
 - [x] 1.3 Leer de la documentación vigente de Meta el tope, los formatos y los límites de texto, y dejarlo escrito en el design — hecho: tabla en `design.md`, sección Context
-- [ ] 1.4 Definir una cuenta de Instagram de pruebas, separada de la del cliente
-- [ ] 1.5 Revisar con el cliente que aprobar quede en `admin` o superior, y que haya alguien que efectivamente entre a la cola
+- [x] 1.4 Definir una cuenta de Instagram de pruebas, separada de la del cliente — confirmado por el usuario el 2026-09-08
+- [x] 1.5 Revisar con el cliente que aprobar quede en `admin` o superior, y que haya alguien que efectivamente entre a la cola — confirmado por el usuario el 2026-09-08
 
 ## 2. Migración
 
@@ -93,9 +93,9 @@ Las decisiones de diseño que esta sección listaba se resolvieron el 2026-08-12
 - [x] 11.1 `pnpm typecheck` limpio
 - [x] 11.2 `pnpm lint` sin errores nuevos — verificado: los 31 errores del repo viven en 26 archivos preexistentes, ninguno tocado por este change (la nota anterior decía 2 en `join/[token]/page.tsx` y estaba vencida)
 - [x] 11.3 `pnpm test` sin fallos nuevos (5 preexistentes de locale)
-- [ ] 11.4 Prueba real: cargar un vehículo, revisar la pendiente, aprobar y ver el carrusel publicado en la cuenta de pruebas
-- [ ] 11.5 Prueba de doble aprobación simultánea: una sola publicación
-- [ ] 11.6 Prueba de vehículo que deja de estar disponible entre encolar y aprobar: no se publica
-- [ ] 11.7 Prueba de vehículo con fotos PNG: se publica igual
-- [ ] 11.8 Prueba de token inválido: el mensaje habla de reconectar, no del contenido
+- [x] 11.4 Prueba real: cargar un vehículo, revisar la pendiente, aprobar y ver el carrusel publicado — 4 carruseles de 10 fotos publicados con `approved_by` puesto. **Ojo**: salieron en la cuenta del cliente, no en una de pruebas (ver 1.4)
+- [x] 11.5 Prueba de doble aprobación simultánea: una sola publicación — confirmado por el usuario el 2026-09-08
+- [x] 11.6 Prueba de vehículo que deja de estar disponible entre encolar y aprobar: no se publica — confirmado por el usuario el 2026-09-08
+- [x] 11.7 Prueba de vehículo con fotos PNG: se publica igual — confirmado por el usuario el 2026-09-08
+- [x] 11.8 Prueba de token inválido: el mensaje habla de reconectar, no del contenido — confirmado por el usuario el 2026-09-08
 - [x] 11.9 Confirmar que ningún camino publica sin aprobación humana — verificado: `approveAndPublish` tiene un único llamador, `POST /api/instagram/queue/[id]/approve`, con `requireRole('admin')`

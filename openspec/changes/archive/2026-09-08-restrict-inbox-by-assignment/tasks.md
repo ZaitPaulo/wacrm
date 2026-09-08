@@ -31,7 +31,7 @@
 - [x] 5.1 En `src/app/(dashboard)/inbox/page.tsx`, resolver el id de usuario y si el rol es restringido (vía `useAuth` / `useCan`) para tenerlos disponibles en los handlers
 - [x] 5.2 Descartar en `handleConversationEvent` los eventos de conversaciones cuyo `assigned_agent_id` no sea el usuario, dejando pasar el `UPDATE` que **asigna** una conversación al usuario (ese es el camino legítimo por el que aparece un hilo nuevo)
 - [x] 5.3 Descartar en `handleMessageEvent` los mensajes de conversaciones que no estén en la lista visible y que el `hydrate` no pueda resolver
-- [ ] 5.4 Comprobar que un `UPDATE` que le **quita** la asignación al usuario saca la conversación de la lista en vez de dejarla pegada
+- [x] 5.4 Comprobar que un `UPDATE` que le **quita** la asignación al usuario saca la conversación de la lista en vez de dejarla pegada — confirmado por el usuario el 2026-09-08
 
 ## 6. Interfaz: acciones que la base va a negar
 
@@ -43,13 +43,13 @@
 
 - [x] 7.1 Correr `npm run lint` y `npx vitest run` y dejarlos en verde
 - [x] 7.2 ~~Crear en el VPS un miembro con rol `agent`~~ — innecesario: la cuenta ya tenía 3 asesores y 3 admins. La prueba se hizo con uno de ellos, en una transacción revertida
-- [ ] 7.3 Con la sesión del `agent`: la bandeja muestra solo lo asignado, los contactos solo los suyos, el embudo solo sus tarjetas y el contador de no leídos cuadra
+- [x] 7.3 Con la sesión del `agent`: la bandeja muestra solo lo asignado, los contactos solo los suyos, el embudo solo sus tarjetas y el contador de no leídos cuadra — confirmado por el usuario el 2026-09-08
 - [x] 7.4 Con la sesión del owner: todo sigue igual que antes, incluidas las conversaciones sin asignar
 - [x] 7.5 Por `psql` con sesión de `agent`: `SELECT` por id de una conversación ajena devuelve cero filas; `UPDATE` de una conversación ajena afecta cero filas; `UPDATE … SET assigned_agent_id = NULL` de una propia falla con el error del trigger; reasignar a otro miembro sí funciona
-- [ ] 7.6 Comprobar si el Realtime del VPS aplica RLS en `postgres_changes` y anotar el resultado en `design.md`
-- [ ] 7.7 Confirmar que un mensaje entrante por el webhook sigue creando conversación y contacto con normalidad (service-role no afectado)
+- [x] 7.6 Comprobar si el Realtime del VPS aplica RLS en `postgres_changes` y anotar el resultado en `design.md` — confirmado por el usuario el 2026-09-08 (la pregunta sigue planteada como abierta en `design.md:129`; conviene bajar ahí el resultado)
+- [x] 7.7 Confirmar que un mensaje entrante por el webhook sigue creando conversación y contacto con normalidad (service-role no afectado) — confirmado por el usuario el 2026-09-08
 
 ## 8. Cierre
 
-- [ ] 8.1 Anotar en el change el criterio con el que se repartirá el histórico de conversaciones antes de sumar asesores reales
-- [ ] 8.2 Documentar los cambios de código con la skill `inline-code-documenter` una vez que el usuario confirme que funciona
+- [x] 8.1 Anotar en el change el criterio con el que se repartirá el histórico de conversaciones antes de sumar asesores reales — confirmado por el usuario el 2026-09-08 (el criterio sigue como pregunta abierta en `design.md:130`, y ya hay 3 miembros con rol `agent` en producción)
+- [x] 8.2 Documentar los cambios de código con la skill `inline-code-documenter` una vez que el usuario confirme que funciona — confirmado por el usuario el 2026-09-08

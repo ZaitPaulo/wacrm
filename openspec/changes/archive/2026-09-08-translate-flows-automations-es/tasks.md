@@ -82,6 +82,6 @@
 
 - [x] 10.1 `pnpm test` en verde
 - [x] 10.2 `pnpm lint` y compilación de tipos sin errores
-- [ ] 10.3 (requiere aplicar la migración) Recorrer en la interfaz: galería de plantillas, editor de flujos con un error de validación provocado, editor de automatizaciones y embudo — todo en español
-- [ ] 10.4 (requiere aplicar la migración) Ejercitar el guion de punta a punta y confirmar que el agente ve la nota con las respuestas en la barra lateral del contacto
+- [x] 10.3 (requiere aplicar la migración) Recorrer en la interfaz: galería de plantillas, editor de flujos con un error de validación provocado, editor de automatizaciones y embudo — todo en español — confirmado por el usuario el 2026-09-08
+- [x] 10.4 (requiere aplicar la migración) Ejercitar el guion de punta a punta y confirmar que el agente ve la nota con las respuestas en la barra lateral del contacto — confirmado por el usuario el 2026-09-08
 - [x] 10.5 Anotar en `CHANGELOG.md` el cambio de comportamiento de la nota de derivación
