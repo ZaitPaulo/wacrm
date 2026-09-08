@@ -62,9 +62,10 @@
 
 ## 9. Migración de los datos ya cargados
 
-> **Escrita y sin aplicar.** No hay Docker, `psql`, proyecto enlazado ni
-> cadena de conexión en `.env`, así que la migración no se pudo ejecutar
-> desde aquí. El SQL está en `supabase/migrations/509_flows_automations_es.sql`.
+> **Aplicada.** Figura en `supabase_migrations.schema_migrations` del VPS y
+> `apply-migrations.sh --dry-run` la da por aplicada (60/60, 0 pendientes).
+> La nota anterior —«escrita y sin aplicar, no hay Docker ni `psql` desde
+> aquí»— venció con el corte de producción al servidor propio.
 
 - [x] 9.1 Crear `supabase/migrations/509_*.sql`, idempotente, sin UUIDs de esta instalación y reescribiendo solo lo que aún coincide con el texto en inglés de la semilla original
 - [x] 9.1b **Ampliar el CHECK de `flow_runs.status` para admitir `cancelled`** — el código del grupo 3 ya lo escribe y la base lo rechaza hasta que esta migración corra
@@ -74,8 +75,8 @@
 - [x] 9.5 Renombrar las 5 `pipeline_stages` sin alterar `id` ni `position`
 - [x] 9.6 Crear la etiqueta de calificación si no existe, conservando "Prospecto"
 - [x] 9.7 Cerrar las ejecuciones `active` de flujos que no están `active`
-- [ ] 9.8 (requiere aplicar la migración) Verificar que el nodo editado a mano ("Transfiriendo a un agente de servicio") no fue sobrescrito
-- [ ] 9.9 (requiere aplicar la migración) Re-ejecutar la migración y comprobar que no produce cambios
+- [x] ~~9.8 Verificar que el nodo editado a mano ("Transfiriendo a un agente de servicio") no fue sobrescrito~~ — **sin objeto**: verificado el 2026-09-08 contra el VPS, ese nodo ya no existe. La cuenta LoraMotors tiene 3 flujos («Calificación de prospecto», «Menú de bienvenida», «Preguntas frecuentes»), todos en `draft`, y no queda rastro del flujo heredado (`name ILIKE '%heredado%' OR '%Lead capture%'` → 0 filas). La base actual es la del VPS, sembrada ya en español; el flujo inglés con la edición del operador vivía en el proyecto de la nube que se retiró en el corte de producción
+- [x] 9.9 Re-ejecutar la migración y comprobar que no produce cambios — verificado el 2026-09-08 contra el VPS, re-ejecutada dentro de `BEGIN; … ROLLBACK;` para no escribir: 22 `UPDATE 0`, 2 `DELETE 0` y 1 `INSERT 0 0`. Ni una fila tocada; el `INSERT 0 0` confirma además que la etiqueta de calificación de 9.6 ya existe
 
 ## 10. Verificación final
 

@@ -26,7 +26,7 @@
 - [x] 3.1 Escribir la migración 513: tabla `facebook_config` (una por cuenta, `page_id`, token cifrado, `token_expires_at`, `status`, RLS de `admin`) con el mismo trato que `instagram_config`
 - [x] 3.2 En la misma migración, ampliar el `CHECK` de `social_posts.network` a `('instagram', 'facebook')`
 - [x] 3.3 Verificar que la migración es idempotente y que no modifica ninguna fila existente
-- [ ] 3.4 Aplicar la migración en el VPS de desarrollo y comprobar que la cola de Instagram sigue funcionando igual
+- [ ] 3.4 Aplicar la migración en el VPS de desarrollo y comprobar que la cola de Instagram sigue funcionando igual — la migración 517 **ya está aplicada** (verificado el 2026-09-08 en `schema_migrations`); falta solo comprobar la cola de Instagram
 
 ## 4. Cliente de Facebook
 

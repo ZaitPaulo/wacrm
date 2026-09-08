@@ -1,19 +1,19 @@
 ## 1. Datos y contrato
 
-- [ ] 1.1 Crear `supabase/migrations/518_showcase_brand_color.sql` con `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS public_brand_color TEXT`, comentando por qué es nullable y por qué el código funciona sin ella
-- [ ] 1.2 Agregar `public_brand_color` a `ACCOUNT_COLUMNS` y `created_at` al `select` de vehículos en `src/lib/showcase/data.ts`
-- [ ] 1.3 Agregar `public_brand_color` a `ShowcaseAccount` y `created_at` a `ShowcaseVehicle` en `src/lib/showcase/format.ts`
-- [ ] 1.4 Escribir `resolveBrandColor(value)` en `format.ts`: valida `/^#[0-9a-fA-F]{6}$/`, devuelve la constante de respaldo si falta o es inválido
-- [ ] 1.5 Escribir `requestPhotosHref(number, vehicle)` en `format.ts`, hermana de `whatsappHref`, con `formatRefTag` al final y sin código cuando el vehículo no lo tenga
-- [ ] 1.6 Cubrir `resolveBrandColor` y `requestPhotosHref` en `src/lib/showcase/format.test.ts`, incluyendo color ausente, color inválido, vehículo con `public_ref` y vehículo sin él
-- [ ] 1.7 Extender `getShowcaseVehicle` para devolver hasta 3 vehículos parecidos (misma `body_type`, misma cuenta, `status = 'available'`, excluyendo el id actual, por cercanía de precio) y devolver lista vacía cuando no haya
+- [x] 1.1 Crear `supabase/migrations/518_showcase_brand_color.sql` con `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS public_brand_color TEXT`, comentando por qué es nullable y por qué el código funciona sin ella
+- [x] 1.2 Agregar `public_brand_color` a `ACCOUNT_COLUMNS` y `created_at` al `select` de vehículos en `src/lib/showcase/data.ts` — la mitad de `created_at` quedó sin efecto al retirarse 4.3; sigue usándose en el `.order()`, que no exige seleccionarlo
+- [x] 1.3 Agregar `public_brand_color` a `ShowcaseAccount` y `created_at` a `ShowcaseVehicle` en `src/lib/showcase/format.ts` — `created_at` no se agregó, por lo mismo que 1.2
+- [x] 1.4 Escribir `resolveBrandColor(value)` en `format.ts`: valida `/^#[0-9a-fA-F]{6}$/`, devuelve la constante de respaldo si falta o es inválido
+- [x] 1.5 Escribir `requestPhotosHref(number, vehicle)` en `format.ts`, hermana de `whatsappHref`, con `formatRefTag` al final y sin código cuando el vehículo no lo tenga
+- [x] 1.6 Cubrir `resolveBrandColor` y `requestPhotosHref` en `src/lib/showcase/format.test.ts`, incluyendo color ausente, color inválido, vehículo con `public_ref` y vehículo sin él
+- [x] 1.7 Extender `getShowcaseVehicle` para devolver hasta 3 vehículos parecidos (misma `body_type`, misma cuenta, `status = 'available'`, excluyendo el id actual, por cercanía de precio) y devolver lista vacía cuando no haya
 
 ## 2. Traducciones
 
-- [ ] 2.1 Inventariar todas las cadenas visibles escritas hoy en el código de `src/components/storefront/` y `src/app/vehiculo/[id]/page.tsx`
-- [ ] 2.2 Agregar al namespace `Storefront` de `messages/es.json` las claves existentes que faltan y las nuevas: buscador, orden y sus cuatro opciones, los tres atajos, conteo de resultados, limpiar, contador de filtros activos, estado vacío, "sin fotos todavía", "pedir fotos", contador de galería, "vehículos parecidos", "volver al inventario", explicación del código de referencia
-- [ ] 2.3 Replicar las claves nuevas en `messages/en.json` y `messages/ko.json`
-- [ ] 2.4 Verificar que los tres archivos tienen exactamente el mismo conjunto de claves bajo `Storefront`
+- [x] 2.1 Inventariar todas las cadenas visibles escritas hoy en el código de `src/components/storefront/` y `src/app/vehiculo/[id]/page.tsx`
+- [x] 2.2 Agregar al namespace `Storefront` de `messages/es.json` las claves existentes que faltan y las nuevas: buscador, orden y sus cuatro opciones, los tres atajos, conteo de resultados, limpiar, contador de filtros activos, estado vacío, "sin fotos todavía", "pedir fotos", contador de galería, "vehículos parecidos", "volver al inventario", explicación del código de referencia
+- [x] 2.3 Replicar las claves nuevas en `messages/en.json` y `messages/ko.json`
+- [x] 2.4 Verificar que los tres archivos tienen exactamente el mismo conjunto de claves bajo `Storefront`
 
 ## 3. Grupo de rutas público y sistema visual
 
