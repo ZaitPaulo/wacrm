@@ -29,6 +29,8 @@ import {
 import { resolveTemplateRow } from '@/lib/whatsapp/template-body';
 import type { MessageTemplate } from '@/types';
 import { findOrCreateContact } from '@/lib/api/v1/contacts';
+import { resolveRecipientId } from '@/lib/outbound/gate';
+import { isPhoneRecipient } from '@/lib/whatsapp/recipient';
 
 /** Thrown by createBroadcast on a caller-visible failure; route maps it. */
 export class BroadcastError extends Error {
@@ -42,9 +44,24 @@ export class BroadcastError extends Error {
   }
 }
 
+/**
+ * Un destinatario de la difusión: por teléfono o por contacto.
+ *
+ * Las dos formas existen porque las dos fuentes son distintas. Un CSV
+ * solo puede traer teléfonos, y ahí `to` es lo único que hay. Pero
+ * cuando la audiencia se arma DENTRO del CRM ya sabemos de qué contacto
+ * se trata, y degradarlo a su teléfono pierde a quien no tiene ninguno
+ * — que desde que WhatsApp tiene nombres de usuario es gente real, no
+ * un caso de borde.
+ *
+ * Con `contactId` el destino sale de sus identidades de canal, que es
+ * la misma resolución que usan la bandeja, los flujos y la IA.
+ */
 export interface BroadcastRecipientInput {
-  /** E.164 phone. */
-  to: string;
+  /** E.164 phone. Alternativa a `contactId`. */
+  to?: string;
+  /** Contacto ya conocido del CRM. Alcanza también a quien no tiene teléfono. */
+  contactId?: string;
   /** Positional body params for the template ({{1}}, {{2}}…). */
   params?: string[];
 }
@@ -58,7 +75,11 @@ export interface CreateBroadcastParams {
 
 interface PlannedRecipient {
   recipientRowId: string;
-  phone: string;
+  /**
+   * A dónde se manda: el teléfono, o el BSUID de quien no lo comparte.
+   * `sendTemplateMessage` lo pone en el campo que corresponda.
+   */
+  recipientId: string;
   params: string[];
 }
 
@@ -70,7 +91,7 @@ export interface BroadcastPlan {
   accessToken: string;
   templateRow: MessageTemplate | null;
   planned: PlannedRecipient[];
-  /** Phones rejected up front (invalid E.164) — counted as failed. */
+  /** Destinatarios sin destino alcanzable — cuentan como fallidos. */
   rejected: number;
 }
 
@@ -141,11 +162,44 @@ export async function createBroadcast(
   }
   const templateRow = resolvedTemplate.row;
 
-  // Resolve each recipient to a contact. Invalid phones are dropped
-  // (counted as rejected) rather than aborting the whole broadcast.
-  const resolved: { contactId: string; phone: string; params: string[] }[] = [];
+  // Cada destinatario se resuelve a un contacto Y a un destino. Lo que
+  // no se puede resolver se descarta contándolo como rechazado, en vez
+  // de abortar la difusión entera.
+  const resolved: {
+    contactId: string;
+    recipientId: string;
+    params: string[];
+  }[] = [];
   let rejected = 0;
   for (const r of recipients) {
+    const params = Array.isArray(r.params)
+      ? r.params.filter((p): p is string => typeof p === 'string')
+      : [];
+
+    // Camino por contacto: la audiencia se armó dentro del CRM y ya
+    // sabemos de quién se trata. El destino sale de sus identidades de
+    // canal, así que alcanza también a quien no tiene teléfono.
+    if (r.contactId) {
+      const destino = await resolveRecipientId(
+        db,
+        accountId,
+        r.contactId,
+        'whatsapp'
+      );
+      if (!destino.ok) {
+        rejected++;
+        continue;
+      }
+      resolved.push({
+        contactId: r.contactId,
+        recipientId: destino.recipientId,
+        params,
+      });
+      continue;
+    }
+
+    // Camino por teléfono: un CSV, o la API pública. Acá el número ES
+    // el destino, y además hay que encontrar o crear su contacto.
     const sanitized = sanitizePhoneForMeta(typeof r.to === 'string' ? r.to : '');
     if (!isValidE164(sanitized)) {
       rejected++;
@@ -154,13 +208,7 @@ export async function createBroadcast(
     const { id } = await findOrCreateContact(db, accountId, auditUserId, {
       phone: sanitized,
     });
-    resolved.push({
-      contactId: id,
-      phone: sanitized,
-      params: Array.isArray(r.params)
-        ? r.params.filter((p): p is string => typeof p === 'string')
-        : [],
-    });
+    resolved.push({ contactId: id, recipientId: sanitized, params });
   }
 
   // Collapse recipients that resolved to the SAME contact (the caller
@@ -178,7 +226,7 @@ export async function createBroadcast(
   if (deduped.length === 0) {
     throw new BroadcastError(
       'bad_request',
-      'No recipients had a valid E.164 phone number',
+      'No recipients could be resolved to a reachable destination',
       400
     );
   }
@@ -226,7 +274,11 @@ export async function createBroadcast(
   const planned: PlannedRecipient[] = createdRows.map(
     (row: { recipient_id: string; contact_id: string }) => {
       const r = byContact.get(row.contact_id)!;
-      return { recipientRowId: row.recipient_id, phone: r.phone, params: r.params };
+      return {
+        recipientRowId: row.recipient_id,
+        recipientId: r.recipientId,
+        params: r.params,
+      };
     }
   );
 
@@ -260,7 +312,12 @@ export async function deliverBroadcast(
   plan: BroadcastPlan
 ): Promise<void> {
   for (const recipient of plan.planned) {
-    const variants = phoneVariants(recipient.phone);
+    // Las variantes corrigen prefijos troncales de un TELEFONO. Sobre
+    // un BSUID no hay nada que corregir: recortarle digitos a un
+    // identificador opaco solo produce identificadores de nadie.
+    const variants = isPhoneRecipient(recipient.recipientId)
+      ? phoneVariants(recipient.recipientId)
+      : [recipient.recipientId];
     let sentMessageId: string | null = null;
     let lastError: string | null = null;
 

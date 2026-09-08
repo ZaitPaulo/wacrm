@@ -22,6 +22,7 @@ import { BroadcastError, type BroadcastPlan } from '@/lib/whatsapp/broadcast-cor
 import { decrypt } from '@/lib/whatsapp/encryption';
 import { resolveTemplateRow } from '@/lib/whatsapp/template-body';
 import { sanitizePhoneForMeta, isValidE164 } from '@/lib/whatsapp/phone-utils';
+import { resolveRecipientId } from '@/lib/outbound/gate';
 
 /** Which recipients a resume pass picks up. */
 export type ResumeScope = 'pending' | 'failed' | 'all';
@@ -118,6 +119,7 @@ export interface ResumePlan {
 interface RecipientRow {
   id: string;
   template_params: unknown;
+  contact_id: string;
   contact: { phone?: string | null } | { phone?: string | null }[] | null;
 }
 
@@ -158,7 +160,7 @@ export async function planBroadcastResume(
   const statuses = scopeStatuses(scope);
   const { data: rawRows, error: recError } = await db
     .from('broadcast_recipients')
-    .select('id, template_params, contact:contacts(phone)')
+    .select('id, template_params, contact_id, contact:contacts(phone)')
     .eq('broadcast_id', broadcastId)
     .in('status', statuses)
     // Oldest first, so repeated capped passes chew through the backlog
@@ -172,14 +174,33 @@ export async function planBroadcastResume(
 
   const rows = (rawRows ?? []) as RecipientRow[];
 
-  // A recipient whose contact has no usable phone can never send. Stamp
-  // it failed now: leaving it 'pending' would keep the broadcast in
-  // 'sending' forever, which is the very symptom being fixed.
-  const sendable: RecipientRow[] = [];
+  // Un destinatario al que no se puede alcanzar nunca va a enviarse.
+  // Se marca fallido ya: dejarlo 'pending' mantendria la difusion en
+  // 'sending' para siempre, que es justo el sintoma que esto arregla.
+  //
+  // "No alcanzable" ya no es lo mismo que "sin telefono". Desde que
+  // WhatsApp tiene nombres de usuario hay contactos con los que solo se
+  // puede hablar por su identidad de canal, y darlos por fallidos aqui
+  // los sacaria de toda difusion que se reanude.
+  //
+  // El telefono se resuelve por el join, sin consulta extra, y es el
+  // caso de la inmensa mayoria. Solo se consultan las identidades de
+  // quien no tiene numero.
+  const sendable: { row: RecipientRow; recipientId: string }[] = [];
   const unsendable: string[] = [];
   for (const row of rows) {
     const sanitized = sanitizePhoneForMeta(contactPhone(row) ?? '');
-    if (isValidE164(sanitized)) sendable.push(row);
+    if (isValidE164(sanitized)) {
+      sendable.push({ row, recipientId: sanitized });
+      continue;
+    }
+    const destino = await resolveRecipientId(
+      db,
+      accountId,
+      row.contact_id,
+      'whatsapp'
+    );
+    if (destino.ok) sendable.push({ row, recipientId: destino.recipientId });
     else unsendable.push(row.id);
   }
   if (unsendable.length > 0) {
@@ -187,7 +208,7 @@ export async function planBroadcastResume(
       .from('broadcast_recipients')
       .update({
         status: 'failed',
-        error_message: 'No valid phone number on contact',
+        error_message: 'No reachable destination on contact',
       })
       .in('id', unsendable);
   }
@@ -239,9 +260,9 @@ export async function planBroadcastResume(
     phoneNumberId: config.phone_number_id,
     accessToken: decrypt(config.access_token),
     templateRow: resolvedTemplate.row,
-    planned: slice.map((row) => ({
+    planned: slice.map(({ row, recipientId }) => ({
       recipientRowId: row.id,
-      phone: sanitizePhoneForMeta(contactPhone(row) ?? ''),
+      recipientId,
       params: Array.isArray(row.template_params)
         ? row.template_params.filter((p): p is string => typeof p === 'string')
         : [],

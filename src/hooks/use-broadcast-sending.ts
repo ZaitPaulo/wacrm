@@ -79,7 +79,8 @@ function sleep(ms: number) {
 }
 
 interface BroadcastApiResult {
-  phone: string;
+  phone?: string;
+  contact_id?: string;
   status: 'sent' | 'failed';
   whatsapp_message_id?: string;
   error?: string;
@@ -478,15 +479,20 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       for (let i = 0; i < recipients.length; i += SEND_BATCH_SIZE) {
         const batch = recipients.slice(i, i + SEND_BATCH_SIZE);
 
-        const apiRecipients = batch
-          .filter((r) => r.contact?.phone)
-          .map((r) => ({
-            phone: r.contact!.phone as string,
-            // Read back off the row rather than re-resolved, so this
-            // pass and any later resume send identical params.
-            params: Array.isArray(r.template_params) ? r.template_params : [],
-            ...(messageParams ? { messageParams } : {}),
-          }));
+        // Se manda el CONTACTO, no su telefono.
+        //
+        // Antes esto filtraba por `r.contact?.phone` y descartaba EN
+        // SILENCIO a quien no tuviera numero: ni se enviaba, ni contaba
+        // como fallido, ni nadie se enteraba. Desde que WhatsApp tiene
+        // nombres de usuario esos son clientes reales, y el servidor
+        // sabe alcanzarlos por su identidad de canal.
+        const apiRecipients = batch.map((r) => ({
+          contact_id: r.contact_id,
+          // Read back off the row rather than re-resolved, so this
+          // pass and any later resume send identical params.
+          params: Array.isArray(r.template_params) ? r.template_params : [],
+          ...(messageParams ? { messageParams } : {}),
+        }));
 
         if (apiRecipients.length === 0) continue;
 
@@ -519,14 +525,15 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
             await sleep(retryIn);
           }
 
-          const resultsByPhone = new Map<string, BroadcastApiResult>();
+          // Emparejado por contacto, no por telefono: un destinatario
+          // sin numero no tendria con que emparejarse.
+          const resultsByContact = new Map<string, BroadcastApiResult>();
           for (const r of (data.results ?? []) as BroadcastApiResult[]) {
-            resultsByPhone.set(r.phone, r);
+            if (r.contact_id) resultsByContact.set(r.contact_id, r);
           }
 
           for (const recipient of batch) {
-            const phone = recipient.contact?.phone;
-            const result = phone ? resultsByPhone.get(phone) : undefined;
+            const result = resultsByContact.get(recipient.contact_id);
 
             if (!result) {
               failedCount++;
@@ -534,7 +541,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
                 .from('broadcast_recipients')
                 .update({
                   status: 'failed',
-                  error_message: 'No phone number on contact',
+                  error_message: 'No reachable destination for this contact',
                 })
                 .eq('id', recipient.id);
               continue;

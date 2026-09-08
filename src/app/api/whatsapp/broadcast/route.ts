@@ -15,9 +15,14 @@ import {
   rateLimitResponse,
   RATE_LIMITS,
 } from '@/lib/rate-limit'
+import { resolveRecipientId } from '@/lib/outbound/gate'
+import { isPhoneRecipient } from '@/lib/whatsapp/recipient'
 
 interface BroadcastResult {
-  phone: string
+  /** Devuelto tal cual llego, para que el llamador empareje su fila. */
+  phone?: string
+  /** Idem, cuando el destinatario se pidio por contacto. */
+  contact_id?: string
   status: 'sent' | 'failed'
   whatsapp_message_id?: string
   error?: string
@@ -46,7 +51,18 @@ interface BroadcastResult {
  * shape is what actually fixes that.
  */
 interface NewRecipient {
-  phone: string
+  /**
+   * El telefono. OPCIONAL desde que un contacto puede no tener ninguno:
+   * quien adopta un nombre de usuario de WhatsApp solo es alcanzable
+   * por su identidad de canal. Para esos hay que mandar `contact_id`.
+   */
+  phone?: string
+  /**
+   * Contacto del CRM. El destino se resuelve desde sus identidades,
+   * igual que en la bandeja y en los flujos, asi que alcanza tambien a
+   * quien no tiene numero. Tiene prioridad sobre `phone`.
+   */
+  contact_id?: string
   /** Body variable values, one per {{N}}. Legacy field. */
   params?: string[]
   /**
@@ -165,21 +181,43 @@ export async function POST(request: Request) {
     let failedCount = 0
 
     for (const recipient of recipients) {
-      const sanitized = sanitizePhoneForMeta(recipient.phone)
+      // Como vuelve identificado este destinatario en la respuesta.
+      const eco = recipient.contact_id
+        ? { contact_id: recipient.contact_id }
+        : { phone: recipient.phone }
 
-      if (!isValidE164(sanitized)) {
+      // El destino: por contacto se resuelve desde sus identidades de
+      // canal —lo que alcanza a quien no comparte su numero—; por
+      // telefono, el numero ES el destino.
+      let destino: string | null = null
+      if (recipient.contact_id) {
+        const r = await resolveRecipientId(
+          supabase,
+          accountId,
+          recipient.contact_id,
+          'whatsapp'
+        )
+        if (r.ok) destino = r.recipientId
+      } else {
+        const sanitized = sanitizePhoneForMeta(recipient.phone ?? '')
+        if (isValidE164(sanitized)) destino = sanitized
+      }
+
+      if (!destino) {
         results.push({
-          phone: recipient.phone,
+          ...eco,
           status: 'failed',
-          error: 'Invalid phone number format',
+          error: 'No reachable destination for this recipient',
         })
         failedCount++
         continue
       }
 
-      // Retry with phone variants on "not in allowed list" so numbers
-      // that differ only in a trunk-prefix 0 still reach recipients.
-      const variants = phoneVariants(sanitized)
+      // Las variantes corrigen prefijos troncales de un TELEFONO. Sobre
+      // un BSUID no hay nada que corregir.
+      const variants = isPhoneRecipient(destino)
+        ? phoneVariants(destino)
+        : [destino]
       let sentMessageId: string | null = null
       let lastError: string | null = null
 
@@ -212,18 +250,18 @@ export async function POST(request: Request) {
 
       if (sentMessageId) {
         results.push({
-          phone: recipient.phone,
+          ...eco,
           status: 'sent',
           whatsapp_message_id: sentMessageId,
         })
         sentCount++
       } else {
         console.error(
-          `Failed to send broadcast to ${recipient.phone}:`,
+          `Failed to send broadcast to ${recipient.contact_id ?? recipient.phone}:`,
           lastError
         )
         results.push({
-          phone: recipient.phone,
+          ...eco,
           status: 'failed',
           error: lastError || 'Unknown error',
         })
