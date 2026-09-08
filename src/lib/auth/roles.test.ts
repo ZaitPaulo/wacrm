@@ -7,6 +7,7 @@ import {
   canManageMembers,
   canSendMessages,
   canTransferOwnership,
+  canViewAllConversations,
   canViewOnly,
   hasMinRole,
   isAccountRole,
@@ -119,6 +120,16 @@ describe("capability predicates", () => {
     expect(canDeleteAccount("admin")).toBe(false);
     expect(canDeleteAccount("agent")).toBe(false);
     expect(canDeleteAccount("viewer")).toBe(false);
+  });
+
+  it("canViewAllConversations: todos menos el asesor", () => {
+    expect(canViewAllConversations("owner")).toBe(true);
+    expect(canViewAllConversations("admin")).toBe(true);
+    expect(canViewAllConversations("agent")).toBe(false);
+    // El viewer supervisa: recortarlo a "lo asignado" —que para él es
+    // nada— dejaría el rol sin sentido. Por eso no se escribe con
+    // hasMinRole, que lo dejaría fuera junto con el agent.
+    expect(canViewAllConversations("viewer")).toBe(true);
   });
 
   it("canTransferOwnership: owner only", () => {

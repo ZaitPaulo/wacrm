@@ -7,6 +7,7 @@ import {
   canManageMembers,
   canSendMessages,
   canTransferOwnership,
+  canViewAllConversations,
   canViewMargins,
   canViewOnly,
 } from "@/lib/auth/roles";
@@ -24,7 +25,8 @@ export type CanAction =
   | "view-only"
   | "delete-account"
   | "transfer-ownership"
-  | "view-margins";
+  | "view-margins"
+  | "view-all-conversations";
 
 /**
  * Inline alternative to `<RequireRole>` for places that need a
@@ -58,6 +60,8 @@ export function useCan(action: CanAction): boolean {
       return canTransferOwnership(accountRole);
     case "view-margins":
       return canViewMargins(accountRole);
+    case "view-all-conversations":
+      return canViewAllConversations(accountRole);
     default: {
       // Exhaustiveness check — adding a new `CanAction` without a
       // case here fails the typecheck because TS narrows `action`

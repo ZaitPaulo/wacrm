@@ -70,6 +70,13 @@ export default function ContactsPage() {
   const supabase = createClient();
   const canEdit = useCan('send-messages');
   const canEditSettings = useCan('edit-settings');
+  // El asesor solo ve los contactos con una conversación asignada a él
+  // (RLS de la migración 520). Un contacto que acabe de crear no tendría
+  // ninguna, así que se le desaparecería al guardar — y el `.select()`
+  // que sigue al insert ni siquiera puede devolvérselo. Antes que
+  // ofrecerle una trampa, no se le ofrece: dar de alta contactos es del
+  // admin. Esto es cosmético; lo que manda es la RLS.
+  const isRestrictedAgent = !useCan('view-all-conversations');
 
   const [contacts, setContacts] = useState<ContactWithTags[]>([]);
   const [loading, setLoading] = useState(true);
@@ -370,25 +377,29 @@ export default function ContactsPage() {
               {t('customFieldsBtn')}
             </Button>
           )}
-          <GatedButton
-            variant="outline"
-            canAct={canEdit}
-            gateReason="add or import contacts"
-            onClick={() => setImportOpen(true)}
-            className="border-border text-muted-foreground hover:bg-muted"
-          >
-            <Upload className="size-4" />
-            {t('importBtn')}
-          </GatedButton>
-          <GatedButton
-            canAct={canEdit}
-            gateReason="add or import contacts"
-            onClick={openAddForm}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            {t('addContactBtn')}
-          </GatedButton>
+          {!isRestrictedAgent && (
+            <>
+              <GatedButton
+                variant="outline"
+                canAct={canEdit}
+                gateReason="add or import contacts"
+                onClick={() => setImportOpen(true)}
+                className="border-border text-muted-foreground hover:bg-muted"
+              >
+                <Upload className="size-4" />
+                {t('importBtn')}
+              </GatedButton>
+              <GatedButton
+                canAct={canEdit}
+                gateReason="add or import contacts"
+                onClick={openAddForm}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                <Plus className="size-4" />
+                {t('addContactBtn')}
+              </GatedButton>
+            </>
+          )}
         </div>
       </div>
 
@@ -599,7 +610,7 @@ export default function ContactsPage() {
                         ? t('noContactsMatch')
                         : t('noContactsYet')}
                     </p>
-                    {!hasActiveFilters && (
+                    {!hasActiveFilters && !isRestrictedAgent && (
                       <GatedButton
                         canAct={canEdit}
                         gateReason="add or import contacts"

@@ -113,6 +113,26 @@ export function canViewMargins(role: AccountRole): boolean {
   return hasMinRole(role, "admin");
 }
 
+/**
+ * Owner / admin / viewer: ver toda la bandeja de la cuenta, no solo lo
+ * asignado a uno. El `agent` es el único rol recortado: su bandeja son
+ * las conversaciones donde `assigned_agent_id` es él, y de ahí cuelga
+ * qué contactos y qué negocios ve.
+ *
+ * `viewer` ve todo a propósito: es un rol de supervisión de solo
+ * lectura, y recortarlo a "lo asignado" —que para un viewer es nada—
+ * lo dejaría inservible. Por eso esto no se escribe con `hasMinRole`.
+ *
+ * Este predicado es cosmético: sirve para esconder lo que la base va a
+ * negar igual (la opción "Sin asignar" del hilo, el alta de contactos).
+ * La frontera real es la RLS de la migración 520, que resuelve la misma
+ * regla con `conversation_visible` / `contact_visible`: un asesor que
+ * se salte la interfaz recibe cero filas.
+ */
+export function canViewAllConversations(role: AccountRole): boolean {
+  return role !== "agent";
+}
+
 /** Owner only: irreversible destructive operations. */
 export function canDeleteAccount(role: AccountRole): boolean {
   return role === "owner";
