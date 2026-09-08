@@ -666,6 +666,25 @@ async function persistMessage(
     name: contact.profile.name || null,
   };
 
+  // DIAGNÓSTICO — no hay contacto que resolver y el mensaje se va a
+  // descartar. Pasa con remitentes cuya identidad NO es un teléfono
+  // (vistos en producción como `CO.4481978948757066` dentro del wamid),
+  // y hasta hoy ocurría en silencio: no quedaba ni la fila ni el log,
+  // así que los mensajes de esas personas desaparecían sin que nadie
+  // pudiera enterarse. Se vuelca el sobre completo para poder darle a
+  // la identidad el tratamiento que corresponda en vez de adivinarlo.
+  if (!sender.externalId) {
+    console.error(
+      '[webhook] remitente sin teléfono utilizable — sobre completo:',
+      JSON.stringify({
+        from: message.from,
+        type: message.type,
+        id: message.id,
+        contact,
+      })
+    );
+  }
+
   const common = {
     db: supabaseAdmin(),
     accountId,
