@@ -1,9 +1,10 @@
 ## 1. Leer el terreno antes de tocarlo
 
-- [ ] 1.1 Leer la migración 513 y confirmar que `contact_channels` admite dos filas del mismo canal para un mismo contacto (pregunta abierta del diseño)
-- [ ] 1.2 Buscar toda lectura que asuma "una identidad por canal por contacto" y anotarla; la decisión 2 la rompe
-- [ ] 1.3 Verificar contra la API real que un envío con `recipient` a `CO.4481978948757066` es aceptado, ANTES de construir sobre esa suposición
-- [ ] 1.4 Averiguar si se puede mandar una plantilla a un BSUID, que es lo que decide si las difusiones los alcanzan
+- [x] 1.1 Leer la migración 513 y confirmar que `contact_channels` admite dos filas del mismo canal para un mismo contacto — **sí**: el único índice único es `(account_id, channel, external_id)`
+- [x] 1.2 Buscar toda lectura que asuma "una identidad por canal por contacto" — dos hallazgos: `outbound/gate.ts:229` usa `.maybeSingle()` y revienta con dos filas (hay que arreglarlo, tareas del grupo 4), y `api/contacts/identity-links/route.ts:42,58,74` listaría `whatsapp` repetido (cosmético, deduplicar)
+- [x] 1.3 Verificar que Meta acepta `recipient` — **sí**, establecido por contraste de errores; ver los hallazgos del diseño. Queda sin probar con un BSUID REAL, que exige mandarle un mensaje a una persona de verdad
+- [x] 1.4 Averiguar si se puede mandar una plantilla a un BSUID — **sí**, salvo plantillas de autenticación one-tap, zero-tap y copy-code
+- [ ] 1.5 **NUEVO** — Decidir si el manejo del webhook `user_id_update` entra en este cambio. El BSUID se regenera cuando la persona cambia de número, y sin seguir ese cambio el requisito de no duplicar queda con un agujero conocido
 
 ## 2. Reconocer la identidad al recibir
 

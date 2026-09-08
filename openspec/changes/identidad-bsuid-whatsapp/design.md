@@ -100,9 +100,25 @@ Verificación: el caso de producción está disponible y es reproducible a volun
 
 Reversión: revertir el commit. Deja atrás los contactos creados por BSUID y sus filas en `contact_channels`; no estorban, pero esos contactos vuelven a quedar sin poder recibir mensajes.
 
+## Hallazgos del grupo 1 (2026-09-08)
+
+Lo que la lectura y las pruebas dejaron establecido, para no volver a averiguarlo:
+
+- **`contact_channels` admite dos filas del mismo canal por contacto.** El único índice único es `(account_id, channel, external_id)`; no hay unicidad por `(cuenta, canal, contacto)`. La decisión 2 es viable sin migración.
+- **Meta acepta `recipient`.** Verificado por contraste: un envío con `recipient` y un BSUID inexistente devuelve `(#100) Invalid parameter`, mientras que un envío SIN destinatario devuelve `The parameter to is required`. Si el campo fuera desconocido, el primero habría dado el segundo error. Reconoce el campo y rechaza el valor.
+- **Las plantillas funcionan con BSUID**, salvo las de autenticación *one-tap*, *zero-tap* y *copy-code*, que exigen teléfono. Las difusiones, entonces, los alcanzan.
+- **El comentario de `contact_channels.external_id` en la 513 quedó desactualizado**: dice que para WhatsApp es el teléfono normalizado. Corregirlo pide una migración de solo comentario, que este cambio evita a propósito; queda anotado para la próxima que toque el esquema.
+
+### El hallazgo que cambia el diseño: el BSUID NO es permanente
+
+La documentación dice que **los BSUID se regeneran cuando la persona cambia de número de teléfono**, y que eso dispara un webhook `user_id_update`.
+
+Eso golpea a la decisión 2. Vincular el BSUID para todos sigue siendo lo correcto —resuelve el caso frecuente—, pero deja de ser suficiente por sí solo: si el identificador cambia y no lo seguimos, la identidad guardada queda vieja y la persona vuelve a aparecer como alguien nuevo. Es exactamente el duplicado que este cambio quiere evitar, solo que por otra puerta.
+
+No se encontró documentación pública del payload de ese webhook, así que la forma exacta está sin confirmar.
+
 ## Open Questions
 
-- ¿`contact_channels` tiene alguna restricción que impida dos filas del mismo canal para un contacto? Hay que leer la 513 antes de escribir código, no después.
+- **¿Se incluye el manejo de `user_id_update` en este cambio?** Sin él, el requisito de no duplicar tiene un agujero conocido. Con él, hace falta la forma del payload, que no está documentada: habría que suscribirse al campo y observar uno real, o escribir un manejador defensivo que tolere una forma que todavía no vimos. **Decisión pendiente del usuario.**
 - ¿Qué muestra la interfaz hoy donde va el teléfono, y qué debería mostrar cuando no hay? Afecta la bandeja, la ficha del contacto y la lista.
-- ¿Se puede mandar una **plantilla** a un BSUID? Importa para las difusiones y para reabrir una conversación fuera de la ventana de 24 horas. La documentación consultada cubre el envío en general, no este caso puntual.
 - ¿Qué pasa con la carga masiva y la exportación de contactos, que hoy giran alrededor del teléfono?
