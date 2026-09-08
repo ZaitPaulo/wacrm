@@ -11,6 +11,7 @@ import {
 import { delay, hasNewerCustomerMessage, hasOutboundSince } from './reply-window'
 import { buildHandoffSummary } from './handoff'
 import { evaluateHandoffGate } from './handoff-gate'
+import { pickHandoffAgent, primerNombre, type HandoffAgent } from './pick-agent'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { engineSendText } from '@/lib/flows/meta-send'
@@ -376,11 +377,27 @@ async function handOffToHuman(args: {
     ai_autoreply_disabled: true,
     ai_handoff_summary: args.summary,
   }
-  // Solo se pone dueño si hay uno configurado Y el hilo no tiene ya el
-  // suyo: nunca se pisa una asignacion humana existente.
-  if (args.handoffAgentId && !args.assignedAgentId) {
-    update.assigned_agent_id = args.handoffAgentId
+
+  // A quien le toca. Nunca se pisa una asignacion humana existente: si el
+  // hilo ya tiene dueño, ese sigue siendo el suyo.
+  let destinatario: HandoffAgent | null = null
+  if (!args.assignedAgentId) {
+    if (args.handoffAgentId) {
+      // Un asesor fijo en Ajustes es una decision explicita del admin y
+      // no se sustituye por el reparto. Se busca su nombre solo para
+      // podercelo decir al cliente.
+      destinatario = {
+        userId: args.handoffAgentId,
+        fullName: await nombreDeAsesor(args.db, args.handoffAgentId),
+      }
+    } else {
+      // Sin asesor fijo, reparte por carga. Antes esto dejaba el hilo en
+      // la cola compartida, que en la practica era nadie.
+      destinatario = await pickHandoffAgent(args.db, args.accountId)
+    }
+    if (destinatario) update.assigned_agent_id = destinatario.userId
   }
+
   await args.db.from('conversations').update(update).eq('id', args.conversationId)
 
   await notifyCustomerOfHandoff({
@@ -388,5 +405,20 @@ async function handOffToHuman(args: {
     userId: args.configOwnerUserId,
     conversationId: args.conversationId,
     contactId: args.contactId,
+    agentName: primerNombre(destinatario?.fullName),
   })
+}
+
+/** Nombre del asesor fijo, para el aviso al cliente. Un fallo aqui solo
+ *  cuesta el nombre en el mensaje, nunca la transferencia. */
+async function nombreDeAsesor(
+  db: ReturnType<typeof supabaseAdmin>,
+  userId: string,
+): Promise<string> {
+  const { data } = await db
+    .from('profiles')
+    .select('full_name')
+    .eq('user_id', userId)
+    .maybeSingle()
+  return (data as { full_name: string | null } | null)?.full_name ?? ''
 }

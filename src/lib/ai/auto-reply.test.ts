@@ -17,6 +17,8 @@ const h = vi.hoisted(() => ({
     claim: true as boolean,
     updatePayload: null as Record<string, unknown> | null,
     rpcCalls: [] as { name: string; args: unknown }[],
+    profiles: [] as { user_id: string; full_name: string }[],
+    openConversations: [] as (string | null)[],
   },
 }))
 
@@ -44,19 +46,49 @@ vi.mock('./admin-client', () => ({
         }
         return chain
       }
-      // conversations
-      return {
-        select: () => ({
-          eq: () => ({
-            maybeSingle: () =>
-              Promise.resolve({ data: h.state.conv, error: null }),
+      if (table === 'profiles') {
+        // Dos formas: .select().eq().in().order() lista los asesores de
+        // la cuenta, y .select().eq().maybeSingle() lee el nombre de uno.
+        let buscado: string | null = null
+        const chain = {
+          select: () => chain,
+          eq: (_col: string, value: string) => {
+            buscado = value
+            return chain
+          },
+          in: () => chain,
+          order: () => Promise.resolve({ data: h.state.profiles, error: null }),
+          maybeSingle: () =>
+            Promise.resolve({
+              data: h.state.profiles.find((p) => p.user_id === buscado) ?? null,
+              error: null,
+            }),
+        }
+        return chain
+      }
+
+      // conversations. El estado del hilo sale de .maybeSingle(); la
+      // carga por asesor se pide con .select().eq().eq() y se espera
+      // directamente, sin metodo terminal — de ahi el `then`.
+      const conversations = {
+        select: () => conversations,
+        eq: () => conversations,
+        maybeSingle: () => Promise.resolve({ data: h.state.conv, error: null }),
+        then: (
+          resolve: (v: { data: unknown; error: null }) => unknown,
+        ) =>
+          resolve({
+            data: h.state.openConversations.map((assigned_agent_id) => ({
+              assigned_agent_id,
+            })),
+            error: null,
           }),
-        }),
         update: (payload: Record<string, unknown>) => {
           h.state.updatePayload = payload
           return { eq: () => Promise.resolve({ error: null }) }
         },
       }
+      return conversations
     },
     rpc: (name: string, args: unknown) => {
       h.state.rpcCalls.push({ name, args })
@@ -116,6 +148,11 @@ beforeEach(() => {
   h.state.claim = true
   h.state.updatePayload = null
   h.state.rpcCalls = []
+  h.state.profiles = [
+    { user_id: 'u-juan', full_name: 'Juan Marino Arias' },
+    { user_id: 'u-brayan', full_name: 'Brayan Hernández' },
+  ]
+  h.state.openConversations = ['u-juan', 'u-juan']
   h.loadAiConfig.mockResolvedValue(aiConfig())
   h.buildConversationContext.mockResolvedValue([{ role: 'user', content: 'hi' }])
   h.retrieveKnowledge.mockResolvedValue([])
@@ -231,17 +268,19 @@ describe('dispatchInboundToAiReply — handoff', () => {
     expect(h.engineSendText).toHaveBeenCalledTimes(1)
     // Language-agnostic on purpose: the notice comes from the catalogue
     // for whatever locale the install runs in.
-    expect(h.engineSendText.mock.calls[0][0].text).toMatch(/agent|asesor/i)
+    expect(h.engineSendText.mock.calls[0][0].text).toMatch(/agent|asesor|advisor/i)
     // The slot is claimed before generating now, so a handoff burns one.
     // Harmless: handoff sets ai_autoreply_disabled, so the thread won't
     // auto-reply again regardless of the remaining count.
     expect(h.state.rpcCalls).toHaveLength(1)
     expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
     expect(h.state.updatePayload?.ai_handoff_summary).toContain(
-      'AI agent handed off',
+      'El bot traspasó la conversación',
     )
-    // No handoff target configured → conversation left unassigned.
-    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+    // Sin asesor configurado ya NO se queda sin dueño: se reparte al de
+    // menos carga. Antes caía en la cola compartida, que en la práctica
+    // era nadie.
+    expect(h.state.updatePayload).toHaveProperty('assigned_agent_id')
   })
 
   // Pasó en producción el 2026-08-26: la cuota gratuita de Gemini se agotó
@@ -257,7 +296,7 @@ describe('dispatchInboundToAiReply — handoff', () => {
 
     // El cliente recibe el aviso de que va un asesor.
     expect(h.engineSendText).toHaveBeenCalledTimes(1)
-    expect(h.engineSendText.mock.calls[0][0].text).toMatch(/agent|asesor/i)
+    expect(h.engineSendText.mock.calls[0][0].text).toMatch(/agent|asesor|advisor/i)
     // Y el hilo queda fuera del bot, con la nota diciendo que fue técnico.
     expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
     expect(h.state.updatePayload?.ai_handoff_summary).toContain('no pudo responder')
@@ -493,5 +532,56 @@ describe('dispatchInboundToAiReply — gate de datos del handoff', () => {
     await dispatchInboundToAiReply(ARGS)
 
     expect(h.state.updatePayload).not.toHaveProperty('ai_autoreply_disabled')
+  })
+})
+
+// Antes de esto la transferencia iba siempre al único asesor configurado
+// a mano: en producción, una sola admin con todas las conversaciones
+// asignadas mientras los tres agentes estaban en cero.
+describe('dispatchInboundToAiReply — a quién se asigna', () => {
+  beforeEach(() => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
+  })
+
+  it('reparte al asesor con menos conversaciones abiertas', async () => {
+    h.state.openConversations = ['u-juan', 'u-juan', 'u-brayan']
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
+  })
+
+  it('le dice al cliente el primer nombre de quien lo va a atender', async () => {
+    h.state.openConversations = ['u-brayan', 'u-brayan']
+
+    await dispatchInboundToAiReply(ARGS)
+
+    // Juan Marino Arias → "Juan": así se presenta un vendedor, no con el
+    // nombre completo de registro civil.
+    const aviso = h.engineSendText.mock.calls[0][0].text as string
+    expect(aviso).toContain('Juan')
+    expect(aviso).not.toContain('Marino')
+  })
+
+  // Configurar un asesor fijo es una decisión explícita del admin y el
+  // reparto no la pisa.
+  it('respeta el asesor configurado por encima del reparto', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'u-brayan' }))
+    h.state.openConversations = ['u-brayan', 'u-brayan', 'u-brayan']
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
+    expect(h.engineSendText.mock.calls[0][0].text).toContain('Brayan')
+  })
+
+  it('deja el hilo en la cola compartida cuando no hay asesores', async () => {
+    h.state.profiles = []
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+    // Y no se le promete al cliente un nombre que no existe.
+    expect(h.engineSendText.mock.calls[0][0].text).not.toContain('Su nombre es')
   })
 })

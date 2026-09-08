@@ -2569,7 +2569,8 @@
     "ogFooter": "링크를 열어 계정을 만들고 수락하세요"
   },
   "Handoff": {
-    "customerNotice": "담당 상담원을 배정했습니다. 곧 연락드리겠습니다. 🙌"
+    "customerNotice": "담당 상담원을 배정했습니다. 곧 연락드리겠습니다. 🙌",
+    "customerNoticeNamed": "담당자가 곱 연락드릴 예정입니다. 담당자 이름은 {name}입니다."
   },
   "SocialQueue": {
     "pageTitle": "게시 대기열",

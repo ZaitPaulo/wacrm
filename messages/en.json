@@ -2569,7 +2569,8 @@
     "ogFooter": "Open the link to create your account and accept"
   },
   "Handoff": {
-    "customerNotice": "We have assigned a sales agent to you. They will be in touch very soon. 🙌"
+    "customerNotice": "We have assigned a sales agent to you. They will be in touch very soon. 🙌",
+    "customerNoticeNamed": "One of our advisors will get in touch with you. Their name is {name}."
   },
   "SocialQueue": {
     "pageTitle": "Publishing queue",

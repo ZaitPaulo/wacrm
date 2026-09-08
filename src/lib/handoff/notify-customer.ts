@@ -37,11 +37,19 @@ const FALLBACK =
  * environment mirrors what `src/i18n/request.ts` does and works
  * anywhere.
  */
-async function notice(): Promise<string> {
+async function notice(agentName: string | null): Promise<string> {
   const locale = process.env.NEXT_PUBLIC_APP_LOCALE || 'en'
   try {
     const messages = (await import(`../../../messages/${locale}.json`)).default
-    return messages?.Handoff?.customerNotice || FALLBACK
+    const handoff = messages?.Handoff
+
+    // Con nombre se usa la forma que lo nombra, que es una frase aparte y
+    // no el texto anónimo con el nombre pegado: cada idioma decide dónde
+    // va el nombre dentro de la oración.
+    if (agentName && handoff?.customerNoticeNamed) {
+      return String(handoff.customerNoticeNamed).replace('{name}', agentName)
+    }
+    return handoff?.customerNotice || FALLBACK
   } catch {
     return FALLBACK
   }
@@ -53,6 +61,10 @@ export async function notifyCustomerOfHandoff(args: {
   userId: string
   conversationId: string | null
   contactId: string | null
+  /** Primer nombre del asesor que recibio el hilo. Cuando falta —no hay
+   *  asesor asignable, o la derivacion vino de un flujo— el aviso
+   *  vuelve a la forma anonima: nunca se promete un nombre inexistente. */
+  agentName?: string | null
 }): Promise<void> {
   if (!args.conversationId || !args.contactId) return
   try {
@@ -61,7 +73,7 @@ export async function notifyCustomerOfHandoff(args: {
       userId: args.userId,
       conversationId: args.conversationId,
       contactId: args.contactId,
-      text: await notice(),
+      text: await notice(args.agentName ?? null),
     })
   } catch (err) {
     console.error('[handoff] customer notice failed:', err)

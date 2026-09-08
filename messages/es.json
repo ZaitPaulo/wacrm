@@ -2569,7 +2569,8 @@
     "retry": "Reintentar"
   },
   "Handoff": {
-    "customerNotice": "Te asignamos un asesor comercial. Se comunicará contigo muy pronto. 🙌"
+    "customerNotice": "Te asignamos un asesor comercial. Se comunicará contigo muy pronto. 🙌",
+    "customerNoticeNamed": "Uno de nuestros asesores se pondrá en contacto contigo. Su nombre es {name}."
   },
   "SocialQueue": {
     "pageTitle": "Cola de publicaciones",
