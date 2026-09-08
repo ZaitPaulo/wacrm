@@ -117,6 +117,8 @@ interface PlanFixture {
   recipients?: Record<string, unknown>[];
   config?: Record<string, unknown> | null;
   templates?: Record<string, unknown>[];
+  /** Identidades de canal, para los contactos sin telefono. */
+  identities?: { external_id: string }[];
 }
 
 interface PlanWrites {
@@ -149,6 +151,10 @@ function planDb(fx: PlanFixture, writes: PlanWrites = {}): SupabaseClient {
           data: fx.config === undefined ? null : fx.config,
           error: null,
         }),
+        // resolveRecipientId lee las identidades en lista. Sin filas,
+        // un contacto sin telefono queda sin destino — que es lo que
+        // estos casos esperan.
+        returns: async () => ({ data: fx.identities ?? [], error: null }),
         then: (resolve: (r: { data: unknown[]; error: null }) => unknown) => {
           if (table === 'broadcast_recipients') {
             return resolve({ data: fx.recipients ?? [], error: null });
@@ -180,6 +186,7 @@ function recipient(
   return {
     id,
     template_params: params,
+    contact_id: `ct-${id}`,
     contact: phone ? { phone } : null,
   };
 }
@@ -211,12 +218,12 @@ describe('planBroadcastResume', () => {
     expect(plan.planned).toEqual([
       {
         recipientRowId: 'r1',
-        phone: '15551234567',
+        recipientId: '15551234567',
         params: ['A123', 'Friday'],
       },
       {
         recipientRowId: 'r2',
-        phone: '15559876543',
+        recipientId: '15559876543',
         params: ['B456', 'Monday'],
       },
     ]);
@@ -364,5 +371,87 @@ describe('planBroadcastResume', () => {
       'pending',
     );
     expect(plan.templateRow?.language).toBe('en');
+  });
+});
+
+// ============================================================
+// Difusiones que alcanzan a quien no comparte su teléfono.
+//
+// Antes, un destinatario sin número se marcaba `failed` con "No valid
+// phone number on contact" y quedaba fuera de toda reanudación. Desde
+// que WhatsApp tiene nombres de usuario esos son clientes reales, y su
+// destino sale de la identidad de canal.
+// ============================================================
+
+describe('planBroadcastResume — destinatarios sin teléfono', () => {
+  it('resuelve el destino por identidad cuando no hay número', async () => {
+    const { plan, unsendable } = await planBroadcastResume(
+      planDb({
+        broadcast: BROADCAST,
+        config: CONFIG,
+        recipients: [recipient('r1', null)],
+        identities: [{ external_id: 'CO.4481978948757066' }],
+      }),
+      'acct-1',
+      'bc-1',
+      'pending',
+    );
+
+    expect(unsendable).toBe(0);
+    expect(plan.planned).toEqual([
+      {
+        recipientRowId: 'r1',
+        recipientId: 'CO.4481978948757066',
+        params: ['A123'],
+      },
+    ]);
+  });
+
+  it('sigue descartando a quien no tiene teléfono NI identidad', async () => {
+    // Dejarlo 'pending' mantendría la difusión en 'sending' para
+    // siempre, que es el síntoma que este descarte existe para evitar.
+    // Va acompañado de uno alcanzable porque un lote enteramente
+    // inalcanzable corta antes, con `nothing_to_resume`.
+    const writes: PlanWrites = {};
+    const { plan, unsendable } = await planBroadcastResume(
+      planDb(
+        {
+          broadcast: BROADCAST,
+          config: CONFIG,
+          recipients: [recipient('r1', null), recipient('r2', '15551234567')],
+          identities: [],
+        },
+        writes,
+      ),
+      'acct-1',
+      'bc-1',
+      'pending',
+    );
+
+    expect(unsendable).toBe(1);
+    expect(writes.failedIds).toEqual(['r1']);
+    expect(writes.failedUpdate).toMatchObject({ status: 'failed' });
+    // El alcanzable sigue su camino.
+    expect(plan.planned).toHaveLength(1);
+    expect(plan.planned[0].recipientRowId).toBe('r2');
+  });
+
+  it('con teléfono no consulta identidades: el join alcanza', async () => {
+    // El camino de la inmensa mayoría no puede pagar una consulta extra
+    // por destinatario.
+    const { plan } = await planBroadcastResume(
+      planDb({
+        broadcast: BROADCAST,
+        config: CONFIG,
+        recipients: [recipient('r1', '15551234567')],
+        // Si se consultaran, este BSUID ganaría — y no debe.
+        identities: [{ external_id: 'CO.9999' }],
+      }),
+      'acct-1',
+      'bc-1',
+      'pending',
+    );
+
+    expect(plan.planned[0].recipientId).toBe('15551234567');
   });
 });

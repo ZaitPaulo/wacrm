@@ -209,7 +209,7 @@ async function lastInboundAt(
  * camino, y sin este respaldo entrarían a la bandeja sin que nadie
  * pudiera contestarles.
  */
-async function resolveRecipientId(
+export async function resolveRecipientId(
   db: SupabaseClient,
   accountId: string,
   contactId: string,

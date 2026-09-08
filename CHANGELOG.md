@@ -11,6 +11,27 @@ and polish.
 
 ## [Unreleased]
 
+### Las difusiones alcanzan a los clientes que no dan su número
+
+- Un contacto sin teléfono —quien escribe con su nombre de usuario de
+  WhatsApp— quedaba **fuera de toda difusión, en silencio**: la
+  interfaz lo descartaba antes de enviar, sin contarlo como fallido y
+  sin decírselo a nadie. Una campaña reportaba «100 enviados» sin
+  mencionar a los 15 que ni siquiera se intentaron.
+- Ahora la audiencia viaja como contactos, no como teléfonos, y el
+  destino se resuelve igual que en la bandeja: el número si lo hay, y
+  la identidad de canal si no.
+- Lo mismo al **reanudar** una difusión. Antes esos destinatarios se
+  marcaban como fallidos definitivos con «no valid phone number», lo
+  que los sacaba de cualquier reintento posterior.
+- Quien de verdad no tiene por dónde ser alcanzado sigue contándose
+  como fallido — con el motivo correcto, no con uno que culpa al
+  teléfono.
+- **Ojo con el conteo:** una difusión por etiquetas o filtros que ayer
+  alcanzaba a 100 personas puede alcanzar a más ahora, porque esos
+  contactos dejaron de ser invisibles.
+- La carga por CSV no cambia: un archivo solo puede traer teléfonos.
+
 ### Los clientes que escriben sin dar su número ya no se pierden
 
 > **Migración requerida:** aplica `522_channel_username.sql` antes de
