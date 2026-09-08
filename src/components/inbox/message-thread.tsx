@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
+import { useCan } from '@/hooks/use-can';
 import { usePresence } from '@/hooks/use-presence';
 import { PresenceDot } from '@/components/presence/presence-dot';
 import { presenceLabel } from '@/lib/presence';
@@ -177,6 +178,11 @@ export function MessageThread({
   const tQuote = useTranslations('Inbox.replyQuote');
 
   const { user } = useAuth();
+  // Un asesor puede pasarle la conversación a un compañero, pero no
+  // dejarla sin asignar: eso la mandaría al limbo que solo ve el admin.
+  // El trigger de la migración 520 lo rechaza en la base; acá solo se
+  // esconde la opción para no ofrecer algo que va a fallar.
+  const canUnassign = useCan('view-all-conversations');
   const { getPresence, getRow, now } = usePresence();
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1104,7 +1110,7 @@ export function MessageThread({
                   );
                 })
               )}
-              {assignedAgentId && (
+              {assignedAgentId && canUnassign && (
                 <>
                   <DropdownMenuSeparator className="bg-border" />
                   <DropdownMenuItem

@@ -9,6 +9,8 @@ import {
   normalizeConversation,
 } from "@/lib/inbox/conversations";
 import type { Conversation, Message, Contact, ConversationStatus } from "@/types";
+import { useAuth } from "@/hooks/use-auth";
+import { useCan } from "@/hooks/use-can";
 import { useRealtime } from "@/hooks/use-realtime";
 import { ConversationList } from "@/components/inbox/conversation-list";
 import { MessageThread } from "@/components/inbox/message-thread";
@@ -42,6 +44,33 @@ function InboxPageInner() {
    * automatically instead of showing the empty center panel.
    */
   const deepLinkConvId = searchParams.get("c");
+
+  /**
+   * Quién mira, y si su bandeja está recortada a lo que tiene asignado
+   * (rol `agent`) o ve toda la cuenta (owner / admin / viewer).
+   *
+   * Esto NO es lo que protege los datos —de eso se encarga la RLS de la
+   * migración 520, que devuelve cero filas a quien no corresponde—,
+   * sino lo que tapa el único camino que no pasa por la base: los
+   * eventos de tiempo real. `use-realtime` se suscribe a las tablas
+   * enteras sin `filter`, y los handlers de abajo meten la conversación
+   * en la lista directamente desde el payload del evento. Si el
+   * Realtime autoalojado no aplica RLS a `postgres_changes`, sin esta
+   * guarda al asesor le aparecerían chats ajenos en la lista.
+   *
+   * `useCan` devuelve false mientras carga el perfil, así que durante
+   * ese rato tratamos a todo el mundo como restringido: es el lado
+   * seguro para equivocarse.
+   */
+  const { user } = useAuth();
+  const canViewAllConversations = useCan("view-all-conversations");
+  const currentUserId = user?.id ?? null;
+  const isMine = useCallback(
+    (assignedAgentId: string | null | undefined) =>
+      canViewAllConversations ||
+      (currentUserId != null && assignedAgentId === currentUserId),
+    [canViewAllConversations, currentUserId]
+  );
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] =
@@ -261,6 +290,14 @@ function InboxPageInner() {
           // the row surfaces with its `contact` joined; the conv-UPDATE
           // event the webhook emits right after the message INSERT will
           // converge state when it arrives.
+          //
+          // Acá no hace falta la guarda de asignación que sí llevan los
+          // eventos de conversación: este camino pasa por la base, así
+          // que la RLS es la que decide. Para un asesor, la
+          // conversación ajena simplemente no vuelve y no entra a la
+          // lista. Y se gana el autoarreglo: si el evento de asignación
+          // se perdió, el siguiente mensaje entrante trae la
+          // conversación recién asignada a su bandeja.
           hydrateConversation(newMsg.conversation_id);
         }
       }
@@ -283,6 +320,23 @@ function InboxPageInner() {
       old: Partial<Conversation>;
     }) => {
       const conv = event.new;
+
+      // Conversación que no me pertenece: fuera. En un INSERT es una
+      // conversación ajena que nunca debió llegarme. En un UPDATE puede
+      // ser eso mismo, o el admin acabando de quitármela — y en ese caso
+      // hay que sacarla de la lista, porque si no se queda pegada hasta
+      // que el usuario recargue, y ya no puede leerla.
+      if (!isMine(conv.assigned_agent_id)) {
+        if (knownConvIdsRef.current.has(conv.id)) {
+          setConversations((prev) => prev.filter((c) => c.id !== conv.id));
+          if (activeConversation?.id === conv.id) {
+            setActiveConversation(null);
+            setActiveContact(null);
+            setMessages([]);
+          }
+        }
+        return;
+      }
 
       if (event.eventType === "INSERT") {
         // Prepend immediately for snappy UX so the new conv shows in the
@@ -334,7 +388,7 @@ function InboxPageInner() {
         }
       }
     },
-    [activeConversation, hydrateConversation]
+    [activeConversation, hydrateConversation, isMine]
   );
 
   // Subscribe to realtime. The `isConnected` flag below feeds the
