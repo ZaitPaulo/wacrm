@@ -4,7 +4,7 @@
 
 Cuando la IA transfiere una conversación y la cuenta no tiene un asesor de derivación configurado, el sistema SHALL asignarla al miembro con menos conversaciones abiertas asignadas en ese momento.
 
-Son candidatos los miembros de la cuenta con rol `agent` o `admin`. El `owner` NO SHALL ser candidato.
+Son candidatos únicamente los miembros de la cuenta con rol `agent`. Ni el `admin` ni el `owner` SHALL ser candidatos: administrar el CRM no es atender clientes.
 
 Los empates SHALL resolverse por antigüedad en la cuenta, de modo que la elección sea determinista y reproducible.
 
@@ -18,10 +18,15 @@ Los empates SHALL resolverse por antigüedad en la cuenta, de modo que la elecci
 - **WHEN** dos asesores tienen la misma cantidad de conversaciones abiertas
 - **THEN** se asigna al que lleva más tiempo en la cuenta
 
-#### Scenario: El owner no atiende
+#### Scenario: Ni el owner ni el admin atienden
 
-- **WHEN** el owner de la cuenta tiene 0 conversaciones abiertas y todos los asesores tienen 2
-- **THEN** la conversación se asigna a un asesor, no al owner
+- **WHEN** el owner y un admin tienen 0 conversaciones abiertas y todos los `agent` tienen 2
+- **THEN** la conversación se asigna a un `agent`, no al owner ni al admin
+
+#### Scenario: La cuenta no tiene ningún agent
+
+- **WHEN** la cuenta solo tiene miembros con rol `admin` y `owner`
+- **THEN** la conversación queda en la cola compartida
 
 #### Scenario: Solo se cuentan las conversaciones abiertas
 
@@ -64,7 +69,7 @@ Cuando no haya asesor asignable, el aviso SHALL conservar la forma anónima, sin
 
 #### Scenario: Sin asesor disponible
 
-- **WHEN** la cuenta no tiene ningún miembro con rol `agent` ni `admin`
+- **WHEN** la cuenta no tiene ningún miembro con rol `agent`
 - **THEN** la conversación queda en la cola compartida
 - **AND** el cliente recibe el aviso sin nombre
 

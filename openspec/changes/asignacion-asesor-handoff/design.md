@@ -49,11 +49,11 @@ Configurar un asesor fijo es una decisión explícita de un admin, y hacer que e
 
 El costo es que el reparto no se activa solo: hay que vaciar ese campo en producción, y queda anotado como paso de despliegue. A cambio, cualquier cuenta que hubiera configurado un asesor a propósito sigue funcionando igual.
 
-### Candidatos: `agent` y `admin`, sin `owner`
+### Candidatos: solo `agent`
 
-En una concesionaria chica los admin atienden — la que hoy recibe todas las transferencias es admin. El `owner` es la cuenta del dueño del CRM y meterlo en el reparto le mandaría clientes a quien administra el sistema.
+Los asesores de LoraMotors son los `agent`. Incluir a los `admin` porque "también abren la bandeja" fue un error que se vio en la primera prueba real: el reparto le mando un cliente a un administrador. Poder entrar a la bandeja no es tener el turno de atender.
 
-Si no hay ningún candidato, la conversación cae en la cola compartida y el aviso al cliente vuelve a la forma anónima. Nunca se promete un nombre inexistente.
+Si no hay ningún `agent`, la conversación cae en la cola compartida y el aviso al cliente vuelve a la forma anónima. Nunca se promete un nombre inexistente.
 
 ### El nombre al cliente es solo el primer nombre
 

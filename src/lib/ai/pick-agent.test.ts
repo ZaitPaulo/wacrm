@@ -69,25 +69,32 @@ describe('pickHandoffAgent', () => {
   // consulta es por antigüedad, así que gana el primero de la lista.
   it('desempata por antigüedad en la cuenta', async () => {
     const agent = await pickHandoffAgent(
-      db({ profiles: [JUAN, BRAYAN, ANGELICA], open: [] }),
+      db({ profiles: [JUAN, BRAYAN], open: [] }),
       'acct-1',
     )
     expect(agent?.userId).toBe('u-juan')
   })
 
-  it('cuenta a los admin como asesores', async () => {
+  // Un admin puede entrar a la bandeja, pero no es un asesor: el reparto
+  // le mando un cliente a un administrador y eso no es su trabajo.
+  it('no elige a un admin, aunque este desocupado', async () => {
     const agent = await pickHandoffAgent(
-      db({ profiles: [JUAN, ANGELICA], open: ['u-juan'] }),
+      db({ profiles: [JUAN, ANGELICA], open: ['u-juan', 'u-juan'] }),
       'acct-1',
     )
-    expect(agent?.userId).toBe('u-ange')
+    expect(agent?.userId).toBe('u-juan')
+  })
+
+  it('devuelve null cuando la cuenta solo tiene admins', async () => {
+    const agent = await pickHandoffAgent(db({ profiles: [ANGELICA], open: [] }), 'acct-1')
+    expect(agent).toBeNull()
   })
 
   // El owner administra el CRM; mandarle clientes por estar desocupado
   // sería repartir hacia quien no atiende.
-  it('nunca elige al owner, aunque esté en cero', async () => {
+  it('nunca elige al owner ni al admin, aunque estén en cero', async () => {
     const agent = await pickHandoffAgent(
-      db({ profiles: [JUAN, ZAIT], open: ['u-juan', 'u-juan'] }),
+      db({ profiles: [JUAN, ZAIT, ANGELICA], open: ['u-juan', 'u-juan'] }),
       'acct-1',
     )
     expect(agent?.userId).toBe('u-juan')

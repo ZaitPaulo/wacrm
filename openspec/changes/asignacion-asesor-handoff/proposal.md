@@ -9,7 +9,7 @@ Cuando la IA transfiere una conversación pasan tres cosas mediocres a la vez:
 ## What Changes
 
 - La transferencia elige asesor por **carga real**: el miembro con menos conversaciones abiertas asignadas. Empate resuelto por antigüedad en la cuenta, lo que hace la elección determinista y repartida.
-- Son candidatos los miembros con rol `agent` o `admin`. El `owner` queda fuera: es la cuenta del dueño del CRM, no un puesto de atención.
+- Son candidatos únicamente los miembros con rol `agent`. `admin` y `owner` quedan fuera: administrar el CRM no es atender clientes.
 - `handoff_agent_id` mantiene la precedencia cuando está configurado — una elección explícita del admin no se pisa. El reparto entra cuando ese campo está vacío. **Como parte del despliegue hay que vaciarlo** para que el reparto empiece a actuar.
 - El aviso al cliente pasa a nombrar a quien lo va a atender: "Uno de nuestros asesores se pondrá en contacto contigo, su nombre es Juan". Cuando no hay asesor elegible, se conserva el texto anónimo actual.
 - La notificación al asesor lleva el resumen de lo que busca el cliente: motivo, nombre, presupuesto, vehículo y crédito, con los faltantes marcados.

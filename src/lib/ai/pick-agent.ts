@@ -12,8 +12,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * diez hilos vivos no reparte nada.
  */
 
-/** Roles que atienden clientes. El `owner` administra el CRM. */
-const ROLES_QUE_ATIENDEN = ['agent', 'admin']
+/**
+ * Roles que atienden clientes: solo `agent`.
+ *
+ * `admin` estuvo aquí un rato y fue un error: el reparto le mandó un
+ * cliente a un administrador de LoraMotors el 2026-09-07. Que un admin
+ * pueda abrir la bandeja no significa que le toque atender; los asesores
+ * son los `agent` y punto.
+ */
+const ROLES_QUE_ATIENDEN = ['agent']
 
 export interface HandoffAgent {
   userId: string
