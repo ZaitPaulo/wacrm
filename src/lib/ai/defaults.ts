@@ -1,4 +1,5 @@
 import { HANDOFF_REASONS, type AiProvider } from './types'
+import type { InventoryIndex } from './inventory-index'
 
 // ============================================================
 // Tunables + prompt scaffold for the AI reply assistant.
@@ -148,8 +149,11 @@ export function buildSystemPrompt(args: {
   mode: 'draft' | 'auto_reply'
   /** Knowledge-base excerpts retrieved for the current question. */
   knowledge?: string[]
+  /** El inventario disponible completo. Cubre QUE existe; los extractos
+   *  cubren el detalle de un vehiculo concreto. */
+  inventory?: InventoryIndex | null
 }): string {
-  const { userPrompt, mode, knowledge } = args
+  const { userPrompt, mode, knowledge, inventory } = args
   const parts: string[] = [
     'You are a customer-messaging assistant for a business that uses a WhatsApp CRM. ' +
       'You are shown the recent WhatsApp conversation between the business (assistant) and a customer (user). ' +
@@ -174,6 +178,23 @@ export function buildSystemPrompt(args: {
 
   if (userPrompt && userPrompt.trim()) {
     parts.push(`Business context and instructions:\n${userPrompt.trim()}`)
+  }
+
+  // El inventario va en su propio bloque, ANTES de los extractos. Su
+  // valor está en ser exhaustivo, y mezclarlo con "referencias
+  // recuperadas para esta pregunta" lo haría parecer una selección más.
+  if (inventory) {
+    const alcance = inventory.truncated
+      ? `This is a PARTIAL list: ${inventory.total} vehicles are available and only the first ${
+          inventory.text.split('\n').length
+        } are shown. Never tell the customer something is unavailable based on this list — you cannot see all of it.`
+      : 'This is the COMPLETE list of vehicles currently available. Never claim a vehicle or a price range does not exist without checking it here first; if nothing here fits what the customer asked for, then it genuinely is not in stock.'
+
+    parts.push(
+      'Current inventory — one line per vehicle: reference · make model year · price in millions COP · mileage · transmission · body type. ' +
+        `${alcance} Use it to find what fits any criteria the customer gives you — budget, year, mileage, transmission, body type. ` +
+        `For the full detail of one vehicle (colour, engine, plate, photos link) use the knowledge base excerpts below.\n\n${inventory.text}`,
+    )
   }
 
   if (knowledge && knowledge.length > 0) {

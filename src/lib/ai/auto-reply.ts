@@ -12,6 +12,7 @@ import { delay, hasNewerCustomerMessage, hasOutboundSince } from './reply-window
 import { buildHandoffSummary } from './handoff'
 import { evaluateHandoffGate } from './handoff-gate'
 import { pickHandoffAgent, primerNombre, type HandoffAgent } from './pick-agent'
+import { buildInventoryIndex } from './inventory-index'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { engineSendText } from '@/lib/flows/meta-send'
@@ -188,10 +189,16 @@ export async function dispatchInboundToAiReply(
       latestUserMessage(messages),
     )
 
+    // El inventario COMPLETO, no solo lo que la busqueda semantica
+    // acerto a recuperar: sin esto el bot le dice a un cliente que no
+    // hay nada en su presupuesto viendo 5 fichas de 123.
+    const inventory = await buildInventoryIndex(db, accountId)
+
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
+      inventory,
     })
 
     const { text, handoff, usage } = await generateReply({

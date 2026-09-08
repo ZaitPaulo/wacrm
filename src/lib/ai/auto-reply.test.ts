@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
     rpcCalls: [] as { name: string; args: unknown }[],
     profiles: [] as { user_id: string; full_name: string }[],
     openConversations: [] as (string | null)[],
+    inventory: [] as Record<string, unknown>[],
   },
 }))
 
@@ -43,6 +44,14 @@ vi.mock('./admin-client', () => ({
           in: () => chain,
           limit: () =>
             Promise.resolve({ data: h.state.autoResponders, error: null }),
+        }
+        return chain
+      }
+      if (table === 'inventory_vehicles') {
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          order: () => Promise.resolve({ data: h.state.inventory, error: null }),
         }
         return chain
       }
@@ -98,6 +107,7 @@ vi.mock('./admin-client', () => ({
 }))
 
 import { dispatchInboundToAiReply } from './auto-reply'
+import { clearInventoryIndexCache } from './inventory-index'
 
 const ARGS = {
   accountId: 'acct-1',
@@ -153,6 +163,21 @@ beforeEach(() => {
     { user_id: 'u-brayan', full_name: 'Brayan Hernández' },
   ]
   h.state.openConversations = ['u-juan', 'u-juan']
+  h.state.inventory = [
+    {
+      public_ref: 'XGCW8S',
+      brand: 'RENAULT',
+      model: 'SANDERO GT',
+      year: 2010,
+      price: 22_000_000,
+      mileage: 179_200,
+      transmission: 'manual',
+      body_type: 'hatchback',
+    },
+  ]
+  // El índice se cachea por cuenta en memoria del módulo; sin esto un
+  // test heredaría el inventario del anterior.
+  clearInventoryIndexCache()
   h.loadAiConfig.mockResolvedValue(aiConfig())
   h.buildConversationContext.mockResolvedValue([{ role: 'user', content: 'hi' }])
   h.retrieveKnowledge.mockResolvedValue([])
@@ -583,5 +608,30 @@ describe('dispatchInboundToAiReply — a quién se asigna', () => {
     expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
     // Y no se le promete al cliente un nombre que no existe.
     expect(h.engineSendText.mock.calls[0][0].text).not.toContain('Su nombre es')
+  })
+})
+
+// El bot le dijo a un cliente que no había nada de 25 millones teniendo
+// un Sandero de 22 disponible: veía 5 fichas de 123, elegidas por
+// parecido de texto. Ahora recibe el catálogo entero.
+describe('dispatchInboundToAiReply — inventario en el prompt', () => {
+  it('le pasa al modelo el inventario disponible completo', async () => {
+    await dispatchInboundToAiReply(ARGS)
+
+    const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
+    expect(systemPrompt).toContain('RENAULT SANDERO GT 2010')
+    expect(systemPrompt).toContain('$22M')
+    expect(systemPrompt).toContain('COMPLETE list')
+  })
+
+  // Leer el inventario es un extra: si falla, se responde como antes.
+  it('responde igual cuando la cuenta no tiene inventario', async () => {
+    h.state.inventory = []
+
+    await dispatchInboundToAiReply(ARGS)
+
+    const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
+    expect(systemPrompt).not.toContain('Current inventory')
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
   })
 })

@@ -70,3 +70,48 @@ describe('buildSystemPrompt — handoff instructions', () => {
     expect(prompt).not.toContain('HANDOFF')
   })
 })
+
+describe('buildSystemPrompt — inventario', () => {
+  const index = {
+    text: 'ABC · RENAULT SANDERO GT 2010 · $22M · 179k kms · mecánica · hatchback',
+    total: 1,
+    truncated: false,
+  }
+
+  it('mete el índice y declara que está completo', () => {
+    const prompt = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', inventory: index })
+    expect(prompt).toContain('RENAULT SANDERO GT 2010')
+    expect(prompt).toContain('COMPLETE list')
+  })
+
+  // Lo que arregla el caso real: el bot dijo "no queda nada en 25
+  // millones" teniendo un Sandero de 22. Sin este permiso explícito
+  // seguiría sin saber si puede fiarse de lo que ve.
+  it('le permite afirmar que algo no hay, pero solo mirando la lista', () => {
+    const prompt = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', inventory: index })
+    expect(prompt).toMatch(/Never claim a vehicle or a price range does not exist/)
+  })
+
+  it('avisa cuando la lista viene recortada y retira ese permiso', () => {
+    const prompt = buildSystemPrompt({
+      userPrompt: null,
+      mode: 'auto_reply',
+      inventory: { text: 'A · KIA PICANTO 2016 · $33M', total: 900, truncated: true },
+    })
+    expect(prompt).toContain('PARTIAL list')
+    expect(prompt).toContain('900 vehicles are available')
+    expect(prompt).not.toContain('COMPLETE list')
+  })
+
+  it('no cambia nada cuando no hay inventario', () => {
+    const conIndice = buildSystemPrompt({ userPrompt: null, mode: 'draft', inventory: null })
+    const sinNada = buildSystemPrompt({ userPrompt: null, mode: 'draft' })
+    expect(conIndice).toBe(sinNada)
+    expect(sinNada).not.toContain('Current inventory')
+  })
+
+  it('también llega en modo borrador', () => {
+    const prompt = buildSystemPrompt({ userPrompt: null, mode: 'draft', inventory: index })
+    expect(prompt).toContain('Current inventory')
+  })
+})

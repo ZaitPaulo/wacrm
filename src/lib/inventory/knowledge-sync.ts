@@ -58,7 +58,7 @@ function featuresToText(features: unknown): string {
 
 /** Etiquetas en español de los códigos de `specs.ts`, para que el
  *  documento se lea como lo diría un vendedor y no como un enum. */
-const KB_TRANSMISSION: Record<string, string> = {
+export const KB_TRANSMISSION: Record<string, string> = {
   manual: 'mecánica',
   automatic: 'automática',
   cvt: 'CVT',
@@ -75,7 +75,7 @@ const KB_CONDITION: Record<string, string> = { new: 'nuevo', used: 'usado' }
  * "una camioneta" no escribe "SUV", y la búsqueda del knowledge base es
  * léxica, así que la palabra tiene que estar ahí para poder encontrarse.
  */
-const KB_BODY: Record<string, string> = {
+export const KB_BODY: Record<string, string> = {
   suv: 'SUV (camioneta)',
   pickup: 'pick-up (camioneta)',
   van: 'van (camioneta)',
