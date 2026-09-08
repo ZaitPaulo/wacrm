@@ -28,6 +28,7 @@ interface Recorded {
   insertedContacts: Record<string, unknown>[];
   linkedIdentities: Record<string, unknown>[];
   nameUpdates: Record<string, unknown>[];
+  usernameUpdates: Record<string, unknown>[];
 }
 
 function fakeDb(state: FakeState) {
@@ -35,6 +36,7 @@ function fakeDb(state: FakeState) {
     insertedContacts: [],
     linkedIdentities: [],
     nameUpdates: [],
+    usernameUpdates: [],
   };
   let nextId = 1;
 
@@ -63,6 +65,16 @@ function fakeDb(state: FakeState) {
               row.contact_id as string
             );
             return { error: null };
+          },
+          // refreshUsername: update().eq(cuenta).eq(contacto).eq(canal)
+          update: (row: Record<string, unknown>) => {
+            rec.usernameUpdates.push(row);
+            const chain: Record<string, unknown> = {
+              eq: () => chain,
+              then: (resolve: (v: unknown) => unknown) =>
+                resolve({ error: null }),
+            };
+            return chain;
           },
         };
         return b;
@@ -553,5 +565,84 @@ describe('resolveContactByChannel — la persona no se duplica al cambiar de ide
 
     expect(out).toEqual({ contactId: 'contacto-5', created: false });
     expect(rec.insertedContacts).toHaveLength(0);
+  });
+});
+
+describe('resolveContactByChannel — el nombre de usuario', () => {
+  it('se guarda en la identidad al crear el contacto', async () => {
+    const { db, rec } = fakeDb({ identities: new Map(), contacts: [] });
+
+    await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: BSUID,
+      name: 'HumbertoR',
+      username: 'RosalesHumberto',
+    });
+
+    expect(rec.linkedIdentities[0]).toMatchObject({
+      external_id: BSUID,
+      username: 'RosalesHumberto',
+    });
+  });
+
+  it('se refresca aunque la identidad ya existiera', async () => {
+    // El vínculo es idempotente a propósito y no toca una fila que ya
+    // está; el nombre de usuario, en cambio, la persona lo cambia
+    // cuando quiere. Un handle viejo en la ficha es peor que ninguno:
+    // manda al asesor a buscar a alguien que ya no se llama así.
+    const { db, rec } = fakeDb({
+      identities: new Map([[`whatsapp:${BSUID}`, 'contacto-7']]),
+      contacts: [],
+    });
+
+    await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: BSUID,
+      name: 'HumbertoR',
+      username: 'HumbertoNuevo',
+    });
+
+    expect(rec.usernameUpdates).toContainEqual({ username: 'HumbertoNuevo' });
+  });
+
+  it('sin nombre de usuario no se escribe nada', async () => {
+    const { db, rec } = fakeDb({
+      identities: new Map([['whatsapp:573166220262', 'contacto-3']]),
+      contacts: [],
+    });
+
+    await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: '573166220262',
+      name: 'Zait',
+    });
+
+    expect(rec.usernameUpdates).toHaveLength(0);
+  });
+
+  it('va en las DOS identidades cuando la persona tiene teléfono y BSUID', async () => {
+    // Cuál de las dos traiga el próximo mensaje no se sabe de antemano.
+    const { db, rec } = fakeDb({ identities: new Map(), contacts: [] });
+
+    await resolveContactByChannel({
+      db,
+      ...BASE,
+      channel: 'whatsapp',
+      externalId: '573166220262',
+      alsoKnownAs: BSUID,
+      name: 'Zait',
+      username: 'zaitp',
+    });
+
+    const conUsername = rec.linkedIdentities.filter(
+      (i) => i.username === 'zaitp'
+    );
+    expect(conUsername).toHaveLength(2);
   });
 });

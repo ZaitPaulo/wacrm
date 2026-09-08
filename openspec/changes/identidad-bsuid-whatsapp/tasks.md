@@ -20,7 +20,7 @@
 - [x] 3.2 Condicionar el respaldo difuso por teléfono a que el `externalId` SEA un teléfono — hoy corre siempre en WhatsApp
 - [x] 3.3 Vincular el BSUID como identidad adicional en todos los mensajes que lo traigan, también cuando el contacto se resolvió por teléfono
 - [x] 3.4 Corregir la creación del contacto: `phone` se puebla solo si el `externalId` es un teléfono, no por ser WhatsApp
-- [ ] 3.5 Guardar y refrescar el nombre de usuario junto al nombre de perfil — **BLOQUEADA**: `contacts` no tiene columna para eso ni campos libres, así que guardarlo pide una migración que el diseño descartó. Decisión pendiente
+- [x] 3.5 Guardar y refrescar el nombre de usuario junto al nombre de perfil — **BLOQUEADA**: `contacts` no tiene columna para eso ni campos libres, así que guardarlo pide una migración que el diseño descartó. Decisión pendiente
 - [x] 3.6 Tests de los dos sentidos del cambio de identificación: conocido que deja de traer teléfono, y creado por BSUID que empieza a traerlo
 - [x] 3.7 Test de que dos BSUID distintos son dos contactos, y de que un BSUID no coincide con un teléfono por sus dígitos
 
@@ -35,14 +35,14 @@
 
 ## 5. Que el asesor lo pueda reconocer
 
-- [ ] 5.1 Decidir qué se muestra donde hoy va el teléfono cuando no lo hay (pregunta abierta del diseño)
-- [ ] 5.2 Mostrar el nombre de usuario en la ficha del contacto, la bandeja y la lista
-- [ ] 5.3 Distinguir "sin teléfono" de "teléfono vacío por error", para que nadie lo lea como un dato faltante que hay que completar
+- [x] 5.1 Decidir qué se muestra donde hoy va el teléfono cuando no lo hay (pregunta abierta del diseño)
+- [x] 5.2 Mostrar el nombre de usuario en la ficha del contacto, la bandeja y la lista
+- [x] 5.3 Distinguir "sin teléfono" de "teléfono vacío por error", para que nadie lo lea como un dato faltante que hay que completar
 
 ## 6. Cierre
 
-- [ ] 6.1 Suite completa y `tsc --noEmit`
-- [ ] 6.2 Entrada en `CHANGELOG.md`
-- [ ] 6.3 Resolver las preguntas abiertas de `design.md` o dejar anotado lo que se decidió
+- [x] 6.1 Suite completa y `tsc --noEmit`
+- [x] 6.2 Entrada en `CHANGELOG.md`
+- [x] 6.3 Resolver las preguntas abiertas de `design.md` o dejar anotado lo que se decidió
 - [ ] 6.4 Verificar de punta a punta con el caso real (`CO.4481978948757066`, autorizado por el usuario): que el mensaje entre Y que la respuesta llegue
-- [ ] 6.5 Revisar si quedaron contactos duplicados por este motivo y decidir qué hacer con ellos — está fuera del alcance, pero no debería descubrirse solo
+- [x] 6.5 Revisar si quedaron contactos duplicados por este motivo — **ninguno**: producción tiene 6 contactos, todos con identidad por teléfono y ninguno sin número. Estos contactos nunca llegaron a crearse, así que se arranca en limpio

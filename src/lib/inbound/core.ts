@@ -204,6 +204,7 @@ export async function persistInbound(
     externalId: sender.externalId,
     name: sender.name,
     alsoKnownAs: sender.alsoKnownAs ?? null,
+    username: sender.username ?? null,
   });
   if (!contactOutcome) {
     return { status: 'failed', reason: 'no se pudo resolver el contacto' };

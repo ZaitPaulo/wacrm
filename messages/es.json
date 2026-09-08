@@ -341,7 +341,9 @@
       "tagPickerHint": "Haz clic en una etiqueta para agregarla o quitarla de este contacto.",
       "noTagsAvailable": "No hay etiquetas disponibles. Créalas en Ajustes.",
       "removeTag": "Quitar la etiqueta {tag}",
-      "tagUpdateFailed": "No se pudo actualizar la etiqueta"
+      "tagUpdateFailed": "No se pudo actualizar la etiqueta",
+      "noPhone": "Sin teléfono",
+      "noPhoneHint": "Esta persona escribe con su nombre de usuario de WhatsApp y no comparte su número."
     },
     "aiBanner": {
       "pausedTitle": "El asistente de IA está pausado acá",

@@ -50,14 +50,18 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  /** Nombre de usuario de WhatsApp, cuando esa persona tiene uno. */
+  const [username, setUsername] = useState<string | null>(null);
 
   const fetchContactData = useCallback(async () => {
     if (!contact) return;
 
     const supabase = createClient();
 
-    // Fetch deals, notes, and tags in parallel
-    const [dealsRes, notesRes, contactTagsRes, allTagsRes] = await Promise.all([
+    // Fetch deals, notes, tags — y el nombre de usuario del canal — en
+    // paralelo.
+    const [dealsRes, notesRes, contactTagsRes, allTagsRes, identitiesRes] =
+      await Promise.all([
       supabase
         .from("deals")
         .select("*, pipeline:pipelines(*), stage:pipeline_stages(*)")
@@ -72,8 +76,19 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
         .from("contact_tags")
         .select("tag_id")
         .eq("contact_id", contact.id),
-      supabase.from("tags").select("*").order("name"),
-    ]);
+        supabase.from("tags").select("*").order("name"),
+        // El nombre de usuario de WhatsApp. Es lo único legible que
+        // tiene un contacto que no comparte su número, así que sin esto
+        // su ficha queda sin un solo identificador que un asesor pueda
+        // usar para encontrarlo o para confirmar con quién habla.
+        supabase
+          .from("contact_channels")
+          .select("username")
+          .eq("contact_id", contact.id)
+          .eq("channel", "whatsapp")
+          .not("username", "is", null)
+          .limit(1),
+      ]);
 
     if (dealsRes.data) setDeals(dealsRes.data);
     if (notesRes.data) setNotes(notesRes.data);
@@ -81,6 +96,10 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     if (contactTagsRes.data) {
       setContactTagIds(contactTagsRes.data.map((ct) => ct.tag_id as string));
     }
+    setUsername(
+      (identitiesRes.data?.[0] as { username?: string } | undefined)
+        ?.username ?? null
+    );
   }, [contact]);
 
   // Load on contact change. setContactData/setTags run inside async
@@ -196,18 +215,45 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
 
           {/* Phone */}
           <div className="mt-4 space-y-2">
-            <button
-              onClick={handleCopyPhone}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted"
-            >
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              <span className="flex-1 text-left">{contact.phone}</span>
-              {copied ? (
-                <Check className="h-3 w-3 text-primary" />
-              ) : (
-                <Copy className="h-3 w-3 text-muted-foreground" />
-              )}
-            </button>
+            {contact.phone ? (
+              <button
+                onClick={handleCopyPhone}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted"
+              >
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1 text-left">{contact.phone}</span>
+                {copied ? (
+                  <Check className="h-3 w-3 text-primary" />
+                ) : (
+                  <Copy className="h-3 w-3 text-muted-foreground" />
+                )}
+              </button>
+            ) : (
+              /*
+               * Sin teléfono. La fila NO se oculta y no se deja en
+               * blanco a propósito: un hueco se lee como un dato que
+               * falta por cargar, y alguien se pondría a buscarlo. Acá
+               * el número no existe y no va a existir — esta persona
+               * escribe con su nombre de usuario de WhatsApp y Meta no
+               * nos entrega su número.
+               */
+              <div className="rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Phone className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                  <span className="flex-1 text-left italic">
+                    {tSidebar("noPhone")}
+                  </span>
+                </div>
+                {username && (
+                  <div className="mt-1 flex items-center gap-2 pl-6 text-sm">
+                    <span className="truncate font-medium">@{username}</span>
+                  </div>
+                )}
+                <p className="mt-1 pl-6 text-xs text-muted-foreground/80">
+                  {tSidebar("noPhoneHint")}
+                </p>
+              </div>
+            )}
 
             {contact.email && (
               <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground">

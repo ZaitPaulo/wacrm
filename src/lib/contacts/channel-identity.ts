@@ -75,7 +75,13 @@ export async function linkChannelIdentity(
   accountId: string,
   contactId: string,
   channel: MessageChannel,
-  externalId: string
+  externalId: string,
+  /**
+   * Nombre de usuario público de ESA identidad, cuando el canal lo
+   * informa. Se guarda para poder reconocer a un contacto que no tiene
+   * teléfono; no participa en la resolución. Ver migración 522.
+   */
+  username?: string | null
 ): Promise<void> {
   const { error } = await db.from('contact_channels').upsert(
     {
@@ -83,7 +89,11 @@ export async function linkChannelIdentity(
       contact_id: contactId,
       channel,
       external_id: externalId,
+      ...(username ? { username } : {}),
     },
+    // `ignoreDuplicates` mantiene el upsert idempotente: una identidad
+    // que ya existe no se toca. El nombre de usuario, que sí puede
+    // cambiar, se refresca aparte — ver `refreshUsername`.
     { onConflict: 'account_id,channel,external_id', ignoreDuplicates: true }
   );
 
@@ -113,6 +123,11 @@ export interface ResolveContactArgs {
    * vincula siempre. Ver `resolveContactByChannel`.
    */
   alsoKnownAs?: string | null;
+  /**
+   * Nombre de usuario público, cuando el canal lo informa. Se guarda
+   * para reconocer a un contacto sin teléfono; no resuelve nada.
+   */
+  username?: string | null;
 }
 
 /**
@@ -157,11 +172,38 @@ export async function resolveContactByChannel(
 
   if (!externalId) return null;
 
-  /** Deja registradas TODAS las identidades que la plataforma informó. */
+  const username = args.username || null;
+
+  /**
+   * Deja registradas TODAS las identidades que la plataforma informó.
+   *
+   * El nombre de usuario va en las dos: es de la persona en ese canal,
+   * y cuál de sus dos identidades traiga el próximo mensaje no se sabe
+   * de antemano.
+   */
   const linkAll = async (contactId: string) => {
-    await linkChannelIdentity(db, accountId, contactId, channel, externalId);
+    await linkChannelIdentity(
+      db,
+      accountId,
+      contactId,
+      channel,
+      externalId,
+      username
+    );
     if (alsoKnownAs && alsoKnownAs !== externalId) {
-      await linkChannelIdentity(db, accountId, contactId, channel, alsoKnownAs);
+      await linkChannelIdentity(
+        db,
+        accountId,
+        contactId,
+        channel,
+        alsoKnownAs,
+        username
+      );
+    }
+    // El upsert de arriba no toca una identidad que ya existe, así que
+    // un nombre de usuario que cambió no entraría por ahí.
+    if (username) {
+      await refreshUsername(db, accountId, contactId, channel, username);
     }
   };
 
@@ -246,6 +288,42 @@ export async function resolveContactByChannel(
 
   await linkAll(created.id);
   return { contactId: created.id, created: true };
+}
+
+/**
+ * Pone al día el nombre de usuario de las identidades de un contacto.
+ *
+ * Va aparte del vínculo porque `linkChannelIdentity` es idempotente a
+ * propósito —`ignoreDuplicates` no toca una fila que ya existe— y el
+ * nombre de usuario SÍ cambia: la persona puede cambiarlo cuando
+ * quiera, y un handle viejo en la ficha es peor que ninguno, porque
+ * manda al asesor a buscar a alguien que ya no se llama así.
+ *
+ * Se escribe SIN comparar contra el valor guardado. La comparación
+ * parecía el ahorro obvio, pero `neq` no alcanza a las filas donde la
+ * columna es NULL —en SQL, `NULL <> 'algo'` no es verdadero— y esas son
+ * justamente todas las identidades anteriores a la migración 522: nunca
+ * se llenarían. Una escritura de más sobre filas que ya estamos
+ * tocando cuesta mucho menos que un dato que no aparece jamás.
+ *
+ * Best-effort: un fallo acá no puede tumbar la recepción del mensaje.
+ */
+async function refreshUsername(
+  db: SupabaseClient,
+  accountId: string,
+  contactId: string,
+  channel: MessageChannel,
+  username: string
+): Promise<void> {
+  const { error } = await db
+    .from('contact_channels')
+    .update({ username })
+    .eq('account_id', accountId)
+    .eq('contact_id', contactId)
+    .eq('channel', channel);
+  if (error) {
+    console.error('[channel-identity] username update error:', error.message);
+  }
 }
 
 /** Re-resolución tras una carrera perdida, por los dos caminos. */
