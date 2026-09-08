@@ -6,6 +6,7 @@ import type {
   ShowcaseVehicleDetail,
   ShowcaseData,
 } from './format'
+import { serverSupabaseUrl } from '@/lib/supabase/server-url'
 
 const ACCOUNT_COLUMNS =
   'id, name, default_currency, public_whatsapp, public_brand_color, public_name, public_logo_url, public_address, public_phone, public_email, public_hours'
@@ -24,7 +25,7 @@ let _client: SupabaseClient | null = null
 function admin(): SupabaseClient {
   if (!_client) {
     _client = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serverSupabaseUrl(),
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     )
   }

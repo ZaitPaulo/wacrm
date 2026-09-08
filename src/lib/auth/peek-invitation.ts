@@ -20,6 +20,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 import { hashInviteToken } from './invitations'
+import { serverSupabaseUrl } from '@/lib/supabase/server-url'
 
 export interface InvitationPreview {
   accountName: string
@@ -40,7 +41,7 @@ export async function peekInvitation(
 ): Promise<InvitationPreview | null> {
   if (!token) return null
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const url = serverSupabaseUrl()
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!url || !anonKey) return null
 

@@ -102,6 +102,14 @@ async function convertAndUpload(args: {
   const { db, accountId, sourceUrl } = args;
 
   const path = convertedObjectPath(accountId, sourceUrl);
+  // OJO con el `db` que llega acá: getPublicUrl() arma la dirección a
+  // partir de la URL del cliente, y esta URL se la damos a Meta para que
+  // DESCARGUE la foto. Tiene que ser pública. Hoy lo es porque el único
+  // camino hasta aquí es la ruta de aprobación, que usa el cliente de
+  // `@/lib/supabase/server` — el que quedó con la URL pública. Si alguna
+  // vez se le pasa un cliente construido con `serverSupabaseUrl()`, estas
+  // URLs saldrían como `http://api-gw:8000/...` y Meta no podría abrirlas.
+  // Ver src/lib/supabase/server-url.ts.
   const publicUrlOf = () =>
     db.storage.from(SHOWCASE_BUCKET).getPublicUrl(path).data.publicUrl;
 

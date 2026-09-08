@@ -5,6 +5,7 @@ import { getMediaUrl } from '@/lib/whatsapp/meta-api';
 import { normalizePhone } from '@/lib/whatsapp/phone-utils';
 import { processInboundMessage, type InboundSender } from '@/lib/inbound/core';
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature';
+import { serverSupabaseUrl } from '@/lib/supabase/server-url';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
 import {
   handleTemplateWebhookChange,
@@ -22,8 +23,11 @@ export const maxDuration = 60;
 let _adminClient: any = null;
 function supabaseAdmin() {
   if (!_adminClient) {
+    // Ruta interna cuando el despliegue la configura: este es EL camino
+    // que perdía mensajes cuando el DNS externo del contenedor fallaba.
+    // Ver src/lib/supabase/server-url.ts.
     _adminClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serverSupabaseUrl(),
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
   }

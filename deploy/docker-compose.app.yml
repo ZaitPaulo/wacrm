@@ -33,6 +33,24 @@ services:
     environment:
       TZ: ${TZ:-America/Bogota}
 
+      # El servidor le habla a Supabase por la red interna, no dando la
+      # vuelta por su propia URL pública. `api-gw` es el gateway del
+      # stack, vecino en la red `loramotors`, así que el camino de datos
+      # deja de depender del DNS externo, de la IP pública, del TLS y de
+      # Caddy — que es justo la cadena que el 2026-09-08 se cayó y perdió
+      # mensajes entrantes de WhatsApp.
+      #
+      # Solo la usan los clientes de service-role que hacen acceso a
+      # datos. Los que leen la cookie de sesión y los que generan URLs
+      # públicas de Storage siguen con la pública, y romperlo tiene
+      # consecuencias que no se ven hasta producción: ver
+      # src/lib/supabase/server-url.ts.
+      #
+      # Se fija acá y no en deploy/.env para que quien despliegue no
+      # tenga que acordarse de agregarla. Se puede sobrescribir desde el
+      # .env si algún montaje necesita otra dirección.
+      SUPABASE_INTERNAL_URL: ${SUPABASE_INTERNAL_URL:-http://api-gw:8000}
+
     # El proxy es el único que escucha en el servidor. Publicar el 3000 aquí
     # lo dejaría accesible desde internet saltándose UFW, porque Docker
     # escribe sus reglas de iptables antes en la cadena.

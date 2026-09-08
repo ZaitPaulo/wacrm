@@ -35,6 +35,26 @@ and polish.
   embebido de Docker: esto solo cambia a quién se le pregunta por los
   nombres de afuera.
 
+### El servidor le habla a Supabase por la red interna
+
+> **Solo afecta al despliegue autoalojado.** No hay migración. Requiere
+> **reconstruir** la imagen, no solo recrear el contenedor.
+
+- El servidor consultaba la base por la URL pública, así que salía por
+  DNS externo hasta su propia IP pública y volvía a entrar por Caddy
+  para alcanzar un contenedor que tenía al lado. Ahora usa
+  `SUPABASE_INTERNAL_URL` (que el compose del despliegue fija en
+  `http://api-gw:8000`), y el camino de datos deja de depender del DNS
+  externo, de la IP pública, del TLS y del proxy.
+- Sin esa variable no cambia nada: quien use Supabase Cloud o corra en
+  local sigue funcionando igual.
+- **No se aplica en todas partes, y es a propósito.** Los clientes que
+  leen la cookie de sesión conservan la URL pública, porque supabase-js
+  deriva el nombre de la cookie del hostname y con la interna dejaría
+  de coincidir con la que escribió el navegador: se caerían todos los
+  logins. Lo mismo el módulo que genera URLs públicas de Storage, que
+  son las que Meta descarga para publicar las fotos en redes.
+
 ### Inventario alineado con la lista de precios del cliente
 
 > **Migraciones requeridas:** aplica `510_inventory_lora_fields.sql` y

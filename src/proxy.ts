@@ -4,6 +4,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
+  // NO cambiar por serverSupabaseUrl(): igual que en
+  // src/lib/supabase/server.ts, el nombre de la cookie de sesión sale
+  // del hostname de esta URL. Con la interna, el nombre deja de
+  // coincidir con el que escribió el navegador y se cae todo login.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
