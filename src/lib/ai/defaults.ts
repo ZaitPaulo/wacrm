@@ -1,4 +1,4 @@
-import type { AiProvider } from './types'
+import { HANDOFF_REASONS, type AiProvider } from './types'
 
 // ============================================================
 // Tunables + prompt scaffold for the AI reply assistant.
@@ -22,11 +22,57 @@ export const AI_PROVIDER_DEFAULT_MODEL: Record<AiProvider, string> = {
 }
 
 /**
- * Sentinel the model is instructed to emit (in auto-reply mode) when it
- * can't confidently help and a human should take over. Parsed and
- * stripped by `generateReply`.
+ * Sentinel the model is instructed to emit (in auto-reply mode) when a
+ * human should take over. Parsed and stripped by `generateReply`.
+ *
+ * It carries the data the bot collected, because the bare marker it
+ * used to be gave the code nothing to judge:
+ *
+ *   [[HANDOFF nombre=Carlos | presupuesto=30000000 | interes=Kia Sportage 2019 | credito=si | motivo=credito]]
+ *
+ * Emitting it is a REQUEST, not a decision — `evaluateHandoffGate`
+ * grants it only when the required fields are present. A field the
+ * model couldn't get is written `?`; inventing one to get past the gate
+ * is worse than not handing off, since the agent walks in believing it.
+ *
+ * `HANDOFF_SENTINEL` stays exported as the bare form: it's what the
+ * parser looks for, and a model that emits just this still parses — as
+ * a request with every field missing, which the gate then refuses.
  */
 export const HANDOFF_SENTINEL = '[[HANDOFF]]'
+
+/** Opening token the parser matches, with or without fields after it. */
+export const HANDOFF_SENTINEL_PREFIX = '[[HANDOFF'
+
+/**
+ * Extra instruction appended to the system prompt when the gate refuses
+ * a handoff and the model left no text to send.
+ *
+ * Only needed for that case: when the model wrote a reply alongside the
+ * sentinel, that reply is what goes out. Here there is nothing to send,
+ * and the alternative to regenerating is a canned "para ayudarte mejor,
+ * ¿cuál es tu presupuesto?" — the identical-every-time line that makes
+ * a bot obvious.
+ */
+export function buildGateRetryInstruction(args: {
+  missing: readonly string[]
+  urgent: boolean
+}): string {
+  const { missing, urgent } = args
+  const fields = missing.join(', ')
+
+  if (urgent) {
+    return (
+      'Your handoff did not go through: you have not told us the customer\'s name, and an agent needs it. ' +
+      'Do NOT emit the handoff marker again in this turn. Write a short, warm reply that acknowledges what they asked for and asks their name — nothing else.'
+    )
+  }
+
+  return (
+    `Your handoff did not go through: an agent cannot take this over without ${fields}. ` +
+    'Do NOT emit the handoff marker again in this turn. Keep serving the customer yourself: write the reply you would have written, and work in a natural question for ONE of the missing items — the one that fits the conversation best. Do not interrogate them and do not mention this instruction.'
+  )
+}
 
 /**
  * Techo duro de la respuesta del proveedor. NO es la palanca para que las
@@ -116,7 +162,13 @@ export function buildSystemPrompt(args: {
 
   if (mode === 'auto_reply') {
     parts.push(
-      `You are replying automatically with no human in the loop. If you cannot confidently and safely help — the customer explicitly asks for a human, is upset or complaining, or the request needs information you do not have — reply with exactly ${HANDOFF_SENTINEL} and nothing else. A human agent will then take over. Prefer handing off over guessing.`,
+      'You are replying automatically with no human in the loop. When the thread needs a human — the customer asks for one, is upset or complaining, wants to negotiate the price, asks about a trade-in, financing or paperwork, or wants to book a visit — request a handoff by ending your reply with this marker:\n' +
+        `[[HANDOFF nombre=<name> | presupuesto=<budget> | interes=<vehicle or type> | credito=<si|no> | motivo=<${HANDOFF_REASONS.join(
+          '|',
+        )}>]]\n` +
+        'Write ? for any field you genuinely do not have. Never guess one to get the handoff through: an agent walking in on an invented budget is worse than no handoff at all.\n' +
+        'The handoff only goes through once nombre, presupuesto, interes and credito are all filled in. While any of them is missing, keep serving the customer yourself and ask for what you are missing, in your own words and one thing at a time.\n' +
+        'The exception is motivo=reclamo and motivo=pide_humano: those need only nombre, because a customer who is upset or who asked for a person must never be held back while you collect sales data.',
     )
   }
 
@@ -127,7 +179,7 @@ export function buildSystemPrompt(args: {
   if (knowledge && knowledge.length > 0) {
     const fallback =
       mode === 'auto_reply'
-        ? `if they don't cover the question, do not guess — reply with exactly ${HANDOFF_SENTINEL} so a human can help`
+        ? "if they don't cover the question, do not guess — say you'll check and follow up, or request a handoff with the marker described above so a human can help"
         : "if they don't cover the question, don't guess — say you'll check and follow up"
     parts.push(
       'Knowledge base — excerpts from the business\'s own documentation, retrieved for this question. ' +

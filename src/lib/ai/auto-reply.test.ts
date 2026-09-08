@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { AiConfig } from './types'
+import type { AiConfig, HandoffRequest } from './types'
 
 // Shared, hoisted mock state so the module mocks can close over it.
 const h = vi.hoisted(() => ({
@@ -92,11 +92,25 @@ function aiConfig(overrides: Partial<AiConfig> = {}): AiConfig {
   }
 }
 
+/** Peticion de transferencia con los cuatro datos: la que el gate deja
+ *  pasar. Los tests que prueban el bloqueo quitan campos. */
+function handoffRequest(overrides: Partial<HandoffRequest> = {}): HandoffRequest {
+  return {
+    nombre: 'Carlos',
+    presupuesto: '30000000',
+    interes: 'Kia Sportage 2019',
+    credito: true,
+    motivo: 'visita',
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
   h.state.conv = {
     assigned_agent_id: null,
     ai_autoreply_disabled: false,
     ai_reply_count: 0,
+    ai_handoff_attempts: 0,
   }
   h.state.autoResponders = []
   h.state.claim = true
@@ -105,7 +119,7 @@ beforeEach(() => {
   h.loadAiConfig.mockResolvedValue(aiConfig())
   h.buildConversationContext.mockResolvedValue([{ role: 'user', content: 'hi' }])
   h.retrieveKnowledge.mockResolvedValue([])
-  h.generateReply.mockResolvedValue({ text: 'Hello!', handoff: false })
+  h.generateReply.mockResolvedValue({ text: 'Hello!', handoff: null })
   h.engineSendText.mockResolvedValue({ whatsapp_message_id: 'm1' })
   h.delay.mockResolvedValue(undefined)
   // Default: nothing else happened while we waited.
@@ -207,7 +221,7 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
 
 describe('dispatchInboundToAiReply — handoff', () => {
   it('disables auto-reply, writes a summary, and tells the customer on handoff', async () => {
-    h.generateReply.mockResolvedValue({ text: '', handoff: true })
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
     await dispatchInboundToAiReply(ARGS)
     // Exactly one send, and it is NOT the model's output — that was
     // empty, which is what triggered the handoff. It is the notice that
@@ -269,7 +283,7 @@ describe('dispatchInboundToAiReply — handoff', () => {
 
   it('routes to the configured handoff agent on handoff', async () => {
     h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
-    h.generateReply.mockResolvedValue({ text: '', handoff: true })
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
     await dispatchInboundToAiReply(ARGS)
     expect(h.state.updatePayload).toMatchObject({
       ai_autoreply_disabled: true,
@@ -283,7 +297,7 @@ describe('dispatchInboundToAiReply — handoff', () => {
     // strand the customer with nobody assigned.
     h.engineSendText.mockRejectedValue(new Error('meta down'))
     h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
-    h.generateReply.mockResolvedValue({ text: '', handoff: true })
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
     await dispatchInboundToAiReply(ARGS)
     expect(h.state.updatePayload).toMatchObject({
       ai_autoreply_disabled: true,
@@ -356,5 +370,128 @@ describe('dispatchInboundToAiReply — reply window', () => {
 
     expect(h.state.rpcCalls.map((c) => c.name)).toContain('claim_ai_reply_slot')
     expect(h.generateReply).not.toHaveBeenCalled()
+  })
+})
+
+// El bug que motivó el gate: el 2026-09-07 dos clientes fueron
+// transferidos en su segundo turno, apenas dijeron el presupuesto, sin
+// que el bot les hubiera mostrado un solo vehículo. El modelo pedía
+// transferir y el código obedecía.
+describe('dispatchInboundToAiReply — gate de datos del handoff', () => {
+  it('no transfiere cuando faltan datos: sigue atendiendo el hilo', async () => {
+    h.generateReply.mockResolvedValue({
+      text: '¿Y con cuánto cuentas?',
+      handoff: handoffRequest({ presupuesto: null }),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    // Ni asignar, ni apagar el bot, ni avisar al cliente.
+    expect(h.state.updatePayload).not.toHaveProperty('ai_autoreply_disabled')
+    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+    // Lo que sale es la respuesta del bot, no el aviso de asignación.
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toBe('¿Y con cuánto cuentas?')
+  })
+
+  it('cuenta el intento rechazado', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'algo',
+      handoff: handoffRequest({ interes: null }),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ ai_handoff_attempts: 1 })
+  })
+
+  // El caso raro: marcador pelado, sin texto que mandar. Se regenera en
+  // vez de soltar una frase fija, que es lo que delata a un bot.
+  it('regenera cuando el marcador viene sin texto', async () => {
+    h.generateReply
+      .mockResolvedValueOnce({ text: '', handoff: handoffRequest({ nombre: null }) })
+      .mockResolvedValueOnce({ text: '¿Cómo te llamas?', handoff: null })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(2)
+    // La segunda llamada lleva la instrucción de no volver a transferir.
+    expect(h.generateReply.mock.calls[1][0].systemPrompt).toContain(
+      'did not go through',
+    )
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toBe('¿Cómo te llamas?')
+  })
+
+  it('transfiere con los cuatro datos y le pasa la ficha al asesor', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'Te paso con un asesor.',
+      handoff: handoffRequest({ motivo: 'credito' }),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(h.state.updatePayload?.ai_handoff_summary).toContain('Nombre: Carlos')
+    expect(h.state.updatePayload?.ai_handoff_summary).toContain('Motivo: credito')
+  })
+
+  it('transfiere un reclamo con solo el nombre', async () => {
+    h.generateReply.mockResolvedValue({
+      text: '',
+      handoff: handoffRequest({
+        motivo: 'reclamo',
+        presupuesto: null,
+        interes: null,
+        credito: null,
+      }),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(h.state.updatePayload?.ai_handoff_summary).toContain('(urgente)')
+  })
+
+  it('retiene una urgencia sin nombre, y la suelta al segundo intento', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'Claro, ¿con quién tengo el gusto?',
+      handoff: handoffRequest({ motivo: 'pide_humano', nombre: null }),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.updatePayload).toMatchObject({ ai_handoff_attempts: 1 })
+    expect(h.state.updatePayload).not.toHaveProperty('ai_autoreply_disabled')
+
+    // Segundo intento: el hilo ya trae un rechazo encima.
+    h.state.conv = {
+      assigned_agent_id: null,
+      ai_autoreply_disabled: false,
+      ai_reply_count: 1,
+      ai_handoff_attempts: 1,
+    }
+    h.state.updatePayload = null
+
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+  })
+
+  // Un sentinel desnudo (modelo que olvida el formato) no puede
+  // transferir: es exactamente una petición sin datos.
+  it('no transfiere con un marcador sin ningún campo', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'dime más',
+      handoff: {
+        nombre: null,
+        presupuesto: null,
+        interes: null,
+        credito: null,
+        motivo: 'otro' as const,
+      },
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).not.toHaveProperty('ai_autoreply_disabled')
   })
 })

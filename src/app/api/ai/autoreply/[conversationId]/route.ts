@@ -81,6 +81,11 @@ export async function POST(request: Request, { params }: Params) {
       // a human choosing to re-engage the assistant.
       update.ai_reply_count = 0
       update.ai_handoff_summary = null
+      // El contador de transferencias rechazadas también vuelve a cero:
+      // reactivar deja el hilo como nuevo a ojos del gate de datos. Si
+      // no, un hilo que ya acumuló un rechazo urgente transferiría de
+      // inmediato la próxima vez, sin darle al bot su turno.
+      update.ai_handoff_attempts = 0
     }
 
     const { error: upErr } = await supabase
