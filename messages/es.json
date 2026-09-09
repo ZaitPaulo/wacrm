@@ -1799,7 +1799,8 @@
       "api": "Claves de API",
       "instagram": "Instagram",
       "facebook": "Facebook",
-      "showcase": "Vitrina pública"
+      "showcase": "Vitrina pública",
+      "business-hours": "Horario de atención"
     },
     "groups": {
       "account": "Cuenta",
@@ -2114,6 +2115,36 @@
         "Elige la página y pulsa Conectar. Guardamos el token de esa página, no el tuyo."
       ],
       "reviewNote": "Si la conexión falla con un aviso de permisos, casi siempre es que Meta todavía no aprobó los tres permisos de páginas. El token puede estar perfecto igual."
+    },
+    "businessHours": {
+      "title": "Horario de atención",
+      "subtitle": "Cuándo el sistema puede escribirle a un cliente por su cuenta.",
+      "ruleTitle": "Responder no depende del horario",
+      "rule": "Un cliente que escribe a las 11 de la noche recibe respuesta: para eso escribió. Este horario solo frena lo que el sistema envía por iniciativa propia — un seguimiento programado, una automatización disparada por una etiqueta. Lo que cae fuera de horario no se pierde: sale en la próxima apertura.",
+      "enable": "Respetar el horario de atención",
+      "enableHint": "Apagado, el sistema puede escribir a cualquier hora.",
+      "closed": "Cerrado",
+      "open": "Abierto",
+      "from": "Desde",
+      "to": "Hasta",
+      "holidays": "Respetar los festivos de Colombia",
+      "holidaysHint": "Un festivo cierra el día entero. Se calculan solos cada año, incluida la Semana Santa y los que la ley corre al lunes.",
+      "humanNote": "Un asesor puede escribir a cualquier hora. El freno es solo para lo automático.",
+      "invalidRange": "La hora de cierre tiene que ser posterior a la de apertura.",
+      "noDays": "Con el horario encendido, al menos un día tiene que estar abierto.",
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "saved": "Horario guardado",
+      "saveFailed": "No se pudo guardar el horario",
+      "days": {
+        "mon": "Lunes",
+        "tue": "Martes",
+        "wed": "Miércoles",
+        "thu": "Jueves",
+        "fri": "Viernes",
+        "sat": "Sábado",
+        "sun": "Domingo"
+      }
     }
   },
   "Inventory": {

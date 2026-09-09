@@ -13,6 +13,8 @@
 
 import { NextResponse } from "next/server";
 
+import { parseHorario } from "@/lib/outbound/business-hours";
+
 import {
   requireRole,
   getCurrentAccount,
@@ -32,7 +34,7 @@ export async function GET() {
     const { data: extra } = await ctx.supabase
       .from("accounts")
       .select(
-        "showcase_enabled, public_whatsapp, public_brand_color, public_name, public_logo_url, public_address, public_phone, public_email, public_hours",
+        "showcase_enabled, public_whatsapp, public_brand_color, public_name, public_logo_url, public_address, public_phone, public_email, public_hours, quiet_hours_enabled, business_hours, holiday_calendar",
       )
       .eq("id", ctx.accountId)
       .maybeSingle();
@@ -48,6 +50,13 @@ export async function GET() {
         public_phone: extra?.public_phone ?? null,
         public_email: extra?.public_email ?? null,
         public_hours: extra?.public_hours ?? null,
+        // Horario de atencion (migracion 523). Distinto de
+        // `public_hours`, que es el texto libre que ve el visitante de
+        // la vitrina: esto lo lee el codigo para decidir si un envio
+        // automatico puede salir.
+        quiet_hours_enabled: extra?.quiet_hours_enabled ?? false,
+        business_hours: extra?.business_hours ?? {},
+        holiday_calendar: extra?.holiday_calendar ?? null,
       },
       role: ctx.role,
     });
@@ -179,6 +188,50 @@ export async function PATCH(request: Request) {
           { status: 400 },
         );
       }
+    }
+
+    // ============================================================
+    // Horario de atencion.
+    //
+    // Se valida con el mismo parser que usa el motor de envio, no con
+    // uno propio: si aqui se aceptara algo que alli se descarta, el
+    // administrador guardaria un horario y veria otro comportamiento.
+    // `parseHorario` deja cerrado cualquier dia mal escrito, asi que lo
+    // que se persiste es exactamente lo que el sistema va a obedecer.
+    // ============================================================
+    if (body.quiet_hours_enabled !== undefined) {
+      if (typeof body.quiet_hours_enabled !== "boolean") {
+        return NextResponse.json(
+          { error: "'quiet_hours_enabled' must be a boolean" },
+          { status: 400 },
+        );
+      }
+      update.quiet_hours_enabled = body.quiet_hours_enabled;
+    }
+
+    if (body.business_hours !== undefined) {
+      if (
+        body.business_hours === null ||
+        typeof body.business_hours !== "object" ||
+        Array.isArray(body.business_hours)
+      ) {
+        return NextResponse.json(
+          { error: "'business_hours' must be an object" },
+          { status: 400 },
+        );
+      }
+      update.business_hours = parseHorario(body.business_hours);
+    }
+
+    if (body.holiday_calendar !== undefined) {
+      const raw = body.holiday_calendar;
+      if (raw !== null && raw !== "CO") {
+        return NextResponse.json(
+          { error: "'holiday_calendar' must be 'CO' or null" },
+          { status: 400 },
+        );
+      }
+      update.holiday_calendar = raw;
     }
 
     if (Object.keys(update).length === 0) {

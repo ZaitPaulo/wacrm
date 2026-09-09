@@ -1,4 +1,5 @@
 import {
+  Clock,
   Coins,
   Megaphone,
   FileText,
@@ -36,6 +37,7 @@ export const SETTINGS_SECTIONS = [
   'facebook',
   'templates',
   'quick-replies',
+  'business-hours',
   'fields',
   'deals',
   'showcase',
@@ -77,6 +79,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   facebook: { id: 'facebook', label: 'Facebook', icon: Megaphone, group: 'workspace', adminOnly: true },
   templates: { id: 'templates', label: 'Templates', icon: FileText, group: 'workspace', adminOnly: true },
   'quick-replies': { id: 'quick-replies', label: 'Quick replies', icon: Zap, group: 'workspace', adminOnly: true },
+  'business-hours': { id: 'business-hours', label: 'Business hours', icon: Clock, group: 'workspace', adminOnly: true },
   fields: { id: 'fields', label: 'Fields & tags', icon: Tags, group: 'workspace', adminOnly: true },
   deals: { id: 'deals', label: 'Deals & currency', icon: Coins, group: 'workspace', adminOnly: true },
   showcase: { id: 'showcase', label: 'Public showcase', icon: Store, group: 'workspace', adminOnly: true },

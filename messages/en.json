@@ -1806,7 +1806,8 @@
       "api": "API keys",
       "instagram": "Instagram",
       "facebook": "Facebook",
-      "showcase": "Public showcase"
+      "showcase": "Public showcase",
+      "business-hours": "Business hours"
     },
     "groups": {
       "account": "Account",
@@ -2121,6 +2122,36 @@
         "Pick the Page and press Connect. We store that Page's token, not yours."
       ],
       "reviewNote": "If connecting fails with a permissions error, it is almost always that Meta has not approved the three Pages permissions yet. The token itself may be perfectly fine."
+    },
+    "businessHours": {
+      "title": "Business hours",
+      "subtitle": "When the system may message a customer on its own.",
+      "ruleTitle": "Replying is never blocked",
+      "rule": "A customer who writes at 11pm gets an answer — that is why they wrote. These hours only hold back what the system sends on its own initiative: a scheduled follow-up, an automation fired by a tag. Nothing is lost; it goes out at the next opening.",
+      "enable": "Respect business hours",
+      "enableHint": "When off, the system may message at any hour.",
+      "closed": "Closed",
+      "open": "Open",
+      "from": "From",
+      "to": "To",
+      "holidays": "Respect Colombian public holidays",
+      "holidaysHint": "A holiday closes the whole day. They are computed each year, including Easter-relative ones and those the law moves to Monday.",
+      "humanNote": "An agent can message at any hour. The hold applies only to automated sends.",
+      "invalidRange": "Closing time must be after opening time.",
+      "noDays": "With hours enabled, at least one day must be open.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Business hours saved",
+      "saveFailed": "Could not save business hours",
+      "days": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      }
     }
   },
   "Inventory": {
