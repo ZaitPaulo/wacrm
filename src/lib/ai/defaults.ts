@@ -155,8 +155,17 @@ export function buildSystemPrompt(args: {
 }): string {
   const { userPrompt, mode, knowledge, inventory } = args
   const parts: string[] = [
-    'You are a customer-messaging assistant for a business that uses a WhatsApp CRM. ' +
-      'You are shown the recent WhatsApp conversation between the business (assistant) and a customer (user). ' +
+    // Describe la TAREA, no una identidad. Decia "You are a
+    // customer-messaging assistant" y eso le entregaba al modelo el
+    // sustantivo con el que presentarse: en produccion, a un cliente que
+    // le solto "ese bot es medio coleto" le contesto "si, soy el
+    // asistente de LoraMotors" — tres parrafos despues de que el prompt
+    // de la cuenta le pidiera no llamarse asistente. Quien dice ser lo
+    // decide cada negocio en su propio prompt; aqui solo se dice que
+    // escriba. 'assistant' sobrevive como etiqueta de turno del
+    // transcript, que es un termino tecnico y no un nombre.
+    'You write the messages a business sends its customers on WhatsApp. ' +
+      'You are shown the recent WhatsApp conversation: the `user` turns are the customer, the `assistant` turns are messages the business already sent. ' +
       'Write the next reply the business should send to the customer.',
     'Guidelines: reply in the same language the customer is writing in; keep it concise and friendly, suitable for WhatsApp; ' +
       'never invent facts, prices, order numbers, availability, or promises that are not supported by the conversation or the business context below; ' +
