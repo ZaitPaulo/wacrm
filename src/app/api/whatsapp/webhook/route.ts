@@ -359,10 +359,19 @@ interface InboundBatch {
 /**
  * Cuánto se espera a que Meta confirme un medio antes de seguir sin él.
  *
- * Valor conservador, no medido: se eligió holgado para no descartar
- * medios que hoy verifican bien, y su único trabajo es impedir que una
- * llamada colgada retenga la confirmación a Meta. Si alguna vez se mide
- * el caso normal, este número puede bajar.
+ * Medido el 2026-09-09 desde el contenedor de producción, que es la red
+ * que importa: en reposo la llamada tarda 0.5–1 s, y bajo ráfaga Meta se
+ * degrada a 3–5 s — una muestra llegó a 5270 ms. O sea que este límite
+ * NO es holgado: ya se agotó al menos una vez.
+ *
+ * Se deja igual a propósito. Bajarlo a los ~2 s que bastarían en reposo
+ * sería optimizar para el caso en que el timeout no hace falta: existe
+ * para el degradado, que es justo donde 5 s se queda corto. Y agotarlo
+ * no pierde el mensaje — cae al mismo camino que un medio que no
+ * verifica, y el mensaje se guarda con su texto.
+ *
+ * El detalle de la medición está en el design del change
+ * `recepcion-durable-de-mensajes`.
  */
 const MEDIA_VERIFY_TIMEOUT_MS = 5000;
 
