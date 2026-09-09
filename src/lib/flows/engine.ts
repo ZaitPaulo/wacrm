@@ -457,6 +457,8 @@ async function sendButtonsAndSuspend(
 ): Promise<{ outcome: "advanced"; node_key: string }> {
   const cfg = node.config as unknown as SendButtonsNodeConfig;
   const { whatsapp_message_id } = await engineSendInteractiveButtons({
+    // Un flujo solo avanza porque el cliente respondio.
+    initiative: 'reply',
     accountId: run.account_id,
     userId: run.user_id,
     conversationId: run.conversation_id!,
@@ -493,6 +495,8 @@ async function sendListAndSuspend(
 ): Promise<{ outcome: "advanced"; node_key: string }> {
   const cfg = node.config as unknown as SendListNodeConfig;
   const { whatsapp_message_id } = await engineSendInteractiveList({
+    // Un flujo solo avanza porque el cliente respondio.
+    initiative: 'reply',
     accountId: run.account_id,
     userId: run.user_id,
     conversationId: run.conversation_id!,
@@ -780,6 +784,8 @@ async function advanceFromNodeKey(
       const cfg = node.config as unknown as SendMessageNodeConfig;
       try {
         const { whatsapp_message_id } = await engineSendText({
+    // Un flujo solo avanza porque el cliente respondio.
+    initiative: 'reply',
           accountId: run.account_id,
     userId: run.user_id,
           conversationId: run.conversation_id!,
@@ -805,6 +811,8 @@ async function advanceFromNodeKey(
       const cfg = node.config as unknown as SendMediaNodeConfig;
       try {
         const { whatsapp_message_id } = await engineSendMedia({
+    // Un flujo solo avanza porque el cliente respondio.
+    initiative: 'reply',
           accountId: run.account_id,
     userId: run.user_id,
           conversationId: run.conversation_id!,
@@ -838,6 +846,8 @@ async function advanceFromNodeKey(
       const cfg = node.config as unknown as CollectInputNodeConfig;
       try {
         const { whatsapp_message_id } = await engineSendText({
+    // Un flujo solo avanza porque el cliente respondio.
+    initiative: 'reply',
           accountId: run.account_id,
     userId: run.user_id,
           conversationId: run.conversation_id!,
@@ -1253,6 +1263,8 @@ async function handleReplyForActiveRun(
       const cfg = currentNode.config as unknown as CollectInputNodeConfig;
       try {
         await engineSendText({
+    // Un flujo solo avanza porque el cliente respondio.
+    initiative: 'reply',
           accountId: run.account_id,
     userId: run.user_id,
           conversationId: run.conversation_id!,

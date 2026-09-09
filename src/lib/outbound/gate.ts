@@ -8,6 +8,10 @@ import {
   type OutsideWindowOption,
   type SenderKind,
 } from './window';
+import { debeEsperar, parseHorario } from './business-hours';
+
+/** Quién tomó la iniciativa de un envío. Ver `OutboundOptions`. */
+export type Initiative = 'reply' | 'unprompted';
 
 // ============================================================
 // La puerta de salida: por dónde y a quién sale una respuesta.
@@ -56,7 +60,12 @@ export type OutboundFailure =
   /** El canal existe en la base pero todavía no tiene cómo enviar. */
   | 'channel_unsupported'
   /** La ventana de respuesta del canal se cerró. */
-  | 'outside_window';
+  | 'outside_window'
+  /**
+   * Fuera del horario de atención, y el envío no responde a nadie.
+   * Nunca se devuelve para una respuesta ni para un envío humano.
+   */
+  | 'quiet_hours';
 
 export type OutboundResolution =
   | { ok: true; target: OutboundTarget }
@@ -76,6 +85,23 @@ export interface OutboundOptions {
    * una persona.
    */
   senderKind: SenderKind;
+  /**
+   * Quién tomó la iniciativa de este envío.
+   *
+   * Obligatorio por la misma razón que `senderKind`, y con más motivo:
+   * un valor por defecto haría que un seguimiento programado se hiciera
+   * pasar por respuesta y le escribiera a alguien a las 3 de la mañana.
+   * Es la única forma de saberlo — no se puede inferir del contenido ni
+   * del tiempo transcurrido.
+   *
+   *   'reply'       responde a un mensaje que el cliente acaba de
+   *                 mandar. Sale a cualquier hora: si escribió a las 11
+   *                 de la noche es porque espera respuesta, y callarse
+   *                 sería peor que contestar.
+   *   'unprompted'  el sistema arranca por su cuenta — una espera que
+   *                 vence, una etiqueta que se agregó. Solo en horario.
+   */
+  initiative: Initiative;
   /** Si el envío es una plantilla aprobada (solo aplica a WhatsApp). */
   isTemplate?: boolean;
 }
@@ -137,6 +163,18 @@ export async function resolveOutboundTarget(
     channel
   );
   if (!recipient.ok) return recipient;
+
+  // El horario de atención. Se comprueba acá, en el único punto por el
+  // que pasan todos los caminos de envío, en vez de confiar en que cada
+  // automatización se acuerde de poner una condición.
+  //
+  // Solo frena lo que NO responde a nadie. Una respuesta sale a
+  // cualquier hora, y un envío humano también: si una persona escribe a
+  // las 11 de la noche es porque decidió hacerlo.
+  if (options.initiative === 'unprompted' && options.senderKind !== 'human') {
+    const bloqueado = await fueraDeHorario(db, accountId);
+    if (bloqueado) return { ok: false, reason: 'quiet_hours' };
+  }
 
   // La ventana se comprueba ACÁ, en la misma llamada que resuelve el
   // destino, para que ningún camino de envío pueda olvidarse de mirarla.
@@ -262,6 +300,41 @@ export async function resolveRecipientId(
 
   if (!elegida) return { ok: false, reason: 'no_recipient' };
   return { ok: true, recipientId: elegida.external_id };
+}
+
+/**
+ * ¿La cuenta está fuera de su horario de atención ahora mismo?
+ *
+ * Un fallo leyendo la configuración devuelve `false` —deja pasar— y no
+ * `true`. Es deliberado: quedarse callado por no poder leer una
+ * columna convertiría un problema de base en clientes sin respuesta,
+ * que es peor y mucho más difícil de notar que un mensaje a deshora.
+ */
+async function fueraDeHorario(
+  db: SupabaseClient,
+  accountId: string
+): Promise<boolean> {
+  const { data, error } = await db
+    .from('accounts')
+    .select('quiet_hours_enabled, business_hours, holiday_calendar')
+    .eq('id', accountId)
+    .maybeSingle<{
+      quiet_hours_enabled: boolean | null;
+      business_hours: unknown;
+      holiday_calendar: string | null;
+    }>();
+
+  if (error) {
+    console.error('[outbound] no se pudo leer el horario:', error.message);
+    return false;
+  }
+  if (!data?.quiet_hours_enabled) return false;
+
+  return debeEsperar({
+    enabled: true,
+    hours: parseHorario(data.business_hours),
+    holidayCalendar: data.holiday_calendar === 'CO' ? 'CO' : null,
+  });
 }
 
 /** True si ese canal ya sabe enviar. Para la UI, que oculta lo que no. */

@@ -251,8 +251,15 @@ export async function sendMessageToConversation(
   // La plantilla se declara porque es la salida que WhatsApp da para
   // hablar fuera de ventana: sin esto, el único envío que sí procede
   // quedaría bloqueado.
+  // La iniciativa se declara como del sistema porque acá NO se puede
+  // saber si el asesor está respondiendo o abriendo la conversación. No
+  // importa para el horario: la puerta exime explícitamente a los
+  // envíos humanos, porque si una persona escribe a las 11 de la noche
+  // es porque lo decidió, y no es a esa decisión a la que hay que
+  // ponerle un freno automático.
   const resolution = await resolveOutboundTarget(db, accountId, conversationId, {
     senderKind: 'human',
+    initiative: 'unprompted',
     isTemplate: messageType === 'template',
   });
   if (!resolution.ok) {

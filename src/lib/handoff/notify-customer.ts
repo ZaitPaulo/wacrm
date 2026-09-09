@@ -69,6 +69,7 @@ export async function notifyCustomerOfHandoff(args: {
   if (!args.conversationId || !args.contactId) return
   try {
     await engineSendText({
+      initiative: 'reply',
       accountId: args.accountId,
       userId: args.userId,
       conversationId: args.conversationId,

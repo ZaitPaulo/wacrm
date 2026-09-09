@@ -13,7 +13,10 @@ import {
   phoneVariants,
   isRecipientNotAllowedError,
 } from '@/lib/whatsapp/phone-utils'
-import { resolveOutboundTarget } from '@/lib/outbound/gate'
+import {
+  resolveOutboundTarget,
+  type Initiative,
+} from '@/lib/outbound/gate'
 import { supabaseAdmin } from './admin-client'
 
 // ------------------------------------------------------------
@@ -31,7 +34,18 @@ import { supabaseAdmin } from './admin-client'
 // keeps the foundation PR self-contained and unit-testable.
 // ------------------------------------------------------------
 
-interface SendTextEngineArgs {
+/**
+ * Comun a todo envio de motor: si responde al cliente o si el sistema
+ * arranco solo. Obligatorio y sin valor por defecto — uno permisivo
+ * haria que un seguimiento programado se hiciera pasar por respuesta y
+ * saliera de madrugada. Los flujos y la IA son respuestas por
+ * construccion; las automatizaciones pasan la suya.
+ */
+interface ConIniciativa {
+  initiative: Initiative
+}
+
+interface SendTextEngineArgs extends ConIniciativa {
   /** Account-level tenancy key. Drives contact + whatsapp_config
    *  lookups so a flow authored by user A still sends through the
    *  WhatsApp number user B saved on the same account. */
@@ -74,7 +88,7 @@ export async function engineSendText(
     db,
     args.accountId,
     args.conversationId,
-    { senderKind: 'automated' },
+    { senderKind: 'automated', initiative: args.initiative },
   )
   if (!resolution.ok) {
     if (resolution.reason === 'channel_unsupported') {
@@ -165,7 +179,7 @@ export async function engineSendText(
   return { whatsapp_message_id: waMessageId }
 }
 
-interface SendMediaEngineArgs {
+interface SendMediaEngineArgs extends ConIniciativa {
   accountId: string
   userId: string
   conversationId: string
@@ -200,7 +214,7 @@ export async function engineSendMedia(
     db,
     args.accountId,
     args.conversationId,
-    { senderKind: 'automated' },
+    { senderKind: 'automated', initiative: args.initiative },
   )
   if (!resolution.ok) {
     if (resolution.reason === 'channel_unsupported') {
@@ -298,7 +312,7 @@ export async function engineSendMedia(
   return { whatsapp_message_id: waMessageId }
 }
 
-interface SendInteractiveButtonsEngineArgs {
+interface SendInteractiveButtonsEngineArgs extends ConIniciativa {
   accountId: string
   userId: string
   conversationId: string
@@ -309,7 +323,7 @@ interface SendInteractiveButtonsEngineArgs {
   footerText?: string
 }
 
-interface SendInteractiveListEngineArgs {
+interface SendInteractiveListEngineArgs extends ConIniciativa {
   accountId: string
   userId: string
   conversationId: string
@@ -365,7 +379,7 @@ async function sendInteractiveViaMeta(
     db,
     input.accountId,
     input.conversationId,
-    { senderKind: 'automated' },
+    { senderKind: 'automated', initiative: input.initiative },
   )
   if (!resolution.ok) {
     if (resolution.reason === 'channel_unsupported') {

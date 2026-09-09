@@ -20,6 +20,12 @@ import type {
   AssignConversationStepConfig,
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
+import type { Initiative } from '@/lib/outbound/gate'
+import {
+  debeEsperar,
+  parseHorario,
+  proximaApertura,
+} from '@/lib/outbound/business-hours'
 import { addContactTagIfAbsent } from '@/lib/contacts/tag-write'
 import { MAX_TAG_CHAIN_DEPTH, getTagChainDepth } from '@/lib/contacts/tag-chain'
 import { engineSendText, engineSendTemplate, engineSendInteractive } from './meta-send'
@@ -152,6 +158,20 @@ export async function resumePendingExecution(pending: {
     return
   }
 
+  // Una espera que vence es, por definicion, iniciativa del sistema: el
+  // cliente no pidio nada ahora. Si vence de madrugada, la ejecucion se
+  // vuelve a encolar para la proxima apertura en vez de escribirle.
+  //
+  // Se aplaza ACA y no en la puerta de salida porque este es el punto
+  // que sabe suspenderse: reencolar la fila conserva el paso siguiente,
+  // el contexto y la rama. Frenarlo abajo, en el envio, perderia el
+  // resto de la automatizacion.
+  const aplazado = await aplazarSiEstaCerrado(
+    automation as Automation,
+    pending
+  )
+  if (aplazado) return
+
   try {
     await executeStepsFrom({
       automation: automation as Automation,
@@ -162,6 +182,7 @@ export async function resumePendingExecution(pending: {
       startPosition: pending.next_step_position,
       logId: pending.log_id,
       triggerEvent: 'resumed_wait',
+      initiative: 'unprompted',
     })
     await markPending(pending.id, 'done')
   } catch (err) {
@@ -217,6 +238,7 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
     startPosition: 0,
     logId: log.id,
     triggerEvent: input.triggerType,
+    initiative: iniciativaDe(input.triggerType),
   })
 
   // Atomic counter update via the SQL function from migration 007.
@@ -231,6 +253,83 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
   }
 }
 
+/**
+ * Reencola una ejecucion que vencio fuera del horario de atencion.
+ *
+ * Devuelve true si la aplazo — el llamador tiene que salir sin ejecutar
+ * nada.
+ *
+ * ## Por que reencolar y no descartar
+ *
+ * Un seguimiento que vence a las 3 de la manana sigue siendo util a las
+ * 8. Descartarlo perderia trabajo que alguien configuro a proposito, y
+ * de forma invisible. La fila se mueve a la proxima apertura y sale
+ * entonces, con su paso siguiente, su contexto y su rama intactos.
+ *
+ * ## El horario enteramente cerrado
+ *
+ * `proximaApertura` devuelve null cuando ningun dia esta abierto — un
+ * horario mal configurado, o encendido sin llenar. En ese caso NO se
+ * aplaza: se deja pasar. Aplazar contra una apertura que no existe
+ * dejaria el mensaje en el limbo para siempre, y un mensaje a deshora
+ * es un problema mas chico y mucho mas visible que uno que nunca sale.
+ */
+async function aplazarSiEstaCerrado(
+  automation: Automation,
+  pending: { id: string; contact_id: string | null }
+): Promise<boolean> {
+  const db = supabaseAdmin()
+
+  const { data: cuenta, error } = await db
+    .from('accounts')
+    .select('quiet_hours_enabled, business_hours, holiday_calendar')
+    .eq('id', automation.account_id)
+    .maybeSingle<{
+      quiet_hours_enabled: boolean | null
+      business_hours: unknown
+      holiday_calendar: string | null
+    }>()
+
+  // Igual que en la puerta de salida: no poder leer el horario deja
+  // pasar. Callarse por un fallo de base es peor y mas dificil de notar.
+  if (error) {
+    console.error('[automations] no se pudo leer el horario:', error.message)
+    return false
+  }
+  if (!cuenta?.quiet_hours_enabled) return false
+
+  const hours = parseHorario(cuenta.business_hours)
+  const holidayCalendar = cuenta.holiday_calendar === 'CO' ? 'CO' : null
+  if (!debeEsperar({ enabled: true, hours, holidayCalendar })) return false
+
+  const apertura = proximaApertura(hours, new Date(), holidayCalendar)
+  if (!apertura) {
+    console.warn(
+      '[automations] horario encendido pero sin ningun dia abierto; se envia igual',
+      automation.account_id,
+    )
+    return false
+  }
+
+  const { error: reErr } = await db
+    .from('automation_pending_executions')
+    .update({ run_at: apertura.toISOString() })
+    .eq('id', pending.id)
+
+  if (reErr) {
+    // No se pudo mover: se deja pendiente y el cron lo reintentara en
+    // el proximo minuto, volviendo a caer aca. Preferible a ejecutarlo
+    // fuera de horario por no haber podido aplazarlo.
+    console.error('[automations] no se pudo aplazar:', reErr.message)
+    return true
+  }
+
+  console.info(
+    `[automations] fuera de horario: ${automation.name} aplazada hasta ${apertura.toISOString()}`,
+  )
+  return true
+}
+
 interface ExecuteArgs {
   automation: Automation
   contactId: string | null
@@ -240,6 +339,38 @@ interface ExecuteArgs {
   startPosition: number
   logId: string | null
   triggerEvent: string
+  /**
+   * Si esta ejecucion responde a un mensaje del cliente o si el sistema
+   * arranco por su cuenta. Viaja con la ejecucion entera y decide si el
+   * horario de atencion la frena. Ver `iniciativaDe`.
+   */
+  initiative: Initiative
+}
+
+/**
+ * Que iniciativa representa un disparador.
+ *
+ * Los cinco primeros solo ocurren PORQUE el cliente acaba de escribir,
+ * asi que lo que sale de ellos es una respuesta y puede salir a
+ * cualquier hora. Los demas los origina el sistema o una persona del
+ * equipo, y para el cliente son un mensaje que no pidio.
+ *
+ * El `switch` es exhaustivo a proposito: un disparador nuevo obliga a
+ * declarar de que lado cae en vez de heredar el permiso mas laxo.
+ */
+export function iniciativaDe(trigger: AutomationTriggerType): Initiative {
+  switch (trigger) {
+    case 'new_message_received':
+    case 'first_inbound_message':
+    case 'keyword_match':
+    case 'new_contact_created':
+    case 'interactive_reply':
+      return 'reply'
+    case 'conversation_assigned':
+    case 'tag_added':
+    case 'time_based':
+      return 'unprompted'
+  }
 }
 
 async function executeStepsFrom(args: ExecuteArgs): Promise<void> {
@@ -367,6 +498,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!text.trim()) throw new Error('send_message has empty text')
       const conversationId = await resolveConversationId(args)
       const { whatsapp_message_id } = await engineSendText({
+        initiative: args.initiative,
         accountId: args.automation.account_id,
         userId: args.automation.user_id,
         conversationId,
@@ -387,6 +519,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!check.ok) throw new Error(check.error)
       const conversationId = await resolveConversationId(args)
       const { whatsapp_message_id } = await engineSendInteractive({
+        initiative: args.initiative,
         accountId: args.automation.account_id,
         userId: args.automation.user_id,
         conversationId,
@@ -420,6 +553,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
             .map((k) => String(cfg.variables![k]))
         : []
       const { whatsapp_message_id } = await engineSendTemplate({
+        initiative: args.initiative,
         accountId: args.automation.account_id,
         userId: args.automation.user_id,
         conversationId,
