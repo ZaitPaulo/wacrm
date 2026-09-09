@@ -53,5 +53,21 @@ ALTER TABLE accounts
 COMMENT ON COLUMN accounts.quiet_hours_enabled IS
   'Cuando es true, los envios por iniciativa del sistema se aplazan hasta la proxima apertura. Las respuestas a un cliente que escribio NO se ven afectadas nunca.';
 
+-- ============================================================
+-- Festivos.
+--
+-- Codigo de pais y no un booleano: el dia que haga falta otro
+-- calendario, agregarlo no deberia obligar a migrar la columna ni a
+-- reinterpretar lo ya guardado. Hoy el unico valor con implementacion
+-- es 'CO'; los festivos colombianos se CALCULAN (fechas fijas, Ley
+-- Emiliani y los cinco relativos a la Pascua), no se mantienen en una
+-- lista que caduca cada 31 de diciembre.
+-- ============================================================
+ALTER TABLE accounts
+  ADD COLUMN IF NOT EXISTS holiday_calendar TEXT;
+
+COMMENT ON COLUMN accounts.holiday_calendar IS
+  'Calendario de festivos a respetar en el horario de atencion. NULL = ninguno. Hoy solo se implementa CO (Colombia). Un festivo cierra el dia entero.';
+
 COMMENT ON COLUMN accounts.business_hours IS
   'Horario de atencion por dia: {"mon":["08:00","18:00"], ..., "sun":null}. Claves sun/mon/tue/wed/thu/fri/sat; null o ausente es dia cerrado. Se compara contra el reloj del proceso (TZ del contenedor).';

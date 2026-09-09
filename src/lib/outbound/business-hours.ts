@@ -26,6 +26,8 @@
 // necesidad traería sus propios errores de conversión.
 // ============================================================
 
+import { esFestivoColombiano } from './colombian-holidays';
+
 /** Días como los numera `Date.getDay()`: 0 domingo … 6 sábado. */
 const DIAS = [
   'sun',
@@ -51,6 +53,15 @@ export interface ConfiguracionHorario {
   /** Sin esto, nada se bloquea ni se aplaza. */
   enabled: boolean;
   hours: HorarioSemanal;
+  /**
+   * Calendario de festivos a respetar. Un festivo cierra el día entero,
+   * pase lo que pase con la franja de ese día de la semana.
+   *
+   * Hoy solo `'CO'`. Es un código de país y no un booleano porque el
+   * día que haga falta otro calendario, agregarlo no debería obligar a
+   * migrar la columna ni a reinterpretar lo ya guardado.
+   */
+  holidayCalendar?: 'CO' | null;
 }
 
 /** Todo cerrado: el valor por defecto más seguro es NO tener horario. */
@@ -102,11 +113,21 @@ export function parseHorario(raw: unknown): HorarioSemanal {
   return out;
 }
 
+/** ¿Este día está cerrado por festivo? */
+function esFestivo(
+  calendario: 'CO' | null | undefined,
+  fecha: Date
+): boolean {
+  return calendario === 'CO' && esFestivoColombiano(fecha);
+}
+
 /** ¿`now` cae dentro del horario de atención? */
 export function dentroDeHorario(
   hours: HorarioSemanal,
-  now: Date = new Date()
+  now: Date = new Date(),
+  holidayCalendar?: 'CO' | null
 ): boolean {
+  if (esFestivo(holidayCalendar, now)) return false;
   const franja = hours[DIAS[now.getDay()]];
   if (!franja) return false;
   const desde = aMinutos(franja[0]);
@@ -120,21 +141,26 @@ export function dentroDeHorario(
  * Cuándo vuelve a abrir, a partir de `now`.
  *
  * Devuelve `now` mismo si ya está abierto, así que quien aplaza puede
- * llamarla sin preguntar primero. Busca hasta OCHO días —una semana
- * completa más el día en curso— y devuelve `null` si no encuentra
- * ninguna apertura: eso solo pasa con un horario enteramente cerrado, y
- * quien aplaza tiene que decidir qué hacer con un mensaje que nunca
- * tendría cuándo salir.
+ * llamarla sin preguntar primero. Busca hasta VEINTE días —un puente
+ * largo encadena festivo, sábado corto y domingo— y devuelve `null` si
+ * no encuentra ninguna apertura: eso pasa con un horario enteramente
+ * cerrado, y quien aplaza tiene que decidir qué hacer con un mensaje
+ * que nunca tendría cuándo salir.
  */
 export function proximaApertura(
   hours: HorarioSemanal,
-  now: Date = new Date()
+  now: Date = new Date(),
+  holidayCalendar?: 'CO' | null
 ): Date | null {
-  if (dentroDeHorario(hours, now)) return now;
+  if (dentroDeHorario(hours, now, holidayCalendar)) return now;
 
-  for (let salto = 0; salto <= 7; salto++) {
+  // Se busca más lejos que una semana porque un puente largo puede
+  // encadenar festivo, sábado corto y domingo. Veinte días cubren
+  // cualquier racha real sin volverse un bucle sin fin.
+  for (let salto = 0; salto <= 20; salto++) {
     const dia = new Date(now);
     dia.setDate(dia.getDate() + salto);
+    if (esFestivo(holidayCalendar, dia)) continue;
     const franja = hours[DIAS[dia.getDay()]];
     if (!franja) continue;
 
@@ -162,5 +188,5 @@ export function debeEsperar(
   now: Date = new Date()
 ): boolean {
   if (!config.enabled) return false;
-  return !dentroDeHorario(config.hours, now);
+  return !dentroDeHorario(config.hours, now, config.holidayCalendar);
 }

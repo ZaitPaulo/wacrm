@@ -163,3 +163,56 @@ describe('debeEsperar', () => {
     ).toBe(false);
   });
 });
+
+describe('festivos colombianos', () => {
+  const CON_FESTIVOS = {
+    enabled: true,
+    hours: LORAMOTORS,
+    holidayCalendar: 'CO' as const,
+  };
+
+  it('el 20 de julio cierra aunque sea día hábil', () => {
+    // 2026-07-20 es lunes. Sin el calendario, el sistema lo trataría
+    // como cualquier lunes y le escribiría a un cliente en un festivo.
+    expect(dentroDeHorario(LORAMOTORS, cuando('2026-07-20T10:00:00'))).toBe(
+      true
+    );
+    expect(debeEsperar(CON_FESTIVOS, cuando('2026-07-20T10:00:00'))).toBe(true);
+  });
+
+  it('sin calendario configurado, un festivo es un día normal', () => {
+    expect(
+      debeEsperar(
+        { enabled: true, hours: LORAMOTORS },
+        cuando('2026-07-20T10:00:00')
+      )
+    ).toBe(false);
+  });
+
+  it('la próxima apertura salta el festivo', () => {
+    // Domingo 19 por la tarde: el lunes 20 es festivo, así que abre el
+    // martes 21.
+    const abre = proximaApertura(
+      LORAMOTORS,
+      cuando('2026-07-19T15:00:00'),
+      'CO'
+    );
+    expect(abre?.toISOString()).toBe(cuando('2026-07-21T08:00:00').toISOString());
+  });
+
+  it('salta un puente entero: festivo, sábado corto y domingo', () => {
+    // Viernes Santo 2026 = 3 de abril. Desde el jueves 2 por la noche
+    // (también festivo) hay que saltar jueves, viernes, el sábado 4
+    // —que sí abre— … el sábado abre, así que la apertura es esa.
+    const abre = proximaApertura(
+      LORAMOTORS,
+      cuando('2026-04-02T20:00:00'),
+      'CO'
+    );
+    expect(abre?.toISOString()).toBe(cuando('2026-04-04T08:00:00').toISOString());
+  });
+
+  it('un día hábil normal no se ve afectado', () => {
+    expect(debeEsperar(CON_FESTIVOS, cuando('2026-09-08T10:00:00'))).toBe(false);
+  });
+});

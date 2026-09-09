@@ -282,11 +282,12 @@ async function aplazarSiEstaCerrado(
 
   const { data: cuenta, error } = await db
     .from('accounts')
-    .select('quiet_hours_enabled, business_hours')
+    .select('quiet_hours_enabled, business_hours, holiday_calendar')
     .eq('id', automation.account_id)
     .maybeSingle<{
       quiet_hours_enabled: boolean | null
       business_hours: unknown
+      holiday_calendar: string | null
     }>()
 
   // Igual que en la puerta de salida: no poder leer el horario deja
@@ -298,9 +299,10 @@ async function aplazarSiEstaCerrado(
   if (!cuenta?.quiet_hours_enabled) return false
 
   const hours = parseHorario(cuenta.business_hours)
-  if (!debeEsperar({ enabled: true, hours })) return false
+  const holidayCalendar = cuenta.holiday_calendar === 'CO' ? 'CO' : null
+  if (!debeEsperar({ enabled: true, hours, holidayCalendar })) return false
 
-  const apertura = proximaApertura(hours)
+  const apertura = proximaApertura(hours, new Date(), holidayCalendar)
   if (!apertura) {
     console.warn(
       '[automations] horario encendido pero sin ningun dia abierto; se envia igual',

@@ -35,6 +35,10 @@ and polish.
   condición.
 - **Un asesor puede escribir a cualquier hora.** El freno es para lo
   automático; si una persona decide escribir de noche, es su decisión.
+- **Los festivos colombianos cierran el día entero.** Se calculan, no se
+  mantienen en una lista: fechas fijas, la Ley Emiliani que corre siete
+  de ellos al lunes, y los cinco relativos a la Pascua. Una lista por
+  año caducaría cada 31 de diciembre y fallaría en silencio.
 - Si no se puede leer la configuración del horario, **se deja pasar**.
   Quedarse callado por un fallo de base convertiría un problema técnico
   en clientes sin respuesta, que es peor y más difícil de notar.

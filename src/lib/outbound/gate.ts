@@ -316,11 +316,12 @@ async function fueraDeHorario(
 ): Promise<boolean> {
   const { data, error } = await db
     .from('accounts')
-    .select('quiet_hours_enabled, business_hours')
+    .select('quiet_hours_enabled, business_hours, holiday_calendar')
     .eq('id', accountId)
     .maybeSingle<{
       quiet_hours_enabled: boolean | null;
       business_hours: unknown;
+      holiday_calendar: string | null;
     }>();
 
   if (error) {
@@ -332,6 +333,7 @@ async function fueraDeHorario(
   return debeEsperar({
     enabled: true,
     hours: parseHorario(data.business_hours),
+    holidayCalendar: data.holiday_calendar === 'CO' ? 'CO' : null,
   });
 }
 
