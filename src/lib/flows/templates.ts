@@ -236,7 +236,10 @@ const FAQ_BOT: FlowTemplate = {
       node_key: "resp_financiacion",
       node_type: "send_message",
       config: {
-        text: "Trabajamos con financiación bancaria y crédito directo. La cuota depende de la cuota inicial y del plazo; un asesor te arma la simulación con el vehículo que elijas.",
+        // Qué modalidades de crédito existen lo pone el operador: dar por
+        // sentado que hay crédito directo le promete al cliente algo que
+        // el negocio puede no ofrecer.
+        text: "Trabajamos con financiación. La cuota depende de la cuota inicial y del plazo; un asesor te arma la simulación con el vehículo que elijas.",
         next_node_key: "fin",
       } as SendMessageNodeConfig,
     },
@@ -244,7 +247,9 @@ const FAQ_BOT: FlowTemplate = {
       node_key: "resp_garantia",
       node_type: "send_message",
       config: {
-        text: "Todos nuestros vehículos se entregan con traspaso incluido y papeles al día. Consulta con el asesor la garantía puntual del que te interese.",
+        // Ninguna plantilla puede afirmar quién asume el costo del
+        // traspaso ni qué garantía se da: eso lo define cada negocio.
+        text: "Los papeles, el traspaso y la garantía dependen de cada vehículo. Un asesor te confirma los costos y las condiciones del que te interese.",
         next_node_key: "fin",
       } as SendMessageNodeConfig,
     },
