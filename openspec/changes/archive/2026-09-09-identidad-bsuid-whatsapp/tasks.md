@@ -20,7 +20,7 @@
 - [x] 3.2 Condicionar el respaldo difuso por teléfono a que el `externalId` SEA un teléfono — hoy corre siempre en WhatsApp
 - [x] 3.3 Vincular el BSUID como identidad adicional en todos los mensajes que lo traigan, también cuando el contacto se resolvió por teléfono
 - [x] 3.4 Corregir la creación del contacto: `phone` se puebla solo si el `externalId` es un teléfono, no por ser WhatsApp
-- [x] 3.5 Guardar y refrescar el nombre de usuario junto al nombre de perfil — **BLOQUEADA**: `contacts` no tiene columna para eso ni campos libres, así que guardarlo pide una migración que el diseño descartó. Decisión pendiente
+- [x] 3.5 Guardar y refrescar el nombre de usuario junto al nombre de perfil — **resuelto con migración**: se descartó la columna en `contacts` (el handle pertenece a la identidad en un canal, no a la persona) y la 522 agregó `contact_channels.username`. `refreshUsername` lo guarda al vincular y lo actualiza cuando cambia
 - [x] 3.6 Tests de los dos sentidos del cambio de identificación: conocido que deja de traer teléfono, y creado por BSUID que empieza a traerlo
 - [x] 3.7 Test de que dos BSUID distintos son dos contactos, y de que un BSUID no coincide con un teléfono por sus dígitos
 

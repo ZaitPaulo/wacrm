@@ -8,7 +8,7 @@ Restricciones que enmarcan el diseño:
 
 - **El núcleo es compartido.** `processInboundMessage` en `src/lib/inbound/core.ts` lo usan los tres canales. Cualquier cambio de forma los afecta a todos.
 - **La idempotencia ya existe y está probada.** El índice único `(conversation_id, message_id)` de la migración 037, con `ignoreDuplicates`, hace que un replay no inserte nada y que el `.select()` vuelva vacío. Todo el corte de replay del issue #367 cuelga de ahí.
-- **Meta ya reintenta.** Ante una respuesta que no es `200`, reentrega con backoff propio durante días. Es un mecanismo de durabilidad que ya está pagado y hoy no se usa.
+- **Meta ya reintenta.** Ante una respuesta que no es `200`, reentrega con frecuencia decreciente **hasta 7 días** (Cloud API; el webhook genérico de Graph API son 36 h, que no es nuestro caso). La propia documentación advierte que esos reintentos pueden llegar duplicados. Es un mecanismo de durabilidad que ya está pagado y hoy no se usa.
 - **La difusión es lenta y externa.** Verificación de medios contra Meta, motor de flujos, automatizaciones, IA y webhooks de terceros. Los tests ya documentan despachos de IA que se sostienen 8 segundos.
 
 ## Goals / Non-Goals
@@ -86,6 +86,22 @@ Reversión: revertir el commit y reconstruir. No deja estado que limpiar.
 
 ## Open Questions
 
-- **El tiempo límite de la verificación de medios — resuelto provisionalmente, sin medir.** Se fijó en 5 s (`MEDIA_VERIFY_TIMEOUT_MS`). El número se eligió holgado a propósito: su único trabajo es impedir que una llamada colgada retenga la confirmación, y errar por largo solo cuesta latencia en un caso raro, mientras que errar por corto descartaría medios que hoy verifican bien. Queda pendiente medir el caso normal en producción para poder bajarlo con un dato; la tarea 1.1 sigue abierta a propósito.
-- **La ventana de respuesta de Meta — sin verificar contra la documentación vigente.** El diseño no depende de conocer el número exacto: la fase de persistencia es solo base y se mueve en milisegundos, muy por debajo de cualquier ventana razonable. La tarea 1.2 queda abierta para confirmarlo y dejarlo anotado.
+- **El tiempo límite de la verificación de medios — medido. Los 5 s se quedan, y por la razón contraria a la esperada.** Se midió el 2026-09-09 desde dentro de `wacrm-app-1`, que es la red que importa:
+
+  | Escenario | Tiempo |
+  |---|---|
+  | Conexión sin auth (`/me` → 400) | ~250 ms, estable |
+  | Nodo autenticado, en frío, tras una ráfaga de ~30 llamadas | 3.0 – **5.3 s** |
+  | Nodo autenticado, en frío, en reposo | 0.51 – 0.96 s |
+  | Nodo autenticado, en caliente | p50 393 ms, p90 575 ms |
+  | Id inexistente (rechazo) | 65 – 158 ms |
+
+  Tres cosas quedan claras. **El DNS no es el problema hoy**: resuelve en 0 ms dentro del contenedor, y aunque `graph.facebook.com` devuelve una IPv6 que este contenedor no puede enrutar, forzar `ipv4first` no cambió nada — la sospecha de Happy Eyeballs queda descartada. **La conexión cuesta ~240 ms fijos** (TCP 207 + TLS 30), que es la distancia de Contabo NY a Meta y no baja. **Lo variable es el procesamiento autenticado del lado de Meta**, que en reposo es medio segundo y bajo ráfaga se degrada a 3–5 s.
+
+  La tarea 1.1 se escribió esperando poder **bajar** el número. El dato dice lo contrario: una muestra dio 5270 ms, o sea que el límite actual ya se agotó al menos una vez. En reposo sobrarían 2 s, pero el timeout no existe para el caso en reposo — existe para el caso degradado, que es justo donde 5 s se queda corto. Bajarlo convertiría una degradación pasajera de Meta en pérdida sistemática de fotos. Se deja en 5 s como compromiso conocido: cubre el caso normal con holgura de 5x, y en degradación cae al camino ya definido — el mensaje se guarda con su texto, sin el medio.
+
+  *Salvedad del método:* se midió `GET /<phone_number_id>` y no `GET /<media-id>`, porque producción no tiene **ningún** mensaje con medio (0 de 59) y no hay un id real que consultar. Es la misma forma de llamada —lectura de nodo por id, mismo token, misma red— y lo que domina el tiempo (conexión y latencia autenticada de Meta) es idéntico en ambas, pero es un sustituto. Si algún día hay medios reales en la base, la medición exacta sale sola.
+- **La ventana de respuesta de Meta — verificada: no existe como número publicado.** La documentación vigente (`whatsapp/cloud-api/guides/set-up-webhooks`, `business-messaging/whatsapp/webhooks/overview` y `graph-api/webhooks`) no fija ningún plazo en segundos para confirmar con `200`. Lo que sí fija es lo de atrás: ante cualquier cosa que no sea `200` —o una entrega que no se logra por otro motivo— **reintenta con frecuencia decreciente hasta 7 días**, y avisa explícitamente que «estos reintentos pueden resultar en notificaciones duplicadas». Tampoco documenta que el webhook se apague ni se limite por fallar repetido.
+
+  Tres consecuencias para este diseño. La primera: los **7 días** son de Cloud API; el webhook genérico de Graph API dice 36 h, y confundirlos subestimaría por mucho la durabilidad con la que contamos. La segunda: que Meta prometa duplicados es la confirmación de que la idempotencia del índice único de la 037 no es una precaución nuestra, sino el contrato — la decisión 3 se apoya en algo que la plataforma promete, no en algo que observamos. La tercera: **no se puede afinar un tiempo límite contra un número que no está publicado.** Un plazo existe — Meta corta —, pero al no documentarlo puede cambiar sin aviso, así que el diseño correcto es no acercarse: la fase de persistencia se queda en escrituras locales de milisegundos, y todo lo lento vive del otro lado de la frontera. Es lo que ya hace.
 - **Registrar los `500` de persistencia de forma distinguible — resuelto.** Cada fallo transitorio se acumula con su `externalMessageId` y su motivo, y se emite una sola línea antes de responder, con el prefijo `[webhook]` y el conteo. Alcanza para alertar sin confundirlo con cualquier otro error del servidor. No se agregó métrica ni instrumentación aparte: no hay hoy dónde mandarla.

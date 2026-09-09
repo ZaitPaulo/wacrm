@@ -1,7 +1,7 @@
 ## 1. Medir antes de fijar números
 
-- [ ] 1.1 Medir cuánto tarda `getMediaUrl` contra Meta en el caso normal, para elegir el tiempo límite de la decisión 5 con un dato y no a ojo
-- [ ] 1.2 Confirmar en la documentación vigente de Meta cuál es la ventana de respuesta del webhook y su política de reintentos, y anotarla en `design.md`
+- [x] 1.1 Medir cuánto tarda `getMediaUrl` contra Meta en el caso normal, para elegir el tiempo límite de la decisión 5 con un dato y no a ojo — medido el 2026-09-09 desde el contenedor: 0.5–1 s en reposo, 3–5.3 s bajo ráfaga. **Los 5 s se quedan**: el dato desaconseja bajarlos, no al revés. Detalle y salvedad del método en `design.md`
+- [x] 1.2 Confirmar en la documentación vigente de Meta cuál es la ventana de respuesta del webhook y su política de reintentos, y anotarla en `design.md` — **la ventana no está publicada**; los reintentos sí: frecuencia decreciente hasta **7 días** en Cloud API (no las 36 h del webhook genérico), y Meta advierte que pueden llegar duplicados. Anotado en `design.md`
 
 ## 2. El resultado de la fase de persistencia
 
@@ -45,4 +45,4 @@
 - [x] 7.1 Correr la suite completa y `tsc --noEmit`
 - [x] 7.2 Entrada en `CHANGELOG.md` describiendo el cambio de contrato: ahora un fallo de recepción se traduce en reintento de Meta
 - [x] 7.3 Resolver las preguntas abiertas de `design.md` o dejarlas anotadas con lo que se decidió
-- [ ] 7.4 Desplegar después de los arreglos de DNS y de la ruta interna, y verificar con un mensaje real que entra y queda guardado
+- [x] 7.4 Desplegar después de los arreglos de DNS y de la ruta interna, y verificar con un mensaje real que entra y queda guardado
