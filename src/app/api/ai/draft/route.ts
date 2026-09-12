@@ -7,6 +7,7 @@ import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { generateReply } from '@/lib/ai/generate'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
 import { buildInventoryIndex } from '@/lib/ai/inventory-index'
+import { attachPhotos, loadNewCustomerPhotos, type NewPhotos } from '@/lib/ai/photos'
 import { latestUserMessage } from '@/lib/ai/query'
 import { logAiUsage } from '@/lib/ai/usage'
 import { supabaseAdmin } from '@/lib/ai/admin-client'
@@ -77,7 +78,30 @@ export async function POST(request: Request) {
       )
     }
 
-    const messages = await buildConversationContext(supabase, conversationId)
+    const textMessages = await buildConversationContext(supabase, conversationId)
+
+    // Same three reads as the auto-reply, in parallel: the photos (two
+    // Meta calls each) must not add to the knowledge-base wait.
+    const [photos, knowledge, inventory] = await Promise.all([
+      // Never throws by contract; a surprise failure drafts without them.
+      loadNewCustomerPhotos(supabase, { accountId, conversationId }).catch(
+        (err): NewPhotos => {
+          console.warn('[ai/draft] customer photos skipped:', err)
+          return { count: 0, images: [] }
+        },
+      ),
+      // Ground the draft in the account's knowledge base (best-effort —
+      // returns [] when there's no KB or retrieval fails). A photo on its
+      // own carries no text to search with.
+      textMessages.length > 0
+        ? retrieveKnowledge(supabase, accountId, config, latestUserMessage(textMessages))
+        : Promise.resolve<string[]>([]),
+      buildInventoryIndex(supabase, accountId),
+    ])
+
+    // Photos go on before the emptiness check: a photo sent on its own
+    // leaves no text, and is still something to draft a reply to.
+    const messages = attachPhotos(textMessages, photos)
     // Nothing to draft from — a brand-new thread with no customer text
     // would otherwise produce a nonsensical reply-to-nothing.
     if (messages.length === 0) {
@@ -90,20 +114,12 @@ export async function POST(request: Request) {
       )
     }
 
-    // Ground the draft in the account's knowledge base (best-effort —
-    // returns [] when there's no KB or retrieval fails).
-    const knowledge = await retrieveKnowledge(
-      supabase,
-      accountId,
-      config,
-      latestUserMessage(messages),
-    )
-
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'draft',
       knowledge,
-      inventory: await buildInventoryIndex(supabase, accountId),
+      inventory,
+      hasPhotos: messages.some((m) => m.images?.length),
     })
 
     const { text, usage } = await generateReply({ config, systemPrompt, messages })

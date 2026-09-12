@@ -9,6 +9,7 @@ import { reopenClosedConversation } from '@/lib/conversations/reopen';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
 import { dispatchInboundToFlows } from '@/lib/flows/engine';
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply';
+import { aiVisionMaxImages } from '@/lib/ai/defaults';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
 import { recordVehicleInquiry } from '@/lib/inventory/inquiries';
 
@@ -93,6 +94,13 @@ export interface NormalizedMessage {
   replyToExternalId: string | null;
   /** Etiqueta para el resumen del hilo cuando no hay texto. */
   typeLabel: string;
+  /**
+   * Es un sticker. Se guarda como `image` —la columna no admite otro
+   * valor— y el MIME no se persiste, así que quien lo traduce es el único
+   * que todavía sabe distinguirlo de una foto. Sin esto, un sticker
+   * despertaría a la IA como una foto sin texto.
+   */
+  isSticker: boolean;
 }
 
 /** Una reacción. No es un mensaje y no se guarda como tal. */
@@ -485,10 +493,26 @@ export async function fanOutInbound(ctx: InboundFanout): Promise<void> {
     }).catch((err) => console.error('[automations] dispatch failed:', err));
   }
 
-  // AI auto-reply. Runs only for plain-text inbound the deterministic
-  // flow runner did NOT consume (flows win over the LLM), and only when
-  // the account has enabled it.
-  if (!flowConsumed && !inbound.interactiveReplyId && inboundText.trim()) {
+  // AI auto-reply. Runs for inbound the deterministic flow runner did NOT
+  // consume (flows win over the LLM), when the account has enabled it,
+  // and only if the message gives the model something to go on:
+  //  - text — typed, or the caption of a photo/video/document, or a
+  //    location. `buildConversationContext` has to keep those same types,
+  //    or the bot answers a message it can't see;
+  //  - or a photo on its own, which the model can now look at. Not a
+  //    sticker (stored as `image` too), not a photo whose media couldn't
+  //    be verified (there'd be nothing to show), and not with vision off
+  //    (`AI_VISION_MAX_IMAGES=0`), where it would be answering blind.
+  const photoForTheModel =
+    inbound.contentType === 'image' &&
+    !!inbound.mediaUrl &&
+    !inbound.isSticker &&
+    aiVisionMaxImages() > 0;
+  if (
+    !flowConsumed &&
+    !inbound.interactiveReplyId &&
+    (inboundText.trim() || photoForTheModel)
+  ) {
     await dispatchInboundToAiReply({
       accountId,
       conversationId,

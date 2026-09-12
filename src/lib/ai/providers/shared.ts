@@ -94,6 +94,11 @@ export async function providerHttpError(
  * Collapse consecutive same-role turns into one (joined with blank
  * lines). Anthropic requires strictly alternating roles; merging is
  * also harmless for OpenAI and keeps the transcript compact.
+ *
+ * The photos of the merged turns travel with them, in order. A turn
+ * with no photos comes out with no `images` key at all — the adapters
+ * pick the wire format on it, and a text-only turn must go out exactly
+ * as it did before photos existed.
  */
 export function mergeConsecutive(messages: ChatMessage[]): ChatMessage[] {
   const out: ChatMessage[] = []
@@ -101,8 +106,11 @@ export function mergeConsecutive(messages: ChatMessage[]): ChatMessage[] {
     const last = out[out.length - 1]
     if (last && last.role === m.role) {
       last.content = `${last.content}\n\n${m.content}`
+      if (m.images?.length) last.images = [...(last.images ?? []), ...m.images]
     } else {
-      out.push({ role: m.role, content: m.content })
+      const turn: ChatMessage = { role: m.role, content: m.content }
+      if (m.images?.length) turn.images = [...m.images]
+      out.push(turn)
     }
   }
   return out

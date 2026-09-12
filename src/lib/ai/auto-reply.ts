@@ -15,6 +15,7 @@ import { pickHandoffAgent, primerNombre, type HandoffAgent } from './pick-agent'
 import { buildInventoryIndex } from './inventory-index'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
+import { attachPhotos, loadNewCustomerPhotos, type NewPhotos } from './photos'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { notifyCustomerOfHandoff } from '@/lib/handoff/notify-customer'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
@@ -161,9 +162,8 @@ export async function dispatchInboundToAiReply(
     }
     if (claimed !== true) return // lost the per-conversation cap race
 
-    const messages = await buildConversationContext(db, conversationId)
-    if (messages.length === 0) return
-    messagesCtx = messages
+    const textMessages = await buildConversationContext(db, conversationId)
+    messagesCtx = textMessages
 
     // Account-wide throttle on the shared BYO key. The per-conversation
     // cap bounds one thread; this bounds a burst across many threads (a
@@ -181,24 +181,43 @@ export async function dispatchInboundToAiReply(
       return
     }
 
-    // Ground the reply in the account's knowledge base (best-effort).
-    const knowledge = await retrieveKnowledge(
-      db,
-      accountId,
-      config,
-      latestUserMessage(messages),
-    )
+    // Tres lecturas independientes, en paralelo: la espera es la de la mas
+    // lenta, no la suma. La lenta suelen ser las fotos —dos llamadas a
+    // Meta cada una—, y no tienen por que sumarse al knowledge base.
+    const [photos, knowledge, inventory] = await Promise.all([
+      // No lanza por contrato. El catch es para que ni un fallo imprevisto
+      // de las fotos acabe en traspaso: se responde sin ellas.
+      loadNewCustomerPhotos(db, { accountId, conversationId }).catch(
+        (err): NewPhotos => {
+          console.warn('[ai auto-reply] customer photos skipped:', err)
+          return { count: 0, images: [] }
+        },
+      ),
+      // Ground the reply in the account's knowledge base (best-effort).
+      // Una foto sola no trae texto con que buscar.
+      textMessages.length > 0
+        ? retrieveKnowledge(db, accountId, config, latestUserMessage(textMessages))
+        : Promise.resolve<string[]>([]),
+      // El inventario COMPLETO, no solo lo que la busqueda semantica
+      // acerto a recuperar: sin esto el bot le dice a un cliente que no
+      // hay nada en su presupuesto viendo 5 fichas de 123. Con fotos es
+      // ademas contra lo que se reconoce el carro de la captura.
+      buildInventoryIndex(db, accountId),
+    ])
 
-    // El inventario COMPLETO, no solo lo que la busqueda semantica
-    // acerto a recuperar: sin esto el bot le dice a un cliente que no
-    // hay nada en su presupuesto viendo 5 fichas de 123.
-    const inventory = await buildInventoryIndex(db, accountId)
+    // Las fotos se pegan ANTES de decidir si hay algo que responder: una
+    // foto sola no deja texto, y el cliente que abre la conversacion con
+    // la captura de un carro se quedaria sin respuesta.
+    const messages = attachPhotos(textMessages, photos)
+    if (messages.length === 0) return
+    messagesCtx = messages
 
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
       inventory,
+      hasPhotos: messages.some((m) => m.images?.length),
     })
 
     const { text, handoff, usage } = await generateReply({

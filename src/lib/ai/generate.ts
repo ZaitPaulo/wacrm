@@ -26,9 +26,39 @@ export interface GenerateArgs {
  * Generate the next reply from the account's configured provider.
  * Dispatches to the right adapter, then parses the handoff sentinel out
  * of the raw text. Throws `AiError` on any provider/network failure.
+ *
+ * Una peticion con fotos que el proveedor rechaza se repite UNA vez sin
+ * ellas. Cubre la cuenta que eligio un modelo sin vision: sin esto, la
+ * foto de un cliente acababa en traspaso por "fallo del proveedor". El
+ * texto conserva sus etiquetas `[Foto]`, asi que el modelo sabe que hubo
+ * una foto que no ve. No se repite ante clave invalida, limite de uso ni
+ * tiempo agotado: sin fotos fallarian igual, y solo sumaria espera.
  */
 export async function generateReply(args: GenerateArgs): Promise<GenerateResult> {
   const { config, systemPrompt, messages } = args
+  try {
+    return await callProvider(config, systemPrompt, messages)
+  } catch (err) {
+    const hadPhotos = messages.some((m) => m.images?.length)
+    if (!hadPhotos || !(err instanceof AiError) || err.code !== 'provider_error') throw err
+
+    console.warn(
+      `[ai] ${config.provider} (${config.model}) rejected a request with photos; retrying once without them:`,
+      err.message,
+    )
+    return callProvider(
+      config,
+      systemPrompt,
+      messages.map((m) => ({ role: m.role, content: m.content })),
+    )
+  }
+}
+
+async function callProvider(
+  config: AiConfig,
+  systemPrompt: string,
+  messages: ChatMessage[],
+): Promise<GenerateResult> {
   const timeoutMs = aiRequestTimeoutMs()
   const providerArgs = {
     apiKey: config.apiKey,

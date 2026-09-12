@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Shared, hoisted state the module mocks close over. Reset per test.
 const h = vi.hoisted(() => ({
@@ -663,6 +663,74 @@ describe('recepción durable: la firma sigue siendo la primera puerta', () => {
     expect(status(res)).toBe(401);
     expect(h.state.upsertCalls).toHaveLength(0);
     expect(h.state.afterCallbacks).toHaveLength(0);
+  });
+});
+
+describe('visión: qué mensajes despiertan a la IA', () => {
+  const FOTO_SOLA = {
+    id: 'wamid.FOTOSOLA',
+    from: '15551230000',
+    timestamp: '1700000000',
+    type: 'image',
+    image: { id: 'media-9', mime_type: 'image/jpeg' },
+  };
+
+  async function metaVerifica() {
+    const { getMediaUrl } = await import('@/lib/whatsapp/meta-api');
+    vi.mocked(getMediaUrl).mockResolvedValue({
+      url: 'https://lookaside.example/x',
+      mimeType: 'image/jpeg',
+    });
+  }
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('una foto sin texto despierta a la IA', async () => {
+    await metaVerifica();
+    await runWebhook(FOTO_SOLA);
+    expect(h.dispatchInboundToAiReply).toHaveBeenCalledTimes(1);
+  });
+
+  // Los stickers se guardan como `image`: el webhook es el único que
+  // todavía sabe que no son una foto.
+  it('un sticker no despierta a la IA', async () => {
+    await metaVerifica();
+    await runWebhook({
+      id: 'wamid.STICKER',
+      from: '15551230000',
+      timestamp: '1700000000',
+      type: 'sticker',
+      sticker: { id: 'st-1', mime_type: 'image/webp' },
+    });
+    expect(h.state.upsertCalls[0].row).toMatchObject({ content_type: 'image' });
+    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled();
+  });
+
+  it('una foto sin texto cuyo medio no se verificó no despierta a la IA', async () => {
+    const { getMediaUrl } = await import('@/lib/whatsapp/meta-api');
+    vi.mocked(getMediaUrl).mockRejectedValue(new Error('Meta no responde'));
+    await runWebhook(FOTO_SOLA);
+    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled();
+  });
+
+  it('con la visión apagada, una foto sin texto no despierta a la IA', async () => {
+    vi.stubEnv('AI_VISION_MAX_IMAGES', '0');
+    await metaVerifica();
+    await runWebhook(FOTO_SOLA);
+    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled();
+  });
+
+  // Apagar la visión no apaga el pie de foto: ese sigue siendo texto.
+  it('con la visión apagada, una foto con pie sigue despertando a la IA', async () => {
+    vi.stubEnv('AI_VISION_MAX_IMAGES', '0');
+    await metaVerifica();
+    await runWebhook({ ...FOTO_SOLA, image: { ...FOTO_SOLA.image, caption: '¿y este?' } });
+    expect(h.dispatchInboundToAiReply).toHaveBeenCalledTimes(1);
+  });
+
+  it('un mensaje escrito sigue despertando a la IA', async () => {
+    await runWebhook();
+    expect(h.dispatchInboundToAiReply).toHaveBeenCalledTimes(1);
   });
 });
 

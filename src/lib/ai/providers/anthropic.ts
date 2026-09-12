@@ -35,6 +35,26 @@ function normalizeForAnthropic(messages: ChatMessage[]): ChatMessage[] {
 }
 
 /**
+ * One turn on the wire. A text-only turn keeps its plain-string
+ * `content`; a turn with photos becomes content blocks, images first —
+ * Anthropic's own guidance is that Claude reads them best before the
+ * text that refers to them.
+ */
+function toAnthropicMessage(m: ChatMessage) {
+  if (!m.images?.length) return { role: m.role, content: m.content }
+  return {
+    role: m.role,
+    content: [
+      ...m.images.map((img) => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mimeType, data: img.base64 },
+      })),
+      { type: 'text', text: m.content },
+    ],
+  }
+}
+
+/**
  * Call Anthropic's Messages endpoint with the caller's own key.
  * Returns the raw assistant text + token usage (handoff parsing happens
  * in `generateReply`).
@@ -55,7 +75,7 @@ export async function generateAnthropic(args: ProviderArgs): Promise<ProviderRes
         model,
         system: systemPrompt,
         max_tokens: MAX_OUTPUT_TOKENS,
-        messages: normalizeForAnthropic(messages),
+        messages: normalizeForAnthropic(messages).map(toAnthropicMessage),
       }),
       signal: AbortSignal.timeout(timeoutMs),
     })

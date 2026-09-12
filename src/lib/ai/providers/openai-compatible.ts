@@ -1,4 +1,4 @@
-import { AiError, type ProviderResult } from '../types'
+import { AiError, type ChatMessage, type ProviderResult } from '../types'
 import { MAX_OUTPUT_TOKENS } from '../defaults'
 import {
   mergeConsecutive,
@@ -35,6 +35,27 @@ export interface OpenAiCompatibleOptions {
   headers?: Record<string, string>
 }
 
+/**
+ * One turn on the wire. A text-only turn keeps the plain-string
+ * `content` it always had; only a turn with photos becomes the parts
+ * array, text first and then one `image_url` per photo as a data URI —
+ * the shape OpenAI, OpenRouter and Gemini's compatibility layer all
+ * accept.
+ */
+function toWireMessage(m: ChatMessage) {
+  if (!m.images?.length) return { role: m.role, content: m.content }
+  return {
+    role: m.role,
+    content: [
+      { type: 'text', text: m.content },
+      ...m.images.map((img) => ({
+        type: 'image_url',
+        image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
+      })),
+    ],
+  }
+}
+
 interface OpenAiResponse {
   choices?: { message?: { content?: string } }[]
   usage?: {
@@ -69,7 +90,7 @@ export async function generateOpenAiCompatible(
         model,
         messages: [
           { role: 'system', content: systemPrompt },
-          ...mergeConsecutive(messages),
+          ...mergeConsecutive(messages).map(toWireMessage),
         ],
         [maxTokensField]: MAX_OUTPUT_TOKENS,
       }),

@@ -801,6 +801,9 @@ async function persistMessage(
         interactiveReplyId,
         replyToExternalId: message.context?.id ?? null,
         typeLabel: message.type,
+        // `contentType` ya dice `image` para un sticker; esto es lo único
+        // que queda de que no era una foto.
+        isSticker: message.type === 'sticker',
       },
     }),
     batch,

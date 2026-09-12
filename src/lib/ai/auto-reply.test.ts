@@ -108,6 +108,7 @@ vi.mock('./admin-client', () => ({
 
 import { dispatchInboundToAiReply } from './auto-reply'
 import { clearInventoryIndexCache } from './inventory-index'
+import { __resetRateLimitForTests } from '@/lib/rate-limit'
 
 const ARGS = {
   accountId: 'acct-1',
@@ -178,6 +179,10 @@ beforeEach(() => {
   // El índice se cachea por cuenta en memoria del módulo; sin esto un
   // test heredaría el inventario del anterior.
   clearInventoryIndexCache()
+  // Lo mismo el limitador por cuenta (30 por minuto): todos los tests
+  // usan `acct-1`, y pasados 30 dispatches los siguientes se callaban por
+  // "rate limit" sin que el test lo supiera.
+  __resetRateLimitForTests()
   h.loadAiConfig.mockResolvedValue(aiConfig())
   h.buildConversationContext.mockResolvedValue([{ role: 'user', content: 'hi' }])
   h.retrieveKnowledge.mockResolvedValue([])
@@ -633,5 +638,126 @@ describe('dispatchInboundToAiReply — inventario en el prompt', () => {
     const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
     expect(systemPrompt).not.toContain('Current inventory')
     expect(h.engineSendText).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ------------------------------------------------------------
+// Visión. Se mockea solo la carga (baja de Meta); el acople a la
+// conversación es el real. `vi.hoisted` y `vi.mock` suben solos al
+// principio del archivo, así que estar aquí no cambia nada para los
+// tests de arriba, que reciben "sin fotos" por defecto.
+// ------------------------------------------------------------
+
+const p = vi.hoisted(() => ({
+  noPhotos: async () => ({ count: 0, images: [] as { mimeType: string; base64: string }[] }),
+  loadNewCustomerPhotos: vi.fn(),
+}))
+p.loadNewCustomerPhotos.mockImplementation(p.noPhotos)
+
+vi.mock('./photos', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./photos')>()),
+  loadNewCustomerPhotos: p.loadNewCustomerPhotos,
+}))
+
+describe('dispatchInboundToAiReply — fotos del cliente', () => {
+  const IMG = { mimeType: 'image/jpeg', base64: 'AAAA' }
+
+  beforeEach(() => {
+    p.loadNewCustomerPhotos.mockReset()
+    p.loadNewCustomerPhotos.mockImplementation(p.noPhotos)
+  })
+
+  it('le pasa al modelo las fotos nuevas del cliente, en su último turno', async () => {
+    h.buildConversationContext.mockResolvedValue([
+      { role: 'assistant', content: 'Cuéntame, ¿en qué te puedo ayudar?' },
+      { role: 'user', content: '[Foto] ¿y este?' },
+    ])
+    p.loadNewCustomerPhotos.mockResolvedValue({ count: 1, images: [IMG] })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    const call = h.generateReply.mock.calls[0][0]
+    expect(call.messages.at(-1)).toEqual({ role: 'user', content: '[Foto] ¿y este?', images: [IMG] })
+    expect(call.systemPrompt).toContain('includes photos you can see')
+    expect(p.loadNewCustomerPhotos).toHaveBeenCalledWith(expect.anything(), {
+      accountId: 'acct-1',
+      conversationId: 'conv-1',
+    })
+  })
+
+  it('agrega el turno del cliente cuando la foto vino sola', async () => {
+    h.buildConversationContext.mockResolvedValue([
+      { role: 'assistant', content: 'Cuéntame, ¿en qué te puedo ayudar?' },
+    ])
+    p.loadNewCustomerPhotos.mockResolvedValue({ count: 1, images: [IMG] })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply.mock.calls[0][0].messages.at(-1)).toEqual({
+      role: 'user',
+      content: '[Foto]',
+      images: [IMG],
+    })
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+  })
+
+  // Una foto sola sin texto no deja nada en el contexto de texto. Sin el
+  // acople, el dispatch se iria por "no hay a que responder" y el cliente
+  // quedaria sin respuesta.
+  it('responde a una foto sola aunque el contexto de texto venga vacío', async () => {
+    h.buildConversationContext.mockResolvedValue([])
+    p.loadNewCustomerPhotos.mockResolvedValue({ count: 1, images: [IMG] })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+  })
+
+  it('sin fotos, el prompt no trae la regla de las fotos', async () => {
+    await dispatchInboundToAiReply(ARGS)
+
+    const call = h.generateReply.mock.calls[0][0]
+    expect(call.systemPrompt).not.toContain('includes photos you can see')
+    expect(call.messages).toEqual([{ role: 'user', content: 'hi' }])
+  })
+
+  it('una foto que no se pudo bajar deja el turno [Foto] y responde sin la regla', async () => {
+    h.buildConversationContext.mockResolvedValue([
+      { role: 'assistant', content: 'Cuéntame, ¿en qué te puedo ayudar?' },
+    ])
+    p.loadNewCustomerPhotos.mockResolvedValue({ count: 1, images: [] })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    const call = h.generateReply.mock.calls[0][0]
+    expect(call.messages.at(-1)).toEqual({ role: 'user', content: '[Foto]' })
+    expect(call.systemPrompt).not.toContain('includes photos you can see')
+  })
+
+  it('un fallo al cargar las fotos no provoca un traspaso', async () => {
+    p.loadNewCustomerPhotos.mockRejectedValue(new Error('Meta caída'))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toBe('Hello!')
+    expect(h.state.updatePayload).toBeNull()
+  })
+
+  it('un dispatch cancelado en la ventana de agrupación no llama a Meta', async () => {
+    h.hasNewerCustomerMessage.mockResolvedValue(true)
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(p.loadNewCustomerPhotos).not.toHaveBeenCalled()
+  })
+
+  it('no carga fotos si no consiguió el cupo', async () => {
+    h.state.claim = false
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(p.loadNewCustomerPhotos).not.toHaveBeenCalled()
   })
 })

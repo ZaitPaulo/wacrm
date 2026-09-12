@@ -62,10 +62,22 @@ export interface AiConfig {
   embeddingsProvider: EmbeddingsProvider
 }
 
+/** A photo attached to a turn, already downloaded and reduced
+ *  (see `photos.ts`). */
+export interface ChatImage {
+  mimeType: string
+  /** The bytes in base64, without a `data:` prefix. */
+  base64: string
+}
+
 /** A single conversation turn in the shape both providers accept. */
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  /** Fotos del turno. Solo las leen los adaptadores de proveedor; todo
+   *  lo demas —resumen del traspaso, busqueda en el knowledge base— lee
+   *  `content` y no tiene por que enterarse de que existen. */
+  images?: ChatImage[]
 }
 
 /**
