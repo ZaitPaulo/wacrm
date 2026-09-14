@@ -142,6 +142,22 @@ docker compose -f docker-compose.yml -f deploy/docker-compose.app.yml \
 El servidor sigue `main`, así que solo recibe lo que hayas promovido desde
 `develop` — nunca trabajo a medias.
 
+**Si el pull cambió `deploy/cron/crontab`, recrea el contenedor del cron.**
+El crontab está montado como un archivo suelto, y `git pull` lo reemplaza por
+otro inodo: el contenedor sigue viendo el viejo, y `up -d --build` no lo
+recrea porque su definición no cambió. Una ruta de cron nueva simplemente
+nunca corre, sin ningún error.
+
+```bash
+docker compose -f docker-compose.yml -f deploy/docker-compose.app.yml \
+  --env-file deploy/.env up -d --force-recreate cron
+docker logs crm-cron --tail 20   # cada ruta debe aparecer con «ok»
+```
+
+Las rutas que llama hoy: `/api/automations/cron` (cada minuto, los pasos
+Wait), `/api/broadcasts/cron` (cada 5 minutos, los recordatorios de
+difusiones — migración 524) y `/api/flows/cron` (cada 5 minutos).
+
 ### Actualizar Supabase
 
 Nunca sin respaldo previo y nunca a `latest`. El procedimiento completo está en
@@ -337,6 +353,7 @@ Síntomas reales de este despliegue, con su causa:
 | Una regla de Caddy «no hace nada» | Al mezclar `handle` con directivas sueltas, Caddy usa **su** orden, no el del archivo | Meter todo lo del host dentro de bloques `handle` |
 | Los pasos Wait no avanzan | El cron no corre o su secreto no coincide | `docker logs crm-cron` — 401 es secreto distinto, 503 es que el app no lo tiene |
 | Un contacto deja de disparar flujos | Su flow run abandonado bloquea `idx_one_active_run_per_contact` | Es lo que barre `/api/flows/cron`; comprobar que el cron corre |
+| Los recordatorios de una difusión no salen («Vencidos sin enviar» sube) | Fuera del horario de atención es lo esperado. Si no: el cron no tiene la ruta porque no se recreó tras cambiar el crontab | `docker logs crm-cron` debe mostrar `ok /api/broadcasts/cron`; si no aparece, recrear el cron (ver «Actualizar el CRM») |
 | Fallos de auth intermitentes | Reloj desfasado: los JWT caducan por tiempo | `timedatectl status \| grep synchronized` |
 | Un `.sh` da `Permission denied` | Perdió el bit ejecutable | `git ls-files -s scripts/` — debe decir `100755`, no `100644` |
 | El webhook **no recibe nada**, pero el botón «Probar» de Meta sí llega | Meta todavía no propagó el enrutamiento de eventos de la WABA | Esperar ~1 h antes de tocar nada — ver la sección siguiente |

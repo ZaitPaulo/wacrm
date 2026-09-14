@@ -28,6 +28,7 @@ import {
   GitBranch,
   Webhook,
   CircleSlash,
+  EyeOff,
   Zap,
   Loader2,
   ArrowDown,
@@ -122,6 +123,7 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   condition: { label: "condition", icon: GitBranch, border: "border-l-amber-500" },
   send_webhook: { label: "send_webhook", icon: Webhook, border: "border-l-primary" },
   close_conversation: { label: "close_conversation", icon: CircleSlash, border: "border-l-primary" },
+  hide_owner_vehicle: { label: "hide_owner_vehicle", icon: EyeOff, border: "border-l-primary" },
 }
 
 const ADDABLE_STEPS: AutomationStepType[] = [
@@ -139,6 +141,7 @@ const ADDABLE_STEPS: AutomationStepType[] = [
   "condition",
   "send_webhook",
   "close_conversation",
+  "hide_owner_vehicle",
 ]
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType }[] = [
@@ -201,6 +204,7 @@ function blankConfig(type: AutomationStepType): Record<string, unknown> {
     case "send_webhook":
       return { url: "", headers: {}, body_template: "" }
     case "close_conversation":
+    case "hide_owner_vehicle":
       return {}
     default:
       return {}
@@ -1552,6 +1556,12 @@ function StepEditor({
       return (
         <p className="text-xs text-muted-foreground">
           {t("config.closeConversationHint", { defaultValue: "Sets the conversation status to \"closed\". No configuration needed." })}
+        </p>
+      )
+    case "hide_owner_vehicle":
+      return (
+        <p className="text-xs text-muted-foreground">
+          {t("config.hideOwnerVehicleHint")}
         </p>
       )
     default:

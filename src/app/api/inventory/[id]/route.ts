@@ -3,6 +3,7 @@ import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { buildVehiclePayload } from '@/lib/inventory/payload'
 import { persistAcquisition } from '@/lib/inventory/acquisitions'
+import { ownerContactError } from '@/lib/inventory/owner'
 import {
   syncVehicleKnowledge,
   deleteVehicleKnowledge,
@@ -30,6 +31,14 @@ export async function PATCH(request: Request, { params }: Params) {
     const parsed = buildVehiclePayload(body, { partial: true })
     if ('error' in parsed) {
       return NextResponse.json({ error: parsed.error }, { status: 400 })
+    }
+    const ownerError = await ownerContactError(
+      supabase,
+      accountId,
+      parsed.value.owner_contact_id,
+    )
+    if (ownerError) {
+      return NextResponse.json({ error: ownerError }, { status: 400 })
     }
 
     // Editar sólo el costo es un patch válido aunque no toque ninguna

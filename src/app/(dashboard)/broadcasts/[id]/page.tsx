@@ -34,12 +34,14 @@ import {
   Trash2,
   PlayCircle,
   RotateCcw,
+  BellRing,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getBroadcastStatus,
   getRecipientStatus,
 } from '@/lib/broadcast-status';
+import { summarizeFollowUp, summarizeNoReply } from '@/lib/broadcast-follow-up-stats';
 import { useTranslations } from 'next-intl';
 
 interface StatCardProps {
@@ -163,6 +165,8 @@ export default function BroadcastDetailPage() {
   const [resumingScope, setResumingScope] = useState<
     'pending' | 'failed' | null
   >(null);
+  const [confirmCancelFollowUp, setConfirmCancelFollowUp] = useState(false);
+  const [cancellingFollowUp, setCancellingFollowUp] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -224,6 +228,13 @@ export default function BroadcastDetailPage() {
       r.read_at ?? '',
       r.error_message ?? '',
     ]);
+    // El recordatorio solo aparece en las difusiones que lo tienen.
+    if (broadcast.follow_up_template_name) {
+      header.push(t('table.followUp'));
+      recipients.forEach((r, i) =>
+        rows[i].push(r.follow_up_status ?? '', r.follow_up_sent_at ?? '', r.follow_up_error ?? '')
+      );
+    }
     const csv = toCsv([header, ...rows]);
     const safeName = broadcast.name.replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
     downloadBlob(`broadcast-${safeName}-${broadcastId.slice(0, 8)}.csv`, csv);
@@ -298,6 +309,43 @@ export default function BroadcastDetailPage() {
     router.push('/broadcasts');
   }
 
+  /**
+   * Corta los recordatorios que faltan (migración 524). Lo que ya está
+   * saliendo termina; lo demás no sale más, porque la función que usa el
+   * cron ignora las difusiones con `follow_up_cancelled_at`.
+   */
+  async function handleCancelFollowUp() {
+    setCancellingFollowUp(true);
+    const supabase = createClient();
+    const { error: cancelErr } = await supabase
+      .from('broadcasts')
+      .update({ follow_up_cancelled_at: new Date().toISOString() })
+      .eq('id', broadcastId);
+    setCancellingFollowUp(false);
+    setConfirmCancelFollowUp(false);
+    if (cancelErr) {
+      toast.error(t('followUp.toastCancelFailed', { error: cancelErr.message }));
+      return;
+    }
+    toast.success(t('followUp.toastCancelled'));
+    await fetchData();
+  }
+
+  function followUpStatusLabel(s: BroadcastRecipient['follow_up_status']): string {
+    switch (s) {
+      case 'sending':
+        return t('followUpStatus.sending');
+      case 'sent':
+        return t('followUpStatus.sent');
+      case 'failed':
+        return t('followUpStatus.failed');
+      case 'skipped':
+        return t('followUpStatus.skipped');
+      default:
+        return '-';
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -332,6 +380,31 @@ export default function BroadcastDetailPage() {
     { label: t('stats.read'), value: broadcast.read_count, color: 'bg-blue-500' },
     { label: t('stats.replied'), value: broadcast.replied_count, color: 'bg-indigo-500' },
   ];
+
+  const followUpStats = broadcast.follow_up_template_name
+    ? summarizeFollowUp(recipients, broadcast)
+    : null;
+  // Baja por silencio (525). El panel del seguimiento aparece si la
+  // difusión tiene recordatorio, baja por silencio o las dos.
+  const noReplyStats =
+    broadcast.no_reply_hide_after_days != null
+      ? summarizeNoReply(recipients, broadcast)
+      : null;
+  const followUpHours = broadcast.follow_up_delay_hours ?? 0;
+  const followUpDelayLabel =
+    followUpHours % 24 === 0
+      ? t('followUp.delayDays', { count: followUpHours / 24 })
+      : t('followUp.delayHours', { count: followUpHours });
+  const followUpCells = followUpStats
+    ? [
+        { key: 'pending', label: t('followUp.pending'), value: followUpStats.pending },
+        { key: 'overdue', label: t('followUp.overdue'), value: followUpStats.overdue },
+        { key: 'sent', label: t('followUp.sent'), value: followUpStats.sent },
+        { key: 'failed', label: t('followUp.failed'), value: followUpStats.failed },
+        { key: 'skipped', label: t('followUp.skipped'), value: followUpStats.skipped },
+        { key: 'repliedAfter', label: t('followUp.repliedAfter'), value: followUpStats.repliedAfter },
+      ]
+    : [];
 
   return (
     <div className="space-y-6">
@@ -506,6 +579,118 @@ export default function BroadcastDetailPage() {
 
       <FunnelChart steps={funnelSteps} />
 
+      {/* Seguimiento: recordatorio (524) y baja por silencio (525). Solo
+          en difusiones que tienen alguno de los dos. */}
+      {(followUpStats || noReplyStats) && (
+        <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="text-sm">
+              <p className="flex items-center gap-2 font-medium text-foreground">
+                <BellRing className="h-4 w-4 text-primary" />
+                {t('followUp.title')}
+              </p>
+              {followUpStats && (
+                <p className="mt-0.5 text-muted-foreground">
+                  {t('followUp.summary', {
+                    template: broadcast.follow_up_template_name ?? '',
+                    delay: followUpDelayLabel,
+                  })}
+                </p>
+              )}
+              {noReplyStats && (
+                <p className="mt-0.5 text-muted-foreground">
+                  {t('noReply.summary', { days: broadcast.no_reply_hide_after_days ?? 0 })}
+                  {noReplyStats.dueAt &&
+                    ` ${t('noReply.dueAt', { date: noReplyStats.dueAt.toLocaleDateString() })}`}
+                </p>
+              )}
+              {broadcast.follow_up_cancelled_at && (
+                <p className="mt-0.5 text-amber-400">
+                  {t('followUp.cancelled', {
+                    date: new Date(broadcast.follow_up_cancelled_at).toLocaleString(),
+                  })}
+                </p>
+              )}
+            </div>
+
+            {!broadcast.follow_up_cancelled_at &&
+              (confirmCancelFollowUp ? (
+                <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-sm">
+                  <span className="text-amber-300">{t('followUp.cancelPrompt')}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmCancelFollowUp(false)}
+                    disabled={cancellingFollowUp}
+                    className="h-7 border-border bg-transparent text-muted-foreground hover:bg-muted"
+                  >
+                    {t('cancel')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleCancelFollowUp}
+                    disabled={cancellingFollowUp}
+                    className="h-7 bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {cancellingFollowUp ? t('followUp.cancelling') : t('confirm')}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConfirmCancelFollowUp(true)}
+                  className="border-border text-muted-foreground hover:bg-muted"
+                >
+                  {t('followUp.cancel')}
+                </Button>
+              ))}
+          </div>
+
+          {followUpStats && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {followUpCells.map((cell) => (
+                <div key={cell.key}>
+                  <p className="text-xs text-muted-foreground">{cell.label}</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {cell.value.toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {followUpStats && followUpStats.overdue > 0 && !broadcast.follow_up_cancelled_at && (
+            <p className="text-xs text-amber-400">
+              {t('followUp.overdueHint', { count: followUpStats.overdue })}
+            </p>
+          )}
+
+          {noReplyStats && (
+            <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">{t('noReply.pending')}</p>
+                <p className="text-lg font-semibold text-foreground">
+                  {noReplyStats.pending.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">{t('noReply.checked')}</p>
+                <p className="text-lg font-semibold text-foreground">
+                  {noReplyStats.checked.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">{t('noReply.hidden')}</p>
+                <p className="text-lg font-semibold text-foreground">
+                  {noReplyStats.hiddenVehicles.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Recipients Table */}
       <div className="rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -589,6 +774,9 @@ export default function BroadcastDetailPage() {
                   <TableHead className="text-muted-foreground">{t('table.delivered')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.read')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.error')}</TableHead>
+                  {followUpStats && (
+                    <TableHead className="text-muted-foreground">{t('table.followUp')}</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -627,6 +815,20 @@ export default function BroadcastDetailPage() {
                       <TableCell className="max-w-xs truncate text-xs text-red-400">
                         {recipient.error_message ?? '-'}
                       </TableCell>
+                      {followUpStats && (
+                        <TableCell
+                          className="text-xs text-muted-foreground"
+                          // El motivo de un fallo u omisión, o la hora del envío.
+                          title={
+                            recipient.follow_up_error ??
+                            (recipient.follow_up_sent_at
+                              ? new Date(recipient.follow_up_sent_at).toLocaleString()
+                              : undefined)
+                          }
+                        >
+                          {followUpStatusLabel(recipient.follow_up_status)}
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}

@@ -765,7 +765,8 @@
         "sent": "Enviado",
         "delivered": "Entregado",
         "read": "Leído",
-        "error": "Error"
+        "error": "Error",
+        "followUp": "Recordatorio"
       },
       "stats": {
         "totalRecipients": "Destinatarios totales",
@@ -785,7 +786,39 @@
       "retryFailed": "Reintentar los fallidos ({count})",
       "toastResumeStarted": "Enviando a {count} destinatarios en segundo plano.",
       "toastResumeStartedCapped": "Enviando a {count} destinatarios en segundo plano. Quedan {remaining} para una próxima corrida.",
-      "toastResumeFailed": "No se pudo reanudar: {error}"
+      "toastResumeFailed": "No se pudo reanudar: {error}",
+      "followUp": {
+        "title": "Seguimiento",
+        "summary": "Recordatorio con {template} a {delay} del envío, para quien no responda.",
+        "delayDays": "{count, plural, one {# día} other {# días}}",
+        "delayHours": "{count, plural, one {# hora} other {# horas}}",
+        "cancelled": "Cancelado el {date}: no sale ningún recordatorio más ni se oculta ningún vehículo por silencio.",
+        "pending": "Por enviar",
+        "overdue": "Vencidos sin enviar",
+        "sent": "Enviados",
+        "failed": "Fallidos",
+        "skipped": "Omitidos",
+        "repliedAfter": "Respondieron después",
+        "overdueHint": "Hay {count} recordatorios vencidos sin enviar. Si fuera del horario de atención es normal; si no, revisa el cron del servidor.",
+        "cancel": "Cancelar seguimiento",
+        "cancelPrompt": "¿Cancelar lo que falta del seguimiento?",
+        "cancelling": "Cancelando…",
+        "toastCancelled": "Seguimiento cancelado",
+        "toastCancelFailed": "No se pudo cancelar: {error}"
+      },
+      "followUpStatus": {
+        "sending": "Enviando",
+        "sent": "Enviado",
+        "failed": "Falló",
+        "skipped": "Omitido"
+      },
+      "noReply": {
+        "summary": "Baja por silencio: se ocultan de la vitrina los vehículos de quien no responda en {days} días desde el envío.",
+        "dueAt": "Próxima baja: {date}.",
+        "pending": "Por revisar",
+        "checked": "Revisados",
+        "hidden": "Vehículos ocultados"
+      }
     },
     "new": {
       "title": "Nueva difusión",
@@ -894,7 +927,38 @@
         "sending": "Enviando...",
         "preparing": "Preparando...",
         "progressDesc": "Procesando {current} de {total} destinatarios...",
-        "toastFailedPreview": "No se pudieron cargar los datos de la vista previa"
+        "toastFailedPreview": "No se pudieron cargar los datos de la vista previa",
+        "followUp": {
+          "title": "Seguimiento",
+          "description": "Si alguien no responde, el CRM le envía un recordatorio una sola vez.",
+          "enable": "Enviar un recordatorio a quien no responda",
+          "template": "Plantilla del recordatorio",
+          "templatePlaceholder": "Elige una plantilla aprobada",
+          "noTemplates": "No hay plantillas aprobadas para usar como recordatorio.",
+          "delay": "Enviar a los",
+          "delayDays": "{count, plural, one {# día} other {# días}}",
+          "quietHoursHint": "Los recordatorios respetan el horario de atención de la cuenta. Si no lo tienes activo, pueden salir a cualquier hora.",
+          "summary": "Recordatorio:",
+          "summaryValue": "{template}, a los {days, plural, one {# día} other {# días}}",
+          "summaryOff": "Sin recordatorio",
+          "problems": {
+            "missing": "Elige la plantilla del recordatorio.",
+            "variable_mismatch": "El recordatorio debe tener las mismas variables que la plantilla de la difusión, o ninguna.",
+            "media_header": "El recordatorio no puede tener encabezado de imagen, video o documento.",
+            "header_variable": "El recordatorio no puede tener un encabezado con variables.",
+            "button_needs_value": "El recordatorio no puede tener botones de enlace con variables."
+          }
+        },
+        "noReply": {
+          "title": "Baja por silencio",
+          "description": "Si alguien no responde en el plazo, sus vehículos se ocultan de la vitrina.",
+          "delay": "Ocultar a los",
+          "delayDays": "{count} días",
+          "ownersOnly": "Solo afecta a contactos que sean propietarios de algún vehículo. El plazo cuenta desde este envío, no desde el recordatorio.",
+          "summary": "Baja por silencio:",
+          "summaryValue": "a los {days} días",
+          "summaryOff": "Sin baja por silencio"
+        }
       }
     }
   },
@@ -968,7 +1032,8 @@
         "wait": "Esperar",
         "condition": "Condición (Si/Si no)",
         "send_webhook": "Enviar webhook",
-        "close_conversation": "Cerrar conversación"
+        "close_conversation": "Cerrar conversación",
+        "hide_owner_vehicle": "Ocultar el vehículo del contacto"
       },
       "triggers": {
         "new_message_received": {
@@ -1108,6 +1173,7 @@
         "matchContains": "Contiene",
         "matchExact": "Exacta",
         "closeConversationHint": "Pone la conversación en estado \"cerrada\". No necesita configuración.",
+        "hideOwnerVehicleHint": "Si el contacto es propietario de un solo vehículo disponible, lo oculta de la vitrina y el bot deja de ofrecerlo; queda una nota con la fecha y el motivo. Si es propietario de varios, no oculta ninguno: no hay forma de saber de cuál habla. No envía mensajes ni cambia la asignación. No necesita configuración.",
         "matchWord": "Palabra completa",
         "matchWordHint": "Solo coincide cuando la palabra clave aparece suelta, así «k» deja de dispararse dentro de «gracias». Conviene para palabras cortas en idiomas que separan con espacios; para idiomas que se escriben sin espacios, usa Contiene."
       },
@@ -2283,6 +2349,14 @@
       "date": "Fecha de venta",
       "buyer": "Comprador",
       "noBuyer": "Sin especificar"
+    },
+    "owner": {
+      "label": "Propietario",
+      "hint": "Quien pone el vehículo en venta con nosotros. Si responde que ya no está disponible, o no responde una consulta, el vehículo puede ocultarse solo.",
+      "none": "Sin propietario",
+      "search": "Buscar por nombre o teléfono…",
+      "empty": "Ningún contacto coincide.",
+      "more": "Y {count} más: escribe para acotar."
     },
     "confirmRevertSale": "Este vehículo figura como vendido. Si cambias el estado se borrarán el precio, la fecha y el comprador. ¿Continuar?"
   },

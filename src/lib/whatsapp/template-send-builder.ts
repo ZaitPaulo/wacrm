@@ -162,6 +162,17 @@ function buttonNeedsSendParam(
   }
 }
 
+/**
+ * ¿Este botón no se puede enviar sin que el llamador aporte un valor?
+ *
+ * Solo un URL con variable: su sufijo es propio de cada envío y no hay
+ * de dónde sacarlo. COPY_CODE no cuenta — cae al `example` de la
+ * plantilla — ni QUICK_REPLY ni PHONE_NUMBER, que no llevan parámetro.
+ */
+export function buttonRequiresCallerValue(button: TemplateButton): boolean {
+  return button.type === 'URL' && extractVariableIndices(button.url).length > 0;
+}
+
 function buildButtonComponent(
   button: TemplateButton,
   index: number,

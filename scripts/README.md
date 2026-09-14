@@ -97,6 +97,32 @@ nombre inexistente falla enumerando las pestañas del libro.
 - El Excel se copia a un temporal antes de leerlo, para no fallar si el
   cliente lo tiene abierto.
 
+## Propietario de los vehículos existentes
+
+`propietarios-a-sql.mjs` (migración 525)
+
+Genera el SQL que asigna `inventory_vehicles.owner_contact_id` a los
+vehículos que ya están cargados, a partir del CSV de referencia de la
+campaña de disponibilidad (`propietarios-referencia-AAAA-MM-DD.csv`, con
+columnas `telefono` y `placa`):
+
+```bash
+node scripts/propietarios-a-sql.mjs propietarios-referencia-2026-09-14.csv <account_id> > propietarios.sql
+docker exec -i supabase-db psql -U postgres -d postgres < propietarios.sql
+```
+
+- **Por defecto es un simulacro**: el SQL termina en `ROLLBACK` y solo
+  muestra qué asignaría y qué no pudo asignar. Se revisa, y después se
+  vuelve a generar con `--aplicar`, que termina en `COMMIT`.
+- Empareja la placa (sin espacios, en mayúsculas) con el teléfono en su
+  forma normalizada (`contacts.phone_normalized`, solo dígitos), así que
+  el teléfono tiene que venir con el 57 adelante.
+- **Nunca pisa un propietario asignado a mano**: solo llena los vacíos.
+- Lista cada placa que no asignó y por qué: no está en el inventario, el
+  teléfono no está en los contactos, o el vehículo ya tiene otro dueño.
+- Hay que correrlo **después** de importar los contactos: sin el contacto
+  no hay a quién asignar.
+
 ## Pendiente: subir las fotos al CRM
 
 Falta el importador que recorra la estructura, suba cada imagen al bucket

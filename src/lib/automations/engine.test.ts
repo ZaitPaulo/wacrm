@@ -24,8 +24,20 @@ const h = vi.hoisted(() => ({
     dealInserts: [] as Record<string, unknown>[],
     dealUpdates: [] as { payload: unknown; filters: [string, string, unknown][] }[],
     dealSelects: [] as [string, string, unknown][][],
+    // Propietario (525): lo que devuelve el SELECT de inventory_vehicles y
+    // los filtros con que se pidió.
+    ownerVehicles: [] as { id: string }[],
+    vehicleSelects: [] as [string, string, unknown][][],
   },
+  // hideVehicles ya está probado en auto-delist.test.ts; acá solo importa
+  // si se llama y con qué. Devuelve lo pedido, como si todo siguiera
+  // disponible.
+  hideVehicles: vi.fn<
+    (db: unknown, account: string, ids: string[], reason: string) => Promise<string[]>
+  >(async (...[, , ids]) => ids),
 }));
+
+vi.mock("@/lib/inventory/auto-delist", () => ({ hideVehicles: h.hideVehicles }));
 
 vi.mock("./admin-client", () => {
   const { state } = h;
@@ -80,6 +92,10 @@ vi.mock("./admin-client", () => {
       }
       state.dealSelects.push(ops.filters);
       return { data: state.openDeal, error: null };
+    }
+    if (table === "inventory_vehicles") {
+      state.vehicleSelects.push(ops.filters);
+      return { data: state.ownerVehicles, error: null };
     }
     if (table === "pipeline_stages") {
       const byId = ops.filters.find((f) => f[0] === "eq" && f[1] === "id");
@@ -153,6 +169,9 @@ beforeEach(() => {
   h.state.dealInserts = [];
   h.state.dealUpdates = [];
   h.state.dealSelects = [];
+  h.state.ownerVehicles = [];
+  h.state.vehicleSelects = [];
+  h.hideVehicles.mockClear();
 });
 
 describe("runAutomationsForTrigger — tenant isolation", () => {
@@ -824,6 +843,100 @@ describe("move_deal_stage", () => {
     expect(h.state.updateCalls.map((u) => u.table)).toContain("contacts");
     expect(stepResults().map((r) => r.step_type)).toEqual([
       "move_deal_stage",
+      "update_contact_field",
+    ]);
+  });
+});
+
+// ------------------------------------------------------------
+// hide_owner_vehicle (525): el botón NO de la consulta de disponibilidad
+// oculta el vehículo del dueño. Solo si hay exactamente uno: con varios
+// no se sabe de cuál habla, y lo decide una persona.
+// ------------------------------------------------------------
+
+function hideStep(position = 0) {
+  return {
+    id: "s-hide",
+    automation_id: "a1",
+    step_type: "hide_owner_vehicle",
+    position,
+    parent_step_id: null,
+    step_config: {},
+  };
+}
+
+describe("hide_owner_vehicle", () => {
+  beforeEach(() => {
+    h.state.owned = { id: "c1" };
+    h.state.automations = [dealAutomation()];
+    h.state.steps = [hideStep()];
+  });
+
+  it("con un solo vehículo disponible lo oculta, con el motivo", async () => {
+    h.state.ownerVehicles = [{ id: "v1" }];
+
+    await run();
+
+    expect(h.hideVehicles).toHaveBeenCalledWith(
+      expect.anything(),
+      ACCOUNT,
+      ["v1"],
+      "el propietario respondió que ya no está disponible",
+    );
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({ step_type: "hide_owner_vehicle", status: "success", detail: "vehicle v1 hidden" }),
+    );
+  });
+
+  it("busca solo los disponibles del contacto, en la cuenta de la automatización", async () => {
+    // El filtro de estado es lo que garantiza que un reservado o un
+    // vendido nunca se toca.
+    await run();
+
+    expect(h.state.vehicleSelects[0]).toEqual(
+      expect.arrayContaining([
+        ["eq", "account_id", ACCOUNT],
+        ["eq", "owner_contact_id", "c1"],
+        ["eq", "status", "available"],
+      ]),
+    );
+  });
+
+  it("sin vehículos no oculta nada y termina con éxito", async () => {
+    h.state.ownerVehicles = [];
+
+    await run();
+
+    expect(h.hideVehicles).not.toHaveBeenCalled();
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({ step_type: "hide_owner_vehicle", status: "success" }),
+    );
+  });
+
+  it("con varios no oculta ninguno y lo deja dicho en el registro", async () => {
+    h.state.ownerVehicles = [{ id: "v1" }, { id: "v2" }];
+
+    await run();
+
+    expect(h.hideVehicles).not.toHaveBeenCalled();
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({
+        step_type: "hide_owner_vehicle",
+        status: "success",
+        detail: expect.stringContaining("2 available vehicles"),
+      }),
+    );
+  });
+
+  it("los pasos siguientes siguen corriendo aunque no haya ocultado nada", async () => {
+    h.state.ownerVehicles = [{ id: "v1" }, { id: "v2" }];
+    h.state.steps = [hideStep(0), { ...updateStep(), position: 1 }];
+
+    await run();
+
+    expect(h.state.updateCalls.map((u) => u.table)).toContain("contacts");
+    expect(stepResults().map((r) => r.step_type)).toEqual([
+      "hide_owner_vehicle",
       "update_contact_field",
     ]);
   });

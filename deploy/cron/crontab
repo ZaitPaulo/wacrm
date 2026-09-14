@@ -12,6 +12,16 @@
 # minuto 10 y el 15. Procesa hasta 50 filas por pasada.
 * * * * * /tick.sh /api/automations/cron
 
+# --- Recordatorios de difusiones: cada 5 minutos ----------------------------
+# Manda el recordatorio a quien no respondió una difusión con seguimiento
+# (migración 524). El plazo se mide en días, así que cinco minutos de
+# precisión sobran. Fuera del horario de atención de la cuenta no reclama
+# nada: lo vencido sale en la primera pasada dentro del horario.
+#
+# Al agregar esta línea hay que RECREAR el contenedor del cron: el crontab
+# se lee al arrancar, y sin eso los recordatorios nunca salen.
+*/5 * * * * /tick.sh /api/broadcasts/cron
+
 # --- Flows: cada 5 minutos --------------------------------------------------
 # Cierra los flow runs abandonados. El propio código lo dice: "a 5-minute
 # interval is more than enough for a 24h timeout default".

@@ -428,8 +428,31 @@ export interface Broadcast {
    * send. Added in migration 038.
    */
   delivery_locked_at?: string | null;
+  /**
+   * Plantilla del recordatorio a quien no responda. NULL = sin
+   * seguimiento. Plantilla y plazo van juntos (CHECK en la base).
+   * Added in migration 524.
+   */
+  follow_up_template_name?: string | null;
+  follow_up_template_language?: string | null;
+  /** Horas desde el envío original hasta el recordatorio (1-168). */
+  follow_up_delay_hours?: number | null;
+  /** Cancelado, no sale ningún recordatorio que no hubiera salido ya. */
+  follow_up_cancelled_at?: string | null;
+  /**
+   * Días desde el envío original tras los cuales se ocultan los vehículos
+   * de quien no respondió. NULL = sin baja por silencio. La cancela
+   * `follow_up_cancelled_at`. Added in migration 525.
+   */
+  no_reply_hide_after_days?: number | null;
   created_at: string;
 }
+
+/**
+ * Estado del recordatorio de un destinatario. NULL = todavía no salió
+ * (no le toca, o le toca y no se ha reclamado). Added in migration 524.
+ */
+export type FollowUpStatus = 'sending' | 'sent' | 'failed' | 'skipped';
 
 export interface BroadcastRecipient {
   id: string;
@@ -459,6 +482,24 @@ export interface BroadcastRecipient {
    * Added in migration 038; null on rows created before it.
    */
   template_params?: string[] | null;
+  /**
+   * El recordatorio vive en la MISMA fila que el mensaje original, para
+   * que la respuesta a él marque `replied` aquí y no en otra difusión.
+   * `follow_up_message_id` es solo trazabilidad: el webhook de estados
+   * sigue emparejando por `whatsapp_message_id`. Added in migration 524.
+   */
+  follow_up_status?: FollowUpStatus | null;
+  follow_up_claimed_at?: string | null;
+  follow_up_sent_at?: string | null;
+  follow_up_message_id?: string | null;
+  follow_up_error?: string | null;
+  /**
+   * Baja por silencio (migración 525): cuándo se revisó a este
+   * destinatario y cuántos vehículos se le ocultaron (0 si había escrito
+   * o no era propietario). Se revisa una sola vez.
+   */
+  no_reply_checked_at?: string | null;
+  no_reply_hidden_count?: number | null;
   created_at: string;
   contact?: Contact;
 }
@@ -494,7 +535,9 @@ export type AutomationStepType =
   | 'wait'
   | 'condition'
   | 'send_webhook'
-  | 'close_conversation';
+  | 'close_conversation'
+  /** Oculta el único vehículo disponible del que el contacto es propietario. Migración 525. */
+  | 'hide_owner_vehicle';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
 
@@ -724,6 +767,13 @@ export interface InventoryVehicle {
   sold_at: string | null;
   /** Comprador. Queda en null si se elimina el contacto. */
   sold_to_contact_id: string | null;
+
+  /**
+   * Propietario: quien pone el vehículo en venta con nosotros. Distinto
+   * del comprador. Su "NO" o su silencio pueden ocultar el vehículo de la
+   * vitrina. Queda en null si se elimina el contacto. Migración 525.
+   */
+  owner_contact_id: string | null;
 
   /**
    * Código corto y opaco que identifica al vehículo en el mensaje de

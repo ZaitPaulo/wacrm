@@ -200,6 +200,7 @@ function validateOne(step: StepLike, path: string, issues: ValidationIssue[]): v
       }
       break
     case 'close_conversation':
+    case 'hide_owner_vehicle':
       // No config required.
       break
     default:

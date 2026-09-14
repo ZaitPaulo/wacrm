@@ -53,6 +53,9 @@ export interface VehiclePayload {
   sold_price?: number | null
   sold_at?: string | null
   sold_to_contact_id?: string | null
+  // Propietario (525). Que el contacto sea de la cuenta lo valida la ruta
+  // con `ownerContactError`: acá solo se normaliza la forma.
+  owner_contact_id?: string | null
 }
 
 /**
@@ -291,6 +294,17 @@ export function buildVehiclePayload(
     const s = str(b.sold_to_contact_id)
     if (!s) return { error: 'sold_to_contact_id inválido' }
     out.sold_to_contact_id = s
+  }
+
+  // --- Propietario (525) -------------------------------------
+  // Independiente del estado: a diferencia del comprador, el propietario
+  // no se limpia al cambiar de estado — sigue siendo el dueño.
+  if (b.owner_contact_id === null || b.owner_contact_id === '') {
+    out.owner_contact_id = null
+  } else if (b.owner_contact_id !== undefined) {
+    const s = str(b.owner_contact_id)
+    if (!s) return { error: 'owner_contact_id inválido' }
+    out.owner_contact_id = s
   }
 
   const coherence = applySoldCoherence(out)

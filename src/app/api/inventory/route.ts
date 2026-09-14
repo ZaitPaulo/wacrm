@@ -7,6 +7,7 @@ import {
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { buildVehiclePayload } from '@/lib/inventory/payload'
 import { persistAcquisition } from '@/lib/inventory/acquisitions'
+import { ownerContactError } from '@/lib/inventory/owner'
 import { syncVehicleKnowledge } from '@/lib/inventory/knowledge-sync'
 import { syncVehiclePost } from '@/lib/social/queue'
 
@@ -21,7 +22,7 @@ import { syncVehiclePost } from '@/lib/social/queue'
 // que nunca se agregaron a esta lista. Al sumar columnas nuevas hay que
 // añadirlas aquí en el mismo cambio.
 const VEHICLE_COLUMNS =
-  'id, brand, model, year, license_plate, vin, price, mileage, status, features, images, internal_notes, kb_document_id, created_at, updated_at, sold_price, sold_at, sold_to_contact_id, public_ref, transmission, fuel_type, body_type, color, condition, doors, engine_displacement, plate_city, warranty_price, soat_expires_at, tecnomecanica_expires_at, has_lien, on_display, accepts_trade_in'
+  'id, brand, model, year, license_plate, vin, price, mileage, status, features, images, internal_notes, kb_document_id, created_at, updated_at, sold_price, sold_at, sold_to_contact_id, owner_contact_id, public_ref, transmission, fuel_type, body_type, color, condition, doors, engine_displacement, plate_city, warranty_price, soat_expires_at, tecnomecanica_expires_at, has_lien, on_display, accepts_trade_in'
 
 // El costo de compra se pide como tabla embebida, no como columna. Para
 // un 'agent' o un 'viewer' la RLS de vehicle_acquisitions (migración 508)
@@ -83,6 +84,14 @@ export async function POST(request: Request) {
     const parsed = buildVehiclePayload(body, { partial: false })
     if ('error' in parsed) {
       return NextResponse.json({ error: parsed.error }, { status: 400 })
+    }
+    const ownerError = await ownerContactError(
+      supabase,
+      accountId,
+      parsed.value.owner_contact_id,
+    )
+    if (ownerError) {
+      return NextResponse.json({ error: ownerError }, { status: 400 })
     }
 
     // `public_ref` no se manda: lo genera el DEFAULT de la migración 508.

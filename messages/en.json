@@ -772,7 +772,8 @@
         "sent": "Sent",
         "delivered": "Delivered",
         "read": "Read",
-        "error": "Error"
+        "error": "Error",
+        "followUp": "Reminder"
       },
       "stats": {
         "totalRecipients": "Total Recipients",
@@ -792,7 +793,39 @@
       "retryFailed": "Retry failed ({count})",
       "toastResumeStarted": "Sending {count} recipients in the background.",
       "toastResumeStartedCapped": "Sending {count} recipients in the background. {remaining} more will need another run.",
-      "toastResumeFailed": "Could not resume: {error}"
+      "toastResumeFailed": "Could not resume: {error}",
+      "followUp": {
+        "title": "Follow-up",
+        "summary": "Reminder with {template} {delay} after sending, for anyone who doesn't reply.",
+        "delayDays": "{count, plural, one {# day} other {# days}}",
+        "delayHours": "{count, plural, one {# hour} other {# hours}}",
+        "cancelled": "Cancelled on {date}: no more reminders will go out and no vehicle will be delisted on silence.",
+        "pending": "To send",
+        "overdue": "Overdue, not sent",
+        "sent": "Sent",
+        "failed": "Failed",
+        "skipped": "Skipped",
+        "repliedAfter": "Replied afterwards",
+        "overdueHint": "{count} reminders are overdue and not sent. That's expected outside business hours; otherwise, check the server cron.",
+        "cancel": "Cancel follow-up",
+        "cancelPrompt": "Cancel what's left of the follow-up?",
+        "cancelling": "Cancelling…",
+        "toastCancelled": "Follow-up cancelled",
+        "toastCancelFailed": "Could not cancel: {error}"
+      },
+      "followUpStatus": {
+        "sending": "Sending",
+        "sent": "Sent",
+        "failed": "Failed",
+        "skipped": "Skipped"
+      },
+      "noReply": {
+        "summary": "Delist on silence: the vehicles of anyone who doesn't reply within {days} days of sending are hidden from the showcase.",
+        "dueAt": "Next delisting: {date}.",
+        "pending": "To check",
+        "checked": "Checked",
+        "hidden": "Vehicles hidden"
+      }
     },
     "new": {
       "title": "New Broadcast",
@@ -901,7 +934,38 @@
         "sending": "Sending...",
         "preparing": "Preparing...",
         "progressDesc": "Processing {current} of {total} recipients...",
-        "toastFailedPreview": "Failed to load preview data"
+        "toastFailedPreview": "Failed to load preview data",
+        "followUp": {
+          "title": "Follow-up",
+          "description": "If someone doesn't reply, the CRM sends them a reminder, once.",
+          "enable": "Send a reminder to anyone who doesn't reply",
+          "template": "Reminder template",
+          "templatePlaceholder": "Choose an approved template",
+          "noTemplates": "There are no approved templates to use as a reminder.",
+          "delay": "Send after",
+          "delayDays": "{count, plural, one {# day} other {# days}}",
+          "quietHoursHint": "Reminders respect the account's business hours. If those are off, reminders can go out at any time.",
+          "summary": "Reminder:",
+          "summaryValue": "{template}, after {days, plural, one {# day} other {# days}}",
+          "summaryOff": "No reminder",
+          "problems": {
+            "missing": "Choose the reminder template.",
+            "variable_mismatch": "The reminder must have the same variables as the broadcast template, or none.",
+            "media_header": "The reminder can't have an image, video or document header.",
+            "header_variable": "The reminder can't have a header with variables.",
+            "button_needs_value": "The reminder can't have link buttons with variables."
+          }
+        },
+        "noReply": {
+          "title": "Delist on silence",
+          "description": "If someone doesn't reply within the period, their vehicles are hidden from the showcase.",
+          "delay": "Hide after",
+          "delayDays": "{count} days",
+          "ownersOnly": "Only affects contacts who own a vehicle. The period counts from this send, not from the reminder.",
+          "summary": "Delist on silence:",
+          "summaryValue": "after {days} days",
+          "summaryOff": "No delisting on silence"
+        }
       }
     }
   },
@@ -975,7 +1039,8 @@
         "wait": "Wait",
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
-        "close_conversation": "Close Conversation"
+        "close_conversation": "Close Conversation",
+        "hide_owner_vehicle": "Hide the contact's vehicle"
       },
       "triggers": {
         "new_message_received": {
@@ -1117,7 +1182,8 @@
         "matchWord": "Whole word",
         "matchWordHint": "Matches the keyword only as a standalone word, so \"k\" no longer fires on \"thanks\". Best for short keywords in space-separated languages; use Contains for languages written without spaces.",
         "matchExact": "Exact",
-        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
+        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed.",
+        "hideOwnerVehicleHint": "If the contact owns exactly one available vehicle, hides it from the showcase and the bot stops offering it; a dated note records why. If they own several, none is hidden: there's no way to tell which one they mean. Sends no messages and doesn't change the assignment. No configuration needed."
       },
       "validation": {
         "at": "at {path}",
@@ -2290,6 +2356,14 @@
       "date": "Sale date",
       "buyer": "Buyer",
       "noBuyer": "Not specified"
+    },
+    "owner": {
+      "label": "Owner",
+      "hint": "Whoever is selling the vehicle through us. If they reply it's no longer available, or don't reply to a check-in, the vehicle can be hidden automatically.",
+      "none": "No owner",
+      "search": "Search by name or phone…",
+      "empty": "No contact matches.",
+      "more": "And {count} more: type to narrow down."
     },
     "confirmRevertSale": "This vehicle is marked as sold. Changing its status will clear the price, date and buyer. Continue?"
   },

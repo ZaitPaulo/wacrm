@@ -50,6 +50,21 @@ interface BroadcastPayload {
    * falls back to the template's stored URL only when this is empty.
    */
   headerMediaUrl?: string;
+  /**
+   * Recordatorio a quien no responda (migración 524). Acá solo se guarda
+   * con la difusión: lo manda el cron del servidor cuando vence el plazo,
+   * sin depender de esta pestaña.
+   */
+  followUp?: {
+    templateName: string;
+    templateLanguage: string;
+    delayHours: number;
+  };
+  /**
+   * Baja por silencio (migración 525): días desde el envío tras los cuales
+   * se ocultan los vehículos de quien no respondió. La aplica el cron.
+   */
+  noReplyHideAfterDays?: number;
 }
 
 interface UseBroadcastSendingReturn {
@@ -385,6 +400,10 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
           read_count: 0,
           replied_count: 0,
           failed_count: 0,
+          follow_up_template_name: payload.followUp?.templateName ?? null,
+          follow_up_template_language: payload.followUp?.templateLanguage ?? null,
+          follow_up_delay_hours: payload.followUp?.delayHours ?? null,
+          no_reply_hide_after_days: payload.noReplyHideAfterDays ?? null,
         })
         .select()
         .single();

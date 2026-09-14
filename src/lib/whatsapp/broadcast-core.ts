@@ -312,44 +312,23 @@ export async function deliverBroadcast(
   plan: BroadcastPlan
 ): Promise<void> {
   for (const recipient of plan.planned) {
-    // Las variantes corrigen prefijos troncales de un TELEFONO. Sobre
-    // un BSUID no hay nada que corregir: recortarle digitos a un
-    // identificador opaco solo produce identificadores de nadie.
-    const variants = isPhoneRecipient(recipient.recipientId)
-      ? phoneVariants(recipient.recipientId)
-      : [recipient.recipientId];
-    let sentMessageId: string | null = null;
-    let lastError: string | null = null;
+    const sent = await sendTemplateWithVariants({
+      phoneNumberId: plan.phoneNumberId,
+      accessToken: plan.accessToken,
+      recipientId: recipient.recipientId,
+      templateName: plan.templateName,
+      language: plan.templateLanguage,
+      templateRow: plan.templateRow,
+      params: recipient.params,
+    });
 
-    for (const variant of variants) {
-      try {
-        const result = await sendTemplateMessage({
-          phoneNumberId: plan.phoneNumberId,
-          accessToken: plan.accessToken,
-          to: variant,
-          templateName: plan.templateName,
-          language: plan.templateLanguage,
-          template: plan.templateRow ?? undefined,
-          params: recipient.params,
-        });
-        sentMessageId = result.messageId;
-        lastError = null;
-        break;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        lastError = message;
-        // Only a "recipient not allowed" error is worth another variant.
-        if (!isRecipientNotAllowedError(message)) break;
-      }
-    }
-
-    if (sentMessageId) {
+    if (sent.ok) {
       await db
         .from('broadcast_recipients')
         .update({
           status: 'sent',
           sent_at: new Date().toISOString(),
-          whatsapp_message_id: sentMessageId,
+          whatsapp_message_id: sent.messageId,
           error_message: null,
         })
         .eq('id', recipient.recipientRowId);
@@ -358,13 +337,72 @@ export async function deliverBroadcast(
         .from('broadcast_recipients')
         .update({
           status: 'failed',
-          error_message: lastError || 'Unknown error',
+          error_message: sent.error,
         })
         .eq('id', recipient.recipientRowId);
     }
   }
 
   await finalizeBroadcastStatus(db, plan.broadcastId);
+}
+
+/** Todo lo que hace falta para mandar una plantilla a un destino. */
+export interface TemplateSendTarget {
+  phoneNumberId: string;
+  accessToken: string;
+  /** Teléfono o BSUID, ya resuelto. */
+  recipientId: string;
+  templateName: string;
+  language: string;
+  templateRow: MessageTemplate | null;
+  params: string[];
+}
+
+export type TemplateSendOutcome =
+  | { ok: true; messageId: string }
+  | { ok: false; error: string };
+
+/**
+ * Manda una plantilla con el reintento por variantes de teléfono.
+ *
+ * Es el bucle que antes vivía dentro de `deliverBroadcast`, sacado para
+ * que el recordatorio de las difusiones (broadcast-follow-up.ts) reintente
+ * un número exactamente igual que el envío original. Nunca lanza: el
+ * fallo vuelve como valor, porque quien llama sigue con el siguiente
+ * destinatario.
+ */
+export async function sendTemplateWithVariants(
+  target: TemplateSendTarget
+): Promise<TemplateSendOutcome> {
+  // Las variantes corrigen prefijos troncales de un TELEFONO. Sobre
+  // un BSUID no hay nada que corregir: recortarle digitos a un
+  // identificador opaco solo produce identificadores de nadie.
+  const variants = isPhoneRecipient(target.recipientId)
+    ? phoneVariants(target.recipientId)
+    : [target.recipientId];
+  let lastError: string | null = null;
+
+  for (const variant of variants) {
+    try {
+      const result = await sendTemplateMessage({
+        phoneNumberId: target.phoneNumberId,
+        accessToken: target.accessToken,
+        to: variant,
+        templateName: target.templateName,
+        language: target.language,
+        template: target.templateRow ?? undefined,
+        params: target.params,
+      });
+      return { ok: true, messageId: result.messageId };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      lastError = message;
+      // Only a "recipient not allowed" error is worth another variant.
+      if (!isRecipientNotAllowedError(message)) break;
+    }
+  }
+
+  return { ok: false, error: lastError || 'Unknown error' };
 }
 
 /**

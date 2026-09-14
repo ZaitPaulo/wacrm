@@ -31,6 +31,7 @@ import { MAX_TAG_CHAIN_DEPTH, getTagChainDepth } from '@/lib/contacts/tag-chain'
 import { engineSendText, engineSendTemplate, engineSendInteractive } from './meta-send'
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
+import { hideVehicles } from '@/lib/inventory/auto-delist'
 
 // ------------------------------------------------------------
 // Public API
@@ -821,6 +822,43 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       })
       if (!res.ok) throw new Error(`webhook returned ${res.status}`)
       return `webhook ${res.status}`
+    }
+
+    case 'hide_owner_vehicle': {
+      // El botón "NO" de la consulta de disponibilidad (migración 525):
+      // el dueño avisa que su carro ya no está, y sale de la vitrina.
+      //
+      // Devuelve —no lanza— en todo caso que no sea un error de verdad:
+      // el motor corta la corrida en el primer paso que lanza, y "no había
+      // qué ocultar" no puede llevarse por delante la etiqueta o la
+      // asignación que vengan después.
+      if (!args.contactId) throw new Error('hide_owner_vehicle needs a contact')
+      const { data: owned, error: ownedErr } = await db
+        .from('inventory_vehicles')
+        .select('id')
+        .eq('account_id', args.automation.account_id)
+        .eq('owner_contact_id', args.contactId)
+        .eq('status', 'available')
+      if (ownedErr) throw new Error(`owner vehicles lookup failed: ${ownedErr.message}`)
+
+      const ids = ((owned ?? []) as { id: string }[]).map((v) => v.id)
+      if (ids.length === 0) return 'contact owns no available vehicle; nothing hidden'
+      // Con varios no hay forma de saber de cuál habla, y ocultar el
+      // equivocado le quita a la vitrina un carro que sí está en venta.
+      // Lo decide una persona.
+      if (ids.length > 1) {
+        return `contact owns ${ids.length} available vehicles; none hidden (ambiguous)`
+      }
+
+      const hidden = await hideVehicles(
+        db,
+        args.automation.account_id,
+        ids,
+        'el propietario respondió que ya no está disponible',
+      )
+      return hidden.length > 0
+        ? `vehicle ${hidden[0]} hidden`
+        : 'vehicle no longer available; nothing hidden'
     }
 
     case 'close_conversation': {

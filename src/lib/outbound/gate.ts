@@ -310,7 +310,7 @@ export async function resolveRecipientId(
  * columna convertiría un problema de base en clientes sin respuesta,
  * que es peor y mucho más difícil de notar que un mensaje a deshora.
  */
-async function fueraDeHorario(
+export async function fueraDeHorario(
   db: SupabaseClient,
   accountId: string
 ): Promise<boolean> {

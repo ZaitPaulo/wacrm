@@ -39,6 +39,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ContactPicker } from '@/components/contacts/contact-picker';
+import type { PickableContact } from '@/lib/contacts/filter-contacts';
 import {
   Car,
   Plus,
@@ -181,6 +183,8 @@ interface VehicleDraft {
   sold_price: string;
   sold_at: string;
   sold_to_contact_id: string;
+  // Propietario (525) — quien pone el vehículo en venta. '' = nadie.
+  owner_contact_id: string;
 }
 
 const EMPTY_DRAFT: VehicleDraft = {
@@ -213,6 +217,7 @@ const EMPTY_DRAFT: VehicleDraft = {
   sold_price: '',
   sold_at: '',
   sold_to_contact_id: '',
+  owner_contact_id: '',
 };
 
 /**
@@ -425,6 +430,7 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
     sold_price: v.sold_price != null ? String(v.sold_price) : '',
     sold_at: v.sold_at ? v.sold_at.slice(0, 10) : '',
     sold_to_contact_id: v.sold_to_contact_id ?? '',
+    owner_contact_id: v.owner_contact_id ?? '',
   };
 }
 
@@ -446,10 +452,10 @@ export default function InventoryPage() {
 
   const [vehicles, setVehicles] = useState<InventoryVehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  // Para el selector de comprador al cerrar una venta. Se cargan una vez
+  // Para los selectores de comprador y de propietario. Se cargan una vez
   // con el cliente de sesión (la RLS los acota a la cuenta), igual que en
-  // /documents.
-  const [contacts, setContacts] = useState<{ id: string; name: string }[]>([]);
+  // /documents. El teléfono es lo que distingue a dos homónimos.
+  const [contacts, setContacts] = useState<PickableContact[]>([]);
 
   const [search, setSearch] = useState('');
   // Sin orden elegido se respeta el que trae la API (editado más
@@ -563,24 +569,37 @@ export default function InventoryPage() {
     load();
   }, [load]);
 
-  // Los contactos sólo alimentan el selector de comprador; si la consulta
-  // falla, cerrar una venta sigue siendo posible sin vincular a nadie.
+  // Los contactos sólo alimentan los selectores de comprador y propietario;
+  // si la consulta falla, se sigue pudiendo guardar sin vincular a nadie.
+  //
+  // Por páginas: PostgREST corta cada respuesta en 1 000 filas (max-rows)
+  // SIN avisar, y un propietario que cayera más allá simplemente no
+  // aparecería en la lista.
   useEffect(() => {
-    const db = createClient();
-    void db
-      .from('contacts')
-      .select('id, name')
-      .order('name')
-      .then(({ data, error }) => {
+    let cancelled = false;
+    async function loadContacts() {
+      const db = createClient();
+      const PAGE = 1000;
+      const all: PickableContact[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await db
+          .from('contacts')
+          .select('id, name, phone')
+          .order('name')
+          .range(from, from + PAGE - 1);
         if (error) {
-          console.warn(
-            '[inventory] no se pudieron cargar los contactos:',
-            error
-          );
+          console.warn('[inventory] no se pudieron cargar los contactos:', error);
           return;
         }
-        setContacts((data ?? []) as { id: string; name: string }[]);
-      });
+        all.push(...((data ?? []) as PickableContact[]));
+        if (!data || data.length < PAGE) break;
+      }
+      if (!cancelled) setContacts(all);
+    }
+    void loadContacts();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function openCreate() {
@@ -641,6 +660,7 @@ export default function InventoryPage() {
         features: textToFeatures(draft.featuresText),
         images: draft.images,
         internal_notes: draft.internal_notes.trim() || null,
+        owner_contact_id: draft.owner_contact_id || null,
         // Sólo se mandan si el vehículo queda vendido; al revertir, el
         // backend los limpia solo (applySoldCoherence).
         ...(draft.status === 'sold'
@@ -1139,6 +1159,24 @@ export default function InventoryPage() {
                   setDraft({ ...draft, license_plate: e.target.value })
                 }
               />
+            </div>
+            {/* Propietario (525): quien pone el vehículo en venta. Su "NO"
+                o su silencio en una consulta pueden ocultarlo solo. */}
+            <div className="space-y-2">
+              <Label htmlFor="owner_contact_id">{t('owner.label')}</Label>
+              <ContactPicker
+                id="owner_contact_id"
+                contacts={contacts}
+                value={draft.owner_contact_id}
+                onChange={(id) => setDraft({ ...draft, owner_contact_id: id })}
+                labels={{
+                  none: t('owner.none'),
+                  search: t('owner.search'),
+                  empty: t('owner.empty'),
+                  more: (count) => t('owner.more', { count }),
+                }}
+              />
+              <p className="text-muted-foreground text-xs">{t('owner.hint')}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="transmission">{t('fields.transmission')}</Label>

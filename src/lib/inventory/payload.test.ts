@@ -122,6 +122,39 @@ describe("buildVehiclePayload — cierre de venta", () => {
   });
 });
 
+describe("buildVehiclePayload — propietario", () => {
+  const OWNER = "c0ffee00-0000-4000-8000-000000000002";
+
+  it("acepta un propietario", () => {
+    const v = ok(buildVehiclePayload({ owner_contact_id: OWNER }, { partial: true }));
+    expect(v.owner_contact_id).toBe(OWNER);
+  });
+
+  it("vacío o null lo quita", () => {
+    expect(ok(buildVehiclePayload({ owner_contact_id: "" }, { partial: true })).owner_contact_id).toBeNull();
+    expect(ok(buildVehiclePayload({ owner_contact_id: null }, { partial: true })).owner_contact_id).toBeNull();
+  });
+
+  it("un patch sin el campo no lo toca", () => {
+    const v = ok(buildVehiclePayload({ mileage: 1000 }, { partial: true }));
+    expect("owner_contact_id" in v).toBe(false);
+  });
+
+  it("no se limpia al cambiar de estado, a diferencia del comprador", () => {
+    const v = ok(
+      buildVehiclePayload({ status: "hidden", owner_contact_id: OWNER }, { partial: true }),
+    );
+    expect(v.owner_contact_id).toBe(OWNER);
+    expect(v.sold_to_contact_id).toBeNull();
+  });
+
+  it("rechaza un valor que no es texto", () => {
+    expect(buildVehiclePayload({ owner_contact_id: 42 }, { partial: true })).toEqual({
+      error: "owner_contact_id inválido",
+    });
+  });
+});
+
 describe("buildAcquisitionPayload", () => {
   it("devuelve null cuando no hay datos de compra", () => {
     const r = buildAcquisitionPayload({ brand: "Toyota" });

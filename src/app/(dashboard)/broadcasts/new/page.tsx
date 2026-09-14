@@ -9,8 +9,13 @@ import { MessageTemplate } from '@/types';
 import { Step1ChooseTemplate } from '@/components/broadcasts/step1-choose-template';
 import { Step2SelectAudience } from '@/components/broadcasts/step2-select-audience';
 import { Step3Personalize } from '@/components/broadcasts/step3-personalize';
-import { Step4ScheduleSend } from '@/components/broadcasts/step4-schedule-send';
+import {
+  Step4ScheduleSend,
+  type FollowUpConfig,
+  type NoReplyConfig,
+} from '@/components/broadcasts/step4-schedule-send';
 import { useBroadcastSending } from '@/hooks/use-broadcast-sending';
+import { checkFollowUpTemplate } from '@/lib/whatsapp/follow-up-template';
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -45,9 +50,25 @@ export default function NewBroadcastPage() {
   >({});
   const [headerMediaUrl, setHeaderMediaUrl] = useState('');
   const [name, setName] = useState('');
+  const [followUp, setFollowUp] = useState<FollowUpConfig>({
+    enabled: false,
+    template: null,
+    delayDays: 2,
+  });
+  // Baja por silencio (525): 60 días por defecto, la regla del cliente.
+  const [noReply, setNoReply] = useState<NoReplyConfig>({ enabled: false, days: 60 });
 
   async function handleSend() {
     if (!template) return;
+
+    // El paso 4 ya bloquea el botón con un seguimiento inválido; esto es
+    // la red por si el estado cambió entre medio. Un recordatorio que no
+    // se puede enviar fallaría días después, para todos a la vez.
+    const followUpReady =
+      followUp.enabled &&
+      followUp.template !== null &&
+      checkFollowUpTemplate(template, followUp.template).ok;
+    if (followUp.enabled && !followUpReady) return;
 
     try {
       const broadcastId = await createAndSendBroadcast({
@@ -62,6 +83,15 @@ export default function NewBroadcastPage() {
         },
         variables,
         headerMediaUrl,
+        followUp:
+          followUpReady && followUp.template
+            ? {
+                templateName: followUp.template.name,
+                templateLanguage: followUp.template.language ?? 'en_US',
+                delayHours: followUp.delayDays * 24,
+              }
+            : undefined,
+        noReplyHideAfterDays: noReply.enabled ? noReply.days : undefined,
       });
       router.push(`/broadcasts/${broadcastId}`);
     } catch (err) {
@@ -221,6 +251,10 @@ export default function NewBroadcastPage() {
               onNameChange={setName}
               template={template}
               audience={audience}
+              followUp={followUp}
+              onFollowUpChange={setFollowUp}
+              noReply={noReply}
+              onNoReplyChange={setNoReply}
               onSend={handleSend}
               onSaveDraft={handleSaveDraft}
               onBack={() => setCurrentStep(2)}
