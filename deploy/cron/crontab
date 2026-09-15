@@ -18,8 +18,8 @@
 # precisión sobran. Fuera del horario de atención de la cuenta no reclama
 # nada: lo vencido sale en la primera pasada dentro del horario.
 #
-# Al agregar esta línea hay que RECREAR el contenedor del cron: el crontab
-# se lee al arrancar, y sin eso los recordatorios nunca salen.
+# Al cambiar este archivo hay que REINICIAR el contenedor del cron: lo copia
+# al arrancar (ver deploy/docker-compose.app.yml), y sin eso sigue con el viejo.
 */5 * * * * /tick.sh /api/broadcasts/cron
 
 # --- Flows: cada 5 minutos --------------------------------------------------

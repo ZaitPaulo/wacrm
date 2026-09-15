@@ -150,19 +150,35 @@ services:
         condition: service_healthy
     environment:
       AUTOMATION_CRON_SECRET: ${AUTOMATION_CRON_SECRET:?falta AUTOMATION_CRON_SECRET en deploy/.env}
+    # Se monta el DIRECTORIO y el comando copia los archivos al arrancar, en
+    # vez de montar el crontab directo en /etc/crontabs/root. Dos razones,
+    # las dos aprendidas en producción:
+    #
+    #   1. busybox crond SOLO carga crontabs cuyo dueño es root, y descarta
+    #      los demás sin decir nada. Un bind mount conserva el dueño del host
+    #      (crm, uid 1001): del 2026-08-20 al 2026-09-15 el cron no ejecutó
+    #      NINGUNA tarea, y el tick de arranque de abajo lo tapaba porque ese
+    #      lo lanza el shell, no crond. La copia la hace root.
+    #   2. El bind mount de un archivo suelto queda atado a su inodo: `git
+    #      pull` lo reemplaza y el contenedor seguía viendo el viejo. Con el
+    #      directorio montado, un `restart` del cron toma el crontab nuevo.
     volumes:
-      - ./deploy/cron/crontab:/etc/crontabs/root:ro
-      - ./deploy/cron/tick.sh:/tick.sh:ro
+      - ./deploy/cron:/cron-src:ro
     # Un tick inmediato al arrancar: si el secreto no coincide se ve en los
     # logs YA, en vez de descubrirlo dentro de un minuto — o de un mes,
     # cuando alguien note que las esperas no avanzan.
     #
     # crond -f no se demoniza (Docker necesita el proceso en primer plano) y
-    # -d 8 manda la salida a stdout para que `docker logs` la recoja.
+    # -d 8 manda su propio log a stderr. La salida de cada tarea (la línea
+    # "ok /api/..." de tick.sh) llega también a `docker logs`: sin MAILTO,
+    # busybox crond deja que la tarea escriba en su stdout. Un "ok" por
+    # minuto de /api/automations/cron es la señal de que el cron corre.
     command:
       - /bin/sh
       - -c
       - |
+        cp /cron-src/crontab /etc/crontabs/root && chmod 600 /etc/crontabs/root
+        cp /cron-src/tick.sh /tick.sh && chmod 755 /tick.sh
         /tick.sh /api/automations/cron || true
         exec crond -f -d 8
     networks:

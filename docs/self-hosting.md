@@ -142,17 +142,23 @@ docker compose -f docker-compose.yml -f deploy/docker-compose.app.yml \
 El servidor sigue `main`, así que solo recibe lo que hayas promovido desde
 `develop` — nunca trabajo a medias.
 
-**Si el pull cambió `deploy/cron/crontab`, recrea el contenedor del cron.**
-El crontab está montado como un archivo suelto, y `git pull` lo reemplaza por
-otro inodo: el contenedor sigue viendo el viejo, y `up -d --build` no lo
-recrea porque su definición no cambió. Una ruta de cron nueva simplemente
-nunca corre, sin ningún error.
+**Si el pull cambió `deploy/cron/crontab` o `deploy/cron/tick.sh`, reinicia el
+contenedor del cron.** El contenedor copia los dos archivos al arrancar, así
+que hasta el siguiente arranque sigue con la versión anterior, y `up -d
+--build` no lo reinicia porque su definición no cambió. Una ruta de cron nueva
+simplemente no corre, sin ningún error.
 
 ```bash
 docker compose -f docker-compose.yml -f deploy/docker-compose.app.yml \
-  --env-file deploy/.env up -d --force-recreate cron
-docker logs crm-cron --tail 20   # cada ruta debe aparecer con «ok»
+  --env-file deploy/.env restart cron
+docker logs crm-cron --tail 20   # debe aparecer un «ok /api/automations/cron» por minuto
 ```
+
+Copia y no monta directo porque **busybox crond solo carga un crontab cuyo
+dueño es root**, y un bind mount conserva el dueño del host (`crm`). Montado
+directo, lo descartaba sin avisar: del 2026-08-20 al 2026-09-15 el cron no
+ejecutó ninguna tarea, y el tick de arranque —que lanza el shell, no crond—
+lo tapaba.
 
 Las rutas que llama hoy: `/api/automations/cron` (cada minuto, los pasos
 Wait), `/api/broadcasts/cron` (cada 5 minutos, los recordatorios de
@@ -351,9 +357,9 @@ Síntomas reales de este despliegue, con su causa:
 | **Ninguna foto** carga en la vitrina | El host de Storage no está en `remotePatterns` de `next/image` | Se deriva de `NEXT_PUBLIC_SUPABASE_URL`; si cambió el dominio, **reconstruir** |
 | Caddy no emite certificado | DNS sin propagar, o algo ocupando el 80 | `dig +short loramotors.co` y `sudo ss -tlnp \| grep ':80'` |
 | Una regla de Caddy «no hace nada» | Al mezclar `handle` con directivas sueltas, Caddy usa **su** orden, no el del archivo | Meter todo lo del host dentro de bloques `handle` |
-| Los pasos Wait no avanzan | El cron no corre o su secreto no coincide | `docker logs crm-cron` — 401 es secreto distinto, 503 es que el app no lo tiene |
+| Los pasos Wait no avanzan | El cron no corre o su secreto no coincide | `docker logs crm-cron` debe mostrar un «ok /api/automations/cron» por minuto. Solo el del arranque y ninguno más: crond no cargó el crontab (tiene que ser de root; el contenedor lo copia al arrancar). 401 es secreto distinto, 503 es que el app no lo tiene |
 | Un contacto deja de disparar flujos | Su flow run abandonado bloquea `idx_one_active_run_per_contact` | Es lo que barre `/api/flows/cron`; comprobar que el cron corre |
-| Los recordatorios de una difusión no salen («Vencidos sin enviar» sube) | Fuera del horario de atención es lo esperado. Si no: el cron no tiene la ruta porque no se recreó tras cambiar el crontab | `docker logs crm-cron` debe mostrar `ok /api/broadcasts/cron`; si no aparece, recrear el cron (ver «Actualizar el CRM») |
+| Los recordatorios de una difusión no salen («Vencidos sin enviar» sube) | Fuera del horario de atención es lo esperado. Si no: el cron no tiene la ruta porque no se recreó tras cambiar el crontab | `docker logs crm-cron` debe mostrar `ok /api/broadcasts/cron` cada 5 minutos; si no aparece, reiniciar el cron (ver «Actualizar el CRM») |
 | Fallos de auth intermitentes | Reloj desfasado: los JWT caducan por tiempo | `timedatectl status \| grep synchronized` |
 | Un `.sh` da `Permission denied` | Perdió el bit ejecutable | `git ls-files -s scripts/` — debe decir `100755`, no `100644` |
 | El webhook **no recibe nada**, pero el botón «Probar» de Meta sí llega | Meta todavía no propagó el enrutamiento de eventos de la WABA | Esperar ~1 h antes de tocar nada — ver la sección siguiente |
