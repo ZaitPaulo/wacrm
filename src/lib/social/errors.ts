@@ -40,6 +40,15 @@ export type PublishStep = 'container' | 'publish' | 'other';
 export interface SocialPublishErrorOptions {
   code?: number | null;
   /**
+   * Meta anunció el fallo como suyo y pasajero.
+   *
+   * No cambia lo que hace el sistema —la fila queda fallida igual y la
+   * persona decide si la devuelve a la cola—, pero sí lo que se le
+   * dice: un hipo de Meta y una foto rechazada se leen igual de mal en
+   * inglés, y sólo uno de los dos se arregla tocando el vehículo.
+   */
+  transient?: boolean;
+  /**
    * ¿La red contestó?
    *
    * `true` incluso cuando contestó un error: la operación tuvo un
@@ -63,6 +72,8 @@ export class SocialPublishError extends Error {
   readonly code: number | null;
   readonly answered: boolean;
   readonly step: PublishStep;
+  /** Meta lo dio por pasajero: reintentar igual suele bastar. */
+  readonly transient: boolean;
 
   constructor(
     message: string,
@@ -75,6 +86,7 @@ export class SocialPublishError extends Error {
     this.code = options.code ?? null;
     this.answered = options.answered ?? true;
     this.step = options.step ?? 'other';
+    this.transient = options.transient ?? false;
   }
 }
 
@@ -97,6 +109,7 @@ interface MetaErrorBody {
     code?: number;
     type?: string;
     error_subcode?: number;
+    is_transient?: boolean;
   };
 }
 
@@ -117,6 +130,25 @@ function isCredentialCode(code: number): boolean {
 }
 
 /**
+ * El código 2 de Meta, "An unexpected error has occurred. Please retry
+ * your request later.".
+ *
+ * Es el hipo genérico de su lado. Lo vimos tumbar un carrusel de diez
+ * fotos dos veces seguidas el 2026-09-17; el tercer intento publicó sin
+ * que nadie tocara el vehículo ni las fotos.
+ */
+const META_UNEXPECTED_ERROR = 2;
+
+/**
+ * Lo que se le dice a la persona cuando el fallo fue de Meta.
+ *
+ * Descarta de entrada las dos cosas que va a revisar primero —el
+ * vehículo y las fotos— porque son justo las que no hay que tocar.
+ */
+const TRANSIENT_MESSAGE =
+  'Instagram falló por un problema temporal suyo, no por el vehículo ni por las fotos. Devuélvelo a la cola para volver a intentarlo.';
+
+/**
  * Convierte una respuesta fallida de Meta en un `SocialPublishError` con
  * su categoría. Vale para cualquiera de sus redes.
  *
@@ -132,12 +164,14 @@ export async function metaErrorFromResponse(
   let message = fallback;
   let code: number | null = null;
   let type: string | undefined;
+  let isTransient = false;
 
   try {
     const body = (await response.json()) as MetaErrorBody;
     if (body.error?.message) message = body.error.message;
     if (typeof body.error?.code === 'number') code = body.error.code;
     type = body.error?.type;
+    isTransient = body.error?.is_transient === true;
   } catch {
     // El cuerpo no era JSON — se conserva el fallback.
   }
@@ -156,9 +190,23 @@ export async function metaErrorFromResponse(
   const kind: PublishFailureKind =
     byStatus || byType || byCode ? 'credentials' : 'content';
 
+  // Un fallo pasajero se cuenta como tal SOLO si no es de credenciales:
+  // un token vencido no se arregla esperando, y sugerir que se reintente
+  // mandaría a la persona a insistir contra una puerta cerrada.
+  const transient =
+    kind === 'content' && (isTransient || code === META_UNEXPECTED_ERROR);
+
   // La red contestó, aunque haya contestado un error: el desenlace
-  // es conocido y la fila puede marcarse fallida sin ambigüedad.
-  return new SocialPublishError(message, kind, { code, answered: true, step });
+  // es conocido y la fila puede marcarse fallida sin ambigüedad. El
+  // mensaje de Meta se reemplaza solo cuando no dice nada accionable;
+  // un rechazo real del contenido llega tal cual, que es lo único que
+  // avisa de que hay que tocar el vehículo.
+  return new SocialPublishError(transient ? TRANSIENT_MESSAGE : message, kind, {
+    code,
+    answered: true,
+    step,
+    transient,
+  });
 }
 
 /**

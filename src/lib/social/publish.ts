@@ -266,10 +266,19 @@ async function recordFailure(
   err: unknown
 ): Promise<PublishOutcome> {
   const reason = err instanceof Error ? err.message : String(err);
+  // El código y el paso de Meta van al log SIEMPRE. Sin ellos, cada
+  // fallo obliga a reconstruir a mano desde el servidor en qué momento
+  // se cayó y qué dijo Meta — que es justo lo que costó el 2026-09-17.
+  const detail =
+    err instanceof SocialPublishError
+      ? ` [meta_code=${err.code ?? '—'} step=${err.step}${
+          err.transient ? ' transient' : ''
+        }]`
+      : '';
 
   if (isOutcomeUnknown(err)) {
     console.error(
-      `[social publish] desenlace desconocido (${network}):`,
+      `[social publish] desenlace desconocido (${network})${detail}:`,
       reason
     );
     await db
@@ -284,7 +293,7 @@ async function recordFailure(
   }
 
   const kind = err instanceof SocialPublishError ? err.kind : 'content';
-  console.error(`[social publish] falló ${network} (${kind}):`, reason);
+  console.error(`[social publish] falló ${network} (${kind})${detail}:`, reason);
 
   await db
     .from('social_posts')
