@@ -6,6 +6,7 @@ import {
 } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { buildVehiclePayload } from '@/lib/inventory/payload'
+import { describeDbError } from '@/lib/inventory/db-error'
 import { persistAcquisition } from '@/lib/inventory/acquisitions'
 import { ownerContactError } from '@/lib/inventory/owner'
 import { syncVehicleKnowledge } from '@/lib/inventory/knowledge-sync'
@@ -83,7 +84,10 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null)
     const parsed = buildVehiclePayload(body, { partial: false })
     if ('error' in parsed) {
-      return NextResponse.json({ error: parsed.error }, { status: 400 })
+      return NextResponse.json(
+        { error: parsed.error, field: parsed.field },
+        { status: 400 },
+      )
     }
     const ownerError = await ownerContactError(
       supabase,
@@ -91,7 +95,10 @@ export async function POST(request: Request) {
       parsed.value.owner_contact_id,
     )
     if (ownerError) {
-      return NextResponse.json({ error: ownerError }, { status: 400 })
+      return NextResponse.json(
+        { error: ownerError, field: 'owner_contact_id' },
+        { status: 400 },
+      )
     }
 
     // `public_ref` no se manda: lo genera el DEFAULT de la migración 508.
@@ -102,15 +109,10 @@ export async function POST(request: Request) {
       .single()
     if (error || !created) {
       console.error('[inventory POST] insert error:', error)
-      if (error?.code === '23505') {
-        return NextResponse.json(
-          { error: 'Ya existe un vehículo con esa placa o VIN' },
-          { status: 409 },
-        )
-      }
+      const described = describeDbError(error, 'No se pudo crear el vehículo')
       return NextResponse.json(
-        { error: 'No se pudo crear el vehículo' },
-        { status: 500 },
+        { error: described.error },
+        { status: described.status },
       )
     }
 
@@ -120,7 +122,7 @@ export async function POST(request: Request) {
     const acq = await persistAcquisition(supabase, accountId, created.id, role, body)
     if (acq.error) {
       return NextResponse.json(
-        { error: acq.error, id: created.id },
+        { error: acq.error, field: acq.field, id: created.id },
         { status: acq.status ?? 500 },
       )
     }

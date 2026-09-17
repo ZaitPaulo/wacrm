@@ -14,6 +14,7 @@ import { canViewMargins } from '@/lib/auth/roles'
 import type { AccountRole } from '@/lib/auth/roles'
 import type { getCurrentAccount } from '@/lib/auth/account'
 import { buildAcquisitionPayload } from './payload'
+import { describeDbError } from './db-error'
 
 type SupabaseClient = Awaited<ReturnType<typeof getCurrentAccount>>['supabase']
 
@@ -30,9 +31,9 @@ export async function persistAcquisition(
   vehicleId: string,
   role: AccountRole,
   body: unknown,
-): Promise<{ error?: string; status?: number }> {
+): Promise<{ error?: string; status?: number; field?: string }> {
   const parsed = buildAcquisitionPayload(body)
-  if ('error' in parsed) return { error: parsed.error, status: 400 }
+  if ('error' in parsed) return { error: parsed.error, field: parsed.field, status: 400 }
 
   const touchesAcquisition = parsed.clear || parsed.value !== null
   if (!touchesAcquisition) return {}
@@ -70,7 +71,7 @@ export async function persistAcquisition(
   )
   if (error) {
     console.error('[acquisitions] upsert error:', error)
-    return { error: 'No se pudo guardar el costo de compra', status: 500 }
+    return describeDbError(error, 'No se pudo guardar el costo de compra')
   }
 
   return {}

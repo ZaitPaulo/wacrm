@@ -67,11 +67,100 @@ export interface AcquisitionPayload {
   purchase_date: string | null
 }
 
-type Result = { value: VehiclePayload } | { error: string }
+/**
+ * Error de validación. `field` es el nombre de la columna que falló, y
+ * viaja hasta el formulario para que marque ese input en rojo y lleve al
+ * usuario hasta él en vez de dejarlo buscar a ojo cuál corregir.
+ */
+export interface PayloadError {
+  error: string
+  field?: string
+}
+
+type Result = { value: VehiclePayload } | PayloadError
 
 /** Devuelve el string recortado, o undefined si no es un string. */
 function str(v: unknown): string | undefined {
   return typeof v === 'string' ? v.trim() : undefined
+}
+
+/**
+ * Normaliza una fecha recibida del cliente.
+ *
+ * El año se limita al mismo rango que `year` (1900–2100), y no por gusto:
+ * en un `<input type="date">` es fácil teclear el año de más y mandar
+ * "112026-07-15". `Date.parse` lo acepta, `toISOString()` lo devuelve en
+ * formato extendido ("+112026-07-15T00:00:00.000Z") y recortarlo a diez
+ * caracteres dejaba "+112026-07". Postgres leía ese "+112026" como
+ * desplazamiento de zona horaria y abortaba el INSERT con un 22009 que
+ * llegaba al usuario como "No se pudo crear el vehículo", sin decir qué
+ * campo era el culpable.
+ *
+ * @param raw Valor recibido, sin confiar.
+ * @param dateOnly `true` recorta a YYYY-MM-DD (columnas DATE); `false`
+ *   devuelve el ISO completo (columnas TIMESTAMPTZ).
+ * @returns La fecha normalizada, o `null` si no es utilizable.
+ */
+function normalizeDate(raw: unknown, dateOnly: boolean): string | null {
+  const s = str(raw)
+  if (!s) return null
+  const ms = Date.parse(s)
+  if (Number.isNaN(ms)) return null
+  const d = new Date(ms)
+  const year = d.getUTCFullYear()
+  if (year < 1900 || year > 2100) return null
+  const iso = d.toISOString()
+  return dateOnly ? iso.slice(0, 10) : iso
+}
+
+/** Error de fecha inválida, con el nombre del campo tal como lo ve el usuario. */
+function dateError(field: string, label: string): PayloadError {
+  return {
+    error: `Revisa la fecha de ${label}: el año debe estar entre 1900 y 2100`,
+    field,
+  }
+}
+
+/**
+ * Nombre de cada campo TAL COMO APARECE en el formulario de /inventory
+ * (ver `Inventory.fields` en `messages/es.json`).
+ *
+ * El mensaje de error es lo único que el usuario tiene para saber qué
+ * corregir, y "fuel_type inválido" no le dice nada a quien está mirando
+ * un campo rotulado «Combustible». Al renombrar una etiqueta en pantalla
+ * hay que actualizarla también acá.
+ */
+const LABELS = {
+  brand: 'Marca',
+  model: 'Línea',
+  year: 'Año',
+  license_plate: 'Placa',
+  vin: 'VIN',
+  price: 'Precio',
+  mileage: 'Kilometraje',
+  transmission: 'Transmisión',
+  fuel_type: 'Combustible',
+  body_type: 'Carrocería',
+  condition: 'Condición',
+  color: 'Color',
+  doors: 'Puertas',
+  status: 'Estado',
+  warranty_price: 'Precio con garantía',
+  features: 'Características',
+  images: 'Imágenes',
+  internal_notes: 'Notas internas',
+  sold_price: 'Precio de venta',
+  sold_to_contact_id: 'Comprador',
+  owner_contact_id: 'Propietario',
+  purchase_cost: 'Costo de compra',
+  has_lien: 'Tiene prenda',
+  on_display: 'En vitrina física',
+  accepts_trade_in: 'Recibe permuta',
+} as const
+
+/** Error de un campo concreto, con el rótulo que el usuario tiene enfrente. */
+function fieldError(key: keyof typeof LABELS, problem: string): PayloadError {
+  return { error: `Revisa «${LABELS[key]}»: ${problem}`, field: key }
 }
 
 /**
@@ -94,30 +183,30 @@ export function buildVehiclePayload(
   // brand
   if (b.brand !== undefined) {
     const s = str(b.brand)
-    if (!s) return { error: 'brand es obligatorio' }
+    if (!s) return fieldError('brand', 'es obligatoria')
     out.brand = s
   } else if (!opts.partial) {
-    return { error: 'brand es obligatorio' }
+    return fieldError('brand', 'es obligatoria')
   }
 
   // model
   if (b.model !== undefined) {
     const s = str(b.model)
-    if (!s) return { error: 'model es obligatorio' }
+    if (!s) return fieldError('model', 'es obligatoria')
     out.model = s
   } else if (!opts.partial) {
-    return { error: 'model es obligatorio' }
+    return fieldError('model', 'es obligatoria')
   }
 
   // year
   if (b.year !== undefined) {
     const n = Number(b.year)
     if (!Number.isInteger(n) || n < 1900 || n > 2100) {
-      return { error: 'year debe ser un entero entre 1900 y 2100' }
+      return fieldError('year', 'debe ser un número entero entre 1900 y 2100')
     }
     out.year = n
   } else if (!opts.partial) {
-    return { error: 'year es obligatorio' }
+    return fieldError('year', 'es obligatorio')
   }
 
   // license_plate / vin — strings anulables
@@ -128,7 +217,7 @@ export function buildVehiclePayload(
   if (b.price !== undefined) {
     const n = Number(b.price)
     if (!Number.isFinite(n) || n < 0) {
-      return { error: 'price debe ser un número >= 0' }
+      return fieldError('price', 'debe ser un número de 0 en adelante')
     }
     out.price = n
   }
@@ -139,32 +228,35 @@ export function buildVehiclePayload(
   } else if (b.mileage !== undefined) {
     const n = Number(b.mileage)
     if (!Number.isInteger(n) || n < 0) {
-      return { error: 'mileage debe ser un entero >= 0' }
+      return fieldError('mileage', 'debe ser un número entero de 0 en adelante')
     }
     out.mileage = n
   }
 
   // Enums estructurados (anulables): valor válido o null.
-  const enumFields: [keyof VehiclePayload, unknown, readonly string[], string][] = [
-    ['transmission', b.transmission, TRANSMISSION_VALUES, 'transmission'],
-    ['fuel_type', b.fuel_type, FUEL_TYPE_VALUES, 'fuel_type'],
-    ['body_type', b.body_type, BODY_TYPE_VALUES, 'body_type'],
+  // El rótulo del mensaje ya no se repite acá: sale de LABELS por la
+  // misma clave, así que la columna y el nombre en pantalla no pueden
+  // quedar desalineados.
+  const enumFields: [keyof typeof LABELS, unknown, readonly string[]][] = [
+    ['transmission', b.transmission, TRANSMISSION_VALUES],
+    ['fuel_type', b.fuel_type, FUEL_TYPE_VALUES],
+    ['body_type', b.body_type, BODY_TYPE_VALUES],
   ]
-  for (const [key, raw, values, name] of enumFields) {
+  for (const [key, raw, values] of enumFields) {
     if (raw === undefined) continue
     if (raw === null || raw === '') {
       ;(out as Record<string, unknown>)[key] = null
     } else if (typeof raw === 'string' && values.includes(raw)) {
       ;(out as Record<string, unknown>)[key] = raw
     } else {
-      return { error: `${name} inválido` }
+      return fieldError(key, 'el valor elegido no es válido')
     }
   }
 
   // condition — no anulable (default 'used' en DB)
   if (b.condition !== undefined) {
     if (typeof b.condition !== 'string' || !CONDITION_VALUES.includes(b.condition)) {
-      return { error: 'condition inválido' }
+      return fieldError('condition', 'el valor elegido no es válido')
     }
     out.condition = b.condition
   }
@@ -178,7 +270,7 @@ export function buildVehiclePayload(
   } else if (b.doors !== undefined) {
     const n = Number(b.doors)
     if (!Number.isInteger(n) || n < 0) {
-      return { error: 'doors debe ser un entero >= 0' }
+      return fieldError('doors', 'debe ser un número entero de 0 en adelante')
     }
     out.doors = n
   }
@@ -186,7 +278,7 @@ export function buildVehiclePayload(
   // status
   if (b.status !== undefined) {
     if (!VEHICLE_STATUSES.includes(b.status as VehicleStatusValue)) {
-      return { error: 'status inválido' }
+      return fieldError('status', 'el valor elegido no es válido')
     }
     out.status = b.status as VehicleStatusValue
   }
@@ -207,7 +299,7 @@ export function buildVehiclePayload(
   } else if (b.warranty_price !== undefined) {
     const n = Number(b.warranty_price)
     if (!Number.isFinite(n) || n < 0) {
-      return { error: 'warranty_price debe ser un número >= 0' }
+      return fieldError('warranty_price', 'debe ser un número de 0 en adelante')
     }
     out.warranty_price = n
   }
@@ -215,19 +307,25 @@ export function buildVehiclePayload(
   // Vencimientos de SOAT y tecnomecánica. Se guardan como DATE, así que
   // se recorta a YYYY-MM-DD: conservar la hora haría que un vencimiento
   // se corriera un día según la zona horaria de quien lo consulte.
-  const dateFields: ['soat_expires_at' | 'tecnomecanica_expires_at', unknown][] = [
-    ['soat_expires_at', b.soat_expires_at],
-    ['tecnomecanica_expires_at', b.tecnomecanica_expires_at],
+  const dateFields: [
+    'soat_expires_at' | 'tecnomecanica_expires_at',
+    unknown,
+    string,
+  ][] = [
+    ['soat_expires_at', b.soat_expires_at, 'vencimiento del SOAT'],
+    [
+      'tecnomecanica_expires_at',
+      b.tecnomecanica_expires_at,
+      'vencimiento de la tecnomecánica',
+    ],
   ]
-  for (const [key, raw] of dateFields) {
+  for (const [key, raw, label] of dateFields) {
     if (raw === null || raw === '') {
       out[key] = null
     } else if (raw !== undefined) {
-      const v = str(raw)
-      if (!v || Number.isNaN(Date.parse(v))) {
-        return { error: `${key} debe ser una fecha válida` }
-      }
-      out[key] = new Date(v).toISOString().slice(0, 10)
+      const v = normalizeDate(raw, true)
+      if (!v) return dateError(key, label)
+      out[key] = v
     }
   }
 
@@ -240,7 +338,7 @@ export function buildVehiclePayload(
   ]
   for (const [key, raw] of boolFields) {
     if (raw === undefined || raw === null) continue
-    if (typeof raw !== 'boolean') return { error: `${key} debe ser booleano` }
+    if (typeof raw !== 'boolean') return fieldError(key, 'sólo admite sí o no')
     out[key] = raw
   }
 
@@ -250,14 +348,14 @@ export function buildVehiclePayload(
     else if (typeof b.features === 'object') {
       out.features = b.features as Record<string, unknown> | unknown[]
     } else {
-      return { error: 'features debe ser un objeto o arreglo JSON' }
+      return fieldError('features', 'tienen un formato que el sistema no entiende')
     }
   }
 
   // images — arreglo de URLs
   if (b.images !== undefined) {
     if (!Array.isArray(b.images) || b.images.some((x) => typeof x !== 'string')) {
-      return { error: 'images debe ser un arreglo de URLs' }
+      return fieldError('images', 'tienen un formato que el sistema no entiende')
     }
     out.images = (b.images as string[]).map((s) => s.trim()).filter(Boolean)
   }
@@ -273,7 +371,7 @@ export function buildVehiclePayload(
   } else if (b.sold_price !== undefined) {
     const n = Number(b.sold_price)
     if (!Number.isFinite(n) || n < 0) {
-      return { error: 'sold_price debe ser un número >= 0' }
+      return fieldError('sold_price', 'debe ser un número de 0 en adelante')
     }
     out.sold_price = n
   }
@@ -281,18 +379,16 @@ export function buildVehiclePayload(
   if (b.sold_at === null || b.sold_at === '') {
     out.sold_at = null
   } else if (b.sold_at !== undefined) {
-    const s = str(b.sold_at)
-    if (!s || Number.isNaN(Date.parse(s))) {
-      return { error: 'sold_at debe ser una fecha válida' }
-    }
-    out.sold_at = new Date(s).toISOString()
+    const v = normalizeDate(b.sold_at, false)
+    if (!v) return dateError('sold_at', 'venta')
+    out.sold_at = v
   }
 
   if (b.sold_to_contact_id === null || b.sold_to_contact_id === '') {
     out.sold_to_contact_id = null
   } else if (b.sold_to_contact_id !== undefined) {
     const s = str(b.sold_to_contact_id)
-    if (!s) return { error: 'sold_to_contact_id inválido' }
+    if (!s) return fieldError('sold_to_contact_id', 'el contacto elegido no es válido')
     out.sold_to_contact_id = s
   }
 
@@ -303,12 +399,12 @@ export function buildVehiclePayload(
     out.owner_contact_id = null
   } else if (b.owner_contact_id !== undefined) {
     const s = str(b.owner_contact_id)
-    if (!s) return { error: 'owner_contact_id inválido' }
+    if (!s) return fieldError('owner_contact_id', 'el contacto elegido no es válido')
     out.owner_contact_id = s
   }
 
   const coherence = applySoldCoherence(out)
-  if (coherence) return { error: coherence }
+  if (coherence) return coherence
 
   return { value: out }
 }
@@ -324,7 +420,7 @@ export function buildVehiclePayload(
  *
  * @returns un mensaje de error, o `null` si el payload quedó coherente.
  */
-function applySoldCoherence(out: VehiclePayload): string | null {
+function applySoldCoherence(out: VehiclePayload): PayloadError | null {
   if (out.status === undefined) return null
 
   if (out.status === 'sold') {
@@ -332,7 +428,10 @@ function applySoldCoherence(out: VehiclePayload): string | null {
     // dependen margen, ingresos y ticket promedio. Sin él la venta
     // entraría al tablero como un hueco silencioso.
     if (out.sold_price === undefined || out.sold_price === null) {
-      return 'Al marcar como vendido hay que indicar el precio de venta'
+      return {
+        error: 'Al marcar como vendido hay que indicar el precio de venta',
+        field: 'sold_price',
+      }
     }
     // La fecha sí tiene default razonable: hoy.
     if (out.sold_at === undefined || out.sold_at === null) {
@@ -361,7 +460,7 @@ function applySoldCoherence(out: VehiclePayload): string | null {
  */
 export function buildAcquisitionPayload(
   body: unknown,
-): { value: AcquisitionPayload | null; clear: boolean } | { error: string } {
+): { value: AcquisitionPayload | null; clear: boolean } | PayloadError {
   if (!body || typeof body !== 'object') return { value: null, clear: false }
   const b = body as Record<string, unknown>
 
@@ -377,17 +476,14 @@ export function buildAcquisitionPayload(
 
   const cost = Number(b.purchase_cost)
   if (!Number.isFinite(cost) || cost < 0) {
-    return { error: 'purchase_cost debe ser un número >= 0' }
+    return fieldError('purchase_cost', 'debe ser un número de 0 en adelante')
   }
 
   let date: string | null = null
   if (b.purchase_date !== null && b.purchase_date !== undefined && b.purchase_date !== '') {
-    const s = str(b.purchase_date)
-    if (!s || Number.isNaN(Date.parse(s))) {
-      return { error: 'purchase_date debe ser una fecha válida' }
-    }
     // DATE en la base: sólo la parte de fecha, sin hora ni zona.
-    date = new Date(s).toISOString().slice(0, 10)
+    date = normalizeDate(b.purchase_date, true)
+    if (!date) return dateError('purchase_date', 'compra')
   }
 
   return { value: { purchase_cost: cost, purchase_date: date }, clear: false }

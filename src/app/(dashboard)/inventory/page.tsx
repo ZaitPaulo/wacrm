@@ -241,6 +241,31 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Rango aceptado por todos los campos de fecha del formulario, igual al
+// que valida la API. El navegador marca el campo en rojo antes de enviar
+// en lugar de dejar pasar un año de cinco o seis cifras —tecleado de más
+// sin querer— que la base rechazaba con un error opaco.
+const DATE_MIN = '1900-01-01';
+const DATE_MAX = '2100-12-31';
+
+/**
+ * Lleva la vista hasta el campo que la API rechazó y le da el foco.
+ *
+ * El `id` del input es el nombre de la columna, así que el campo llega
+ * desde la API sin traducción de por medio. Se espera un cuadro para que
+ * el diálogo haya terminado de repintar; si el campo no está en pantalla
+ * (una sección que sólo aparece al vender, o un costo que este rol no
+ * ve), no pasa nada: el mensaje del toast sigue siendo la guía.
+ */
+function focusField(field: string) {
+  requestAnimationFrame(() => {
+    const el = document.getElementById(field);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.focus({ preventScroll: true });
+  });
+}
+
 /** Columnas por las que se puede ordenar la tabla. */
 type SortKey =
   | 'vehicle'
@@ -511,6 +536,11 @@ export default function InventoryPage() {
   }
 
   const [saving, setSaving] = useState(false);
+  // Campo que la API señaló como culpable del último rechazo. El `id` de
+  // cada input coincide a propósito con el nombre de la columna que
+  // devuelve la API, así que alcanza para pintarlo en rojo y llevar al
+  // usuario hasta él sin traducir nada por el camino.
+  const [errorField, setErrorField] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -604,12 +634,14 @@ export default function InventoryPage() {
 
   function openCreate() {
     setEditing(null);
+    setErrorField(null);
     setDraft(EMPTY_DRAFT);
     setDialogOpen(true);
   }
 
   function openEdit(v: InventoryVehicle) {
     setEditing(v);
+    setErrorField(null);
     setDraft(draftFromVehicle(v));
     setDialogOpen(true);
   }
@@ -692,7 +724,13 @@ export default function InventoryPage() {
         }
       );
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Error al guardar');
+      if (!res.ok) {
+        const field = typeof json.field === 'string' ? json.field : null;
+        setErrorField(field);
+        if (field) focusField(field);
+        throw new Error(json.error || 'Error al guardar');
+      }
+      setErrorField(null);
 
       if (json.warning) toast.warning(json.warning);
       else toast.success(editing ? t('toasts.updated') : t('toasts.created'));
@@ -977,6 +1015,7 @@ export default function InventoryPage() {
               <Label htmlFor="brand">{t('fields.brand')}</Label>
               <Input
                 id="brand"
+                aria-invalid={errorField === 'brand'}
                 value={draft.brand}
                 onChange={(e) => setDraft({ ...draft, brand: e.target.value })}
               />
@@ -985,6 +1024,7 @@ export default function InventoryPage() {
               <Label htmlFor="model">{t('fields.model')}</Label>
               <Input
                 id="model"
+                aria-invalid={errorField === 'model'}
                 value={draft.model}
                 onChange={(e) => setDraft({ ...draft, model: e.target.value })}
               />
@@ -993,6 +1033,7 @@ export default function InventoryPage() {
               <Label htmlFor="year">{t('fields.year')}</Label>
               <Input
                 id="year"
+                aria-invalid={errorField === 'year'}
                 type="number"
                 value={draft.year}
                 onChange={(e) => setDraft({ ...draft, year: e.target.value })}
@@ -1006,7 +1047,7 @@ export default function InventoryPage() {
                   setDraft({ ...draft, status: value as VehicleStatus })
                 }
               >
-                <SelectTrigger id="status">
+                <SelectTrigger id="status" aria-invalid={errorField === 'status'}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1022,6 +1063,7 @@ export default function InventoryPage() {
               <Label htmlFor="price">{t('fields.price')}</Label>
               <Input
                 id="price"
+                aria-invalid={errorField === 'price'}
                 type="number"
                 value={draft.price}
                 onChange={(e) => setDraft({ ...draft, price: e.target.value })}
@@ -1031,6 +1073,7 @@ export default function InventoryPage() {
               <Label htmlFor="mileage">{t('fields.mileage')}</Label>
               <Input
                 id="mileage"
+                aria-invalid={errorField === 'mileage'}
                 type="number"
                 value={draft.mileage}
                 onChange={(e) =>
@@ -1056,6 +1099,7 @@ export default function InventoryPage() {
                     <Label htmlFor="purchase_cost">{t('purchase.cost')}</Label>
                     <Input
                       id="purchase_cost"
+                      aria-invalid={errorField === 'purchase_cost'}
                       type="number"
                       value={draft.purchase_cost}
                       onChange={(e) =>
@@ -1067,7 +1111,10 @@ export default function InventoryPage() {
                     <Label htmlFor="purchase_date">{t('purchase.date')}</Label>
                     <Input
                       id="purchase_date"
+                      aria-invalid={errorField === 'purchase_date'}
                       type="date"
+                      min={DATE_MIN}
+                      max={DATE_MAX}
                       value={draft.purchase_date}
                       onChange={(e) =>
                         setDraft({ ...draft, purchase_date: e.target.value })
@@ -1095,6 +1142,7 @@ export default function InventoryPage() {
                     <Label htmlFor="sold_price">{t('sale.price')}</Label>
                     <Input
                       id="sold_price"
+                      aria-invalid={errorField === 'sold_price'}
                       type="number"
                       value={draft.sold_price}
                       // Se propone el precio de lista para no teclearlo de
@@ -1109,7 +1157,10 @@ export default function InventoryPage() {
                     <Label htmlFor="sold_at">{t('sale.date')}</Label>
                     <Input
                       id="sold_at"
+                      aria-invalid={errorField === 'sold_at'}
                       type="date"
+                      min={DATE_MIN}
+                      max={DATE_MAX}
                       value={draft.sold_at || today()}
                       onChange={(e) =>
                         setDraft({ ...draft, sold_at: e.target.value })
@@ -1132,7 +1183,7 @@ export default function InventoryPage() {
                         })
                       }
                     >
-                      <SelectTrigger id="sold_to_contact_id">
+                      <SelectTrigger id="sold_to_contact_id" aria-invalid={errorField === 'sold_to_contact_id'}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1154,6 +1205,7 @@ export default function InventoryPage() {
               <Label htmlFor="license_plate">{t('fields.plate')}</Label>
               <Input
                 id="license_plate"
+                aria-invalid={errorField === 'license_plate'}
                 value={draft.license_plate}
                 onChange={(e) =>
                   setDraft({ ...draft, license_plate: e.target.value })
@@ -1166,6 +1218,7 @@ export default function InventoryPage() {
               <Label htmlFor="owner_contact_id">{t('owner.label')}</Label>
               <ContactPicker
                 id="owner_contact_id"
+                aria-invalid={errorField === 'owner_contact_id'}
                 contacts={contacts}
                 value={draft.owner_contact_id}
                 onChange={(id) => setDraft({ ...draft, owner_contact_id: id })}
@@ -1186,7 +1239,7 @@ export default function InventoryPage() {
                   setDraft({ ...draft, transmission: v ?? '' })
                 }
               >
-                <SelectTrigger id="transmission">
+                <SelectTrigger id="transmission" aria-invalid={errorField === 'transmission'}>
                   <SelectValue placeholder={t('fields.selectPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -1206,7 +1259,7 @@ export default function InventoryPage() {
                   setDraft({ ...draft, fuel_type: v ?? '' })
                 }
               >
-                <SelectTrigger id="fuel_type">
+                <SelectTrigger id="fuel_type" aria-invalid={errorField === 'fuel_type'}>
                   <SelectValue placeholder="Selecciona…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1226,7 +1279,7 @@ export default function InventoryPage() {
                   setDraft({ ...draft, body_type: v ?? '' })
                 }
               >
-                <SelectTrigger id="body_type">
+                <SelectTrigger id="body_type" aria-invalid={errorField === 'body_type'}>
                   <SelectValue placeholder="Selecciona…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1246,7 +1299,7 @@ export default function InventoryPage() {
                   setDraft({ ...draft, condition: v ?? 'used' })
                 }
               >
-                <SelectTrigger id="condition">
+                <SelectTrigger id="condition" aria-invalid={errorField === 'condition'}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1262,6 +1315,7 @@ export default function InventoryPage() {
               <Label htmlFor="color">{t('fields.color')}</Label>
               <Input
                 id="color"
+                aria-invalid={errorField === 'color'}
                 value={draft.color}
                 onChange={(e) => setDraft({ ...draft, color: e.target.value })}
               />
@@ -1295,6 +1349,7 @@ export default function InventoryPage() {
               <div className="flex gap-2">
                 <Input
                   id="warranty_price"
+                  aria-invalid={errorField === 'warranty_price'}
                   type="number"
                   value={draft.warranty_price}
                   onChange={(e) =>
@@ -1331,7 +1386,10 @@ export default function InventoryPage() {
               <Label htmlFor="soat_expires_at">{t('fields.soat')}</Label>
               <Input
                 id="soat_expires_at"
+                aria-invalid={errorField === 'soat_expires_at'}
                 type="date"
+                min={DATE_MIN}
+                max={DATE_MAX}
                 value={draft.soat_expires_at}
                 onChange={(e) =>
                   setDraft({ ...draft, soat_expires_at: e.target.value })
@@ -1344,7 +1402,10 @@ export default function InventoryPage() {
               </Label>
               <Input
                 id="tecnomecanica_expires_at"
+                aria-invalid={errorField === 'tecnomecanica_expires_at'}
                 type="date"
+                min={DATE_MIN}
+                max={DATE_MAX}
                 value={draft.tecnomecanica_expires_at}
                 onChange={(e) =>
                   setDraft({
@@ -1403,6 +1464,7 @@ export default function InventoryPage() {
               <Label htmlFor="features">{t('fields.features')}</Label>
               <Textarea
                 id="features"
+                aria-invalid={errorField === 'features'}
                 rows={4}
                 placeholder={t('fields.featuresPlaceholder')}
                 value={draft.featuresText}
@@ -1462,6 +1524,7 @@ export default function InventoryPage() {
               </Label>
               <Textarea
                 id="internal_notes"
+                aria-invalid={errorField === 'internal_notes'}
                 rows={2}
                 value={draft.internal_notes}
                 onChange={(e) =>

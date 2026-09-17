@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { buildVehiclePayload } from '@/lib/inventory/payload'
+import { describeDbError } from '@/lib/inventory/db-error'
 import { persistAcquisition } from '@/lib/inventory/acquisitions'
 import { ownerContactError } from '@/lib/inventory/owner'
 import {
@@ -30,7 +31,10 @@ export async function PATCH(request: Request, { params }: Params) {
     const body = await request.json().catch(() => null)
     const parsed = buildVehiclePayload(body, { partial: true })
     if ('error' in parsed) {
-      return NextResponse.json({ error: parsed.error }, { status: 400 })
+      return NextResponse.json(
+        { error: parsed.error, field: parsed.field },
+        { status: 400 },
+      )
     }
     const ownerError = await ownerContactError(
       supabase,
@@ -38,7 +42,10 @@ export async function PATCH(request: Request, { params }: Params) {
       parsed.value.owner_contact_id,
     )
     if (ownerError) {
-      return NextResponse.json({ error: ownerError }, { status: 400 })
+      return NextResponse.json(
+        { error: ownerError, field: 'owner_contact_id' },
+        { status: 400 },
+      )
     }
 
     // Editar sólo el costo es un patch válido aunque no toque ninguna
@@ -46,7 +53,10 @@ export async function PATCH(request: Request, { params }: Params) {
     // decidir que "no hay nada que actualizar".
     const acq = await persistAcquisition(supabase, accountId, id, role, body)
     if (acq.error) {
-      return NextResponse.json({ error: acq.error }, { status: acq.status ?? 500 })
+      return NextResponse.json(
+        { error: acq.error, field: acq.field },
+        { status: acq.status ?? 500 },
+      )
     }
 
     if (Object.keys(parsed.value).length === 0) {
@@ -62,15 +72,10 @@ export async function PATCH(request: Request, { params }: Params) {
       .maybeSingle()
     if (error) {
       console.error('[inventory PATCH] error:', error)
-      if (error.code === '23505') {
-        return NextResponse.json(
-          { error: 'Ya existe un vehículo con esa placa o VIN' },
-          { status: 409 },
-        )
-      }
+      const described = describeDbError(error, 'No se pudo actualizar el vehículo')
       return NextResponse.json(
-        { error: 'No se pudo actualizar el vehículo' },
-        { status: 500 },
+        { error: described.error },
+        { status: described.status },
       )
     }
     if (!updated) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
@@ -126,9 +131,10 @@ export async function DELETE(_request: Request, { params }: Params) {
       .eq('id', id)
     if (error) {
       console.error('[inventory DELETE] error:', error)
+      const described = describeDbError(error, 'No se pudo eliminar el vehículo')
       return NextResponse.json(
-        { error: 'No se pudo eliminar el vehículo' },
-        { status: 500 },
+        { error: described.error },
+        { status: described.status },
       )
     }
 
