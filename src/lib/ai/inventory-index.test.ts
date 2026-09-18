@@ -6,6 +6,7 @@ import {
 } from './inventory-index'
 
 interface Row {
+  id: string
   public_ref: string | null
   brand: string
   model: string
@@ -18,6 +19,7 @@ interface Row {
 
 function vehiculo(overrides: Partial<Row> = {}): Row {
   return {
+    id: 'veh-1',
     public_ref: 'ABC123',
     brand: 'RENAULT',
     model: 'SANDERO GT',
@@ -47,10 +49,15 @@ function db(rows: Row[], error: unknown = null) {
 }
 
 beforeEach(() => {
+  // Sin URL pública por defecto: las pruebas de formato no dependen del .env.
+  vi.stubEnv('NEXT_PUBLIC_SITE_URL', '')
   consultas = 0
   clearInventoryIndexCache()
 })
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllEnvs()
+})
 
 describe('buildInventoryIndex — formato', () => {
   it('arma una línea por vehículo con lo que se filtra', async () => {
@@ -103,6 +110,41 @@ describe('buildInventoryIndex — formato', () => {
   // responde sin índice, como antes de este cambio.
   it('devuelve null cuando la consulta falla', async () => {
     expect(await buildInventoryIndex(db([], { message: 'boom' }), 'acct-1')).toBeNull()
+  })
+})
+
+// El 2026-09-17 el bot nombró una Sorento, un March y un Logan sin su
+// enlace: solo los extractos del RAG lo traían, y esos carros los había
+// sacado del índice.
+describe('buildInventoryIndex — enlace de la ficha', () => {
+  it('agrega el enlace de la ficha al final de cada línea', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://loramotors.co/')
+    const idx = await buildInventoryIndex(db([vehiculo()]), 'acct-1')
+    expect(idx?.text).toBe(
+      'ABC123 · RENAULT SANDERO GT 2010 · $22M · 179k kms · mecánica · hatchback · https://loramotors.co/vehiculo/veh-1',
+    )
+  })
+
+  it('omite el enlace cuando no hay URL pública configurada', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', '')
+    const idx = await buildInventoryIndex(db([vehiculo()]), 'acct-1')
+    expect(idx?.text).not.toContain('/vehiculo/')
+    expect(idx?.entries[0].url).toBeNull()
+  })
+
+  it('expone las entradas para verificar los enlaces de la respuesta', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://loramotors.co')
+    const idx = await buildInventoryIndex(db([vehiculo()]), 'acct-1')
+    expect(idx?.entries).toEqual([
+      {
+        id: 'veh-1',
+        brand: 'RENAULT',
+        model: 'SANDERO GT',
+        year: 2010,
+        price: 22_000_000,
+        url: 'https://loramotors.co/vehiculo/veh-1',
+      },
+    ])
   })
 })
 

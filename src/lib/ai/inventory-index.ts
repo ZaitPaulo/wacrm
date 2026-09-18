@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { KB_BODY, KB_TRANSMISSION } from '@/lib/inventory/knowledge-sync'
+import { configuredBaseUrl } from '@/lib/showcase/site-url'
 
 // ============================================================
 // El inventario COMPLETO que ve el asistente en cada respuesta.
@@ -37,9 +38,23 @@ export const INVENTORY_INDEX_LIMIT = 400
  *  vehículo vendido desaparezca casi enseguida. */
 const CACHE_TTL_MS = 60_000
 
+/** Lo que hace falta para reconocer un vehículo nombrado en una
+ *  respuesta y darle su enlace (ver `vehicle-links.ts`). */
+export interface InventoryEntry {
+  id: string
+  brand: string
+  model: string
+  year: number
+  price: number
+  /** Null cuando no hay URL pública configurada. */
+  url: string | null
+}
+
 export interface InventoryIndex {
   /** Una línea por vehículo, listo para el prompt. */
   text: string
+  /** Los mismos vehículos de `text`, estructurados. */
+  entries: InventoryEntry[]
   /** Cuántos hay disponibles en total (antes del recorte). */
   total: number
   /** True cuando `text` no los trae todos. */
@@ -47,6 +62,7 @@ export interface InventoryIndex {
 }
 
 interface VehicleRow {
+  id: string
   public_ref: string | null
   brand: string
   model: string
@@ -73,7 +89,7 @@ function millones(price: number): string {
   return `$${txt}M`
 }
 
-function linea(v: VehicleRow): string {
+function linea(v: VehicleRow, url: string | null): string {
   // Los nulos se omiten en vez de imprimirse: una línea con "null" o con
   // separadores vacíos le enseña ruido al modelo.
   const partes = [
@@ -83,6 +99,9 @@ function linea(v: VehicleRow): string {
     v.mileage != null ? `${Math.round(v.mileage / 1000)}k kms` : null,
     v.transmission ? (KB_TRANSMISSION[v.transmission] ?? v.transmission) : null,
     v.body_type ? (KB_BODY[v.body_type] ?? v.body_type) : null,
+    // El enlace de la ficha: sin él, el modelo nombraba carros del
+    // índice sin poder mandarlo, porque solo lo traían los extractos.
+    url,
   ]
   return partes.filter(Boolean).join(' · ')
 }
@@ -104,7 +123,7 @@ export async function buildInventoryIndex(
 
   const { data, error } = await db
     .from('inventory_vehicles')
-    .select('public_ref, brand, model, year, price, mileage, transmission, body_type')
+    .select('id, public_ref, brand, model, year, price, mileage, transmission, body_type')
     .eq('account_id', accountId)
     .eq('status', 'available')
     // Por precio ascendente: es el criterio que más aparece en la
@@ -116,8 +135,18 @@ export async function buildInventoryIndex(
   if (!error && data && data.length > 0) {
     const rows = data as VehicleRow[]
     const mostrados = rows.slice(0, INVENTORY_INDEX_LIMIT)
+    const base = configuredBaseUrl()?.origin ?? null
+    const entries: InventoryEntry[] = mostrados.map((v) => ({
+      id: v.id,
+      brand: v.brand,
+      model: v.model,
+      year: v.year,
+      price: v.price,
+      url: base ? `${base}/vehiculo/${v.id}` : null,
+    }))
     value = {
-      text: mostrados.map(linea).join('\n'),
+      text: mostrados.map((v, i) => linea(v, entries[i].url)).join('\n'),
+      entries,
       total: rows.length,
       truncated: rows.length > INVENTORY_INDEX_LIMIT,
     }

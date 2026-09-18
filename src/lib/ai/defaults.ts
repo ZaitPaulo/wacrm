@@ -188,7 +188,7 @@ export function buildSystemPrompt(args: {
   knowledge?: string[]
   /** El inventario disponible completo. Cubre QUE existe; los extractos
    *  cubren el detalle de un vehiculo concreto. */
-  inventory?: InventoryIndex | null
+  inventory?: Pick<InventoryIndex, 'text' | 'total' | 'truncated'> | null
   /** Hay fotos del cliente en la conversacion que recibe el modelo. */
   hasPhotos?: boolean
 }): string {
@@ -239,9 +239,10 @@ export function buildSystemPrompt(args: {
       : 'This is the COMPLETE list of vehicles currently available. Never claim a vehicle or a price range does not exist without checking it here first; if nothing here fits what the customer asked for, then it genuinely is not in stock.'
 
     parts.push(
-      'Current inventory — one line per vehicle: reference · make model year · price in millions COP · mileage · transmission · body type. ' +
+      'Current inventory — one line per vehicle: reference · make model year · price in millions COP · mileage · transmission · body type · photos link. ' +
         `${alcance} Use it to find what fits any criteria the customer gives you — budget, year, mileage, transmission, body type. ` +
-        `For the full detail of one vehicle (colour, engine, plate, photos link) use the knowledge base excerpts below.\n\n${inventory.text}`,
+        'Every time you name a specific vehicle to the customer, include its photos link from this list, written exactly as it appears. ' +
+        `For the full detail of one vehicle (colour, engine, plate) use the knowledge base excerpts below.\n\n${inventory.text}`,
     )
   }
 

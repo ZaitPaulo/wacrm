@@ -199,6 +199,11 @@ describe('buildSystemPrompt — inventario', () => {
     expect(sinNada).not.toContain('Current inventory')
   })
 
+  it('pide mandar el enlace de la ficha de cada vehículo que nombra', () => {
+    const prompt = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', inventory: index })
+    expect(prompt).toContain('include its photos link from this list')
+  })
+
   it('también llega en modo borrador', () => {
     const prompt = buildSystemPrompt({ userPrompt: null, mode: 'draft', inventory: index })
     expect(prompt).toContain('Current inventory')

@@ -629,6 +629,42 @@ describe('dispatchInboundToAiReply — inventario en el prompt', () => {
     expect(systemPrompt).toContain('COMPLETE list')
   })
 
+  it('agrega el enlace de la ficha cuando la respuesta nombra un carro sin él', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://loramotors.co')
+    h.state.inventory = [{ ...h.state.inventory[0], id: 'veh-1' }]
+    h.generateReply.mockResolvedValue({
+      text: 'Tengo un Renault Sandero GT 2010 en $22.000.000.',
+      handoff: null,
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    const sent = h.engineSendText.mock.calls[0][0].text as string
+    expect(sent).toContain('https://loramotors.co/vehiculo/veh-1')
+    vi.unstubAllEnvs()
+  })
+
+  it('también agrega el enlace en la respuesta de un traspaso rechazado', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://loramotors.co')
+    h.state.inventory = [{ ...h.state.inventory[0], id: 'veh-1' }]
+    h.generateReply.mockResolvedValue({
+      text: 'El Renault Sandero GT 2010 te sirve. ¿Cómo es tu nombre?',
+      handoff: {
+        nombre: null,
+        presupuesto: '25 millones',
+        interes: 'Sandero',
+        credito: false,
+        motivo: 'visita',
+      },
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    const sent = h.engineSendText.mock.calls[0][0].text as string
+    expect(sent).toContain('https://loramotors.co/vehiculo/veh-1')
+    vi.unstubAllEnvs()
+  })
+
   // Leer el inventario es un extra: si falla, se responde como antes.
   it('responde igual cuando la cuenta no tiene inventario', async () => {
     h.state.inventory = []

@@ -12,7 +12,8 @@ import { delay, hasNewerCustomerMessage, hasOutboundSince } from './reply-window
 import { buildHandoffSummary } from './handoff'
 import { evaluateHandoffGate } from './handoff-gate'
 import { pickHandoffAgent, primerNombre, type HandoffAgent } from './pick-agent'
-import { buildInventoryIndex } from './inventory-index'
+import { buildInventoryIndex, type InventoryIndex } from './inventory-index'
+import { ensureVehicleLinks } from './vehicle-links'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { attachPhotos, loadNewCustomerPhotos, type NewPhotos } from './photos'
@@ -281,7 +282,7 @@ export async function dispatchInboundToAiReply(
             userId: configOwnerUserId,
             conversationId,
             contactId,
-            text: reply,
+            text: withVehicleLinks(reply, inventory),
             aiGenerated: true,
           })
         }
@@ -334,7 +335,7 @@ export async function dispatchInboundToAiReply(
       userId: configOwnerUserId,
       conversationId,
       contactId,
-      text,
+      text: withVehicleLinks(text, inventory),
       aiGenerated: true,
     })
   } catch (err) {
@@ -393,6 +394,12 @@ export async function dispatchInboundToAiReply(
  * simplemente dejaba de responder: el asesor se enteraba, el cliente no,
  * y no habia forma de distinguir "ya va alguien" de "esto se rompio".
  */
+/** El texto con el enlace de cada vehículo que nombra y no lo trae. Sin
+ *  índice no hay contra qué reconocerlos, y sale tal cual. */
+function withVehicleLinks(text: string, inventory: InventoryIndex | null): string {
+  return inventory ? ensureVehicleLinks(text, inventory.entries) : text
+}
+
 async function handOffToHuman(args: {
   db: ReturnType<typeof supabaseAdmin>
   accountId: string
