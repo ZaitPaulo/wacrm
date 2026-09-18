@@ -302,6 +302,10 @@
       "adBadgeTitle": "Meta 광고에서 유입됨",
       "download": "다운로드",
       "downloadFailed": "첨부파일을 다운로드할 수 없습니다",
+      "share": "WhatsApp으로 전달",
+      "shareRetry": "파일이 준비되었습니다. 다시 눌러 전달하세요.",
+      "shareFallback": "이 브라우저는 파일을 공유할 수 없어 다운로드했습니다. WhatsApp에서 첨부하세요.",
+      "shareFailed": "전달할 파일을 준비할 수 없습니다",
       "viewImage": "이미지 보기",
       "expandVideo": "동영상 확대",
       "imageAlt": "공유된 이미지"
@@ -315,6 +319,10 @@
       "openOriginal": "원본 열기",
       "download": "다운로드",
       "downloadFailed": "첨부파일을 다운로드할 수 없습니다",
+      "share": "WhatsApp으로 전달",
+      "shareRetry": "파일이 준비되었습니다. 다시 눌러 전달하세요.",
+      "shareFallback": "이 브라우저는 파일을 공유할 수 없어 다운로드했습니다. WhatsApp에서 첨부하세요.",
+      "shareFailed": "전달할 파일을 준비할 수 없습니다",
       "failed": "이 첨부파일은 더 이상 사용할 수 없습니다",
       "imageAlt": "공유된 이미지",
       "you": "나"

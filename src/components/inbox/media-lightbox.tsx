@@ -9,6 +9,7 @@ import {
   ExternalLink,
   ImageOff,
   Loader2,
+  Share2,
   ZoomIn,
   ZoomOut,
   type LucideIcon,
@@ -24,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useMediaBlobUrl } from "@/hooks/use-media-blob-url";
+import { useMediaShare } from "@/hooks/use-media-share";
 import { downloadMediaMessage } from "@/lib/media/download";
 import { galleryIndexOf, type MediaGalleryItem } from "@/lib/media/gallery";
 
@@ -113,6 +115,8 @@ export function MediaLightbox({
     }
   }, [downloading, item, t]);
 
+  const { sharing, share } = useMediaShare(item?.message ?? null, t);
+
   if (!item) return null;
 
   const authorLabel = item.fromCustomer ? contactLabel : t("you");
@@ -157,6 +161,12 @@ export function MediaLightbox({
             >
               <ExternalLink className="h-4 w-4" />
             </a>
+            <ToolbarButton
+              icon={Share2}
+              label={t("share")}
+              onClick={share}
+              busy={sharing}
+            />
             <ToolbarButton
               icon={Download}
               label={t("download")}

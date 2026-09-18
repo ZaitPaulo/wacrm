@@ -295,6 +295,10 @@
       "adBadgeTitle": "Llegó desde un anuncio de Meta",
       "download": "Descargar",
       "downloadFailed": "No se pudo descargar el archivo",
+      "share": "Reenviar a WhatsApp",
+      "shareRetry": "El archivo ya está listo: toca otra vez para reenviarlo.",
+      "shareFallback": "Este navegador no puede compartir el archivo: se descargó para que lo adjuntes en WhatsApp.",
+      "shareFailed": "No se pudo preparar el archivo para reenviarlo",
       "viewImage": "Ver imagen",
       "expandVideo": "Ampliar video",
       "imageAlt": "Imagen compartida"
@@ -370,6 +374,10 @@
       "openOriginal": "Abrir original",
       "download": "Descargar",
       "downloadFailed": "No se pudo descargar el archivo",
+      "share": "Reenviar a WhatsApp",
+      "shareRetry": "El archivo ya está listo: toca otra vez para reenviarlo.",
+      "shareFallback": "Este navegador no puede compartir el archivo: se descargó para que lo adjuntes en WhatsApp.",
+      "shareFailed": "No se pudo preparar el archivo para reenviarlo",
       "failed": "Este archivo ya no está disponible",
       "imageAlt": "Imagen compartida",
       "you": "Tú"

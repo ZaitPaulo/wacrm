@@ -7,6 +7,7 @@ import {
   ImageOff,
   Loader2,
   Maximize2,
+  Share2,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { Message } from "@/types";
 import { downloadMediaMessage } from "@/lib/media/download";
 import { useMediaBlobUrl } from "@/hooks/use-media-blob-url";
+import { useMediaShare } from "@/hooks/use-media-share";
 
 /**
  * The media renderers behind `<MessageBubble>`'s image / video / audio /
@@ -125,6 +127,7 @@ export function MediaImageBubble({
   // The fetch can succeed and the bytes still not be a decodable image.
   const [broken, setBroken] = useState(false);
   const { downloading, download } = useMediaDownload(message, t);
+  const { sharing, share } = useMediaShare(message, t);
 
   if (status === "error" || broken) {
     return (
@@ -168,7 +171,13 @@ export function MediaImageBubble({
       )}
       {/* Hover-only: on touch there is no hover, but tapping the image opens
           the viewer, which carries a full-size Download button. */}
-      <div className="absolute bottom-2 right-2 opacity-0 transition-opacity group-hover/media:opacity-100 group-focus-within/media:opacity-100">
+      <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover/media:opacity-100 group-focus-within/media:opacity-100">
+        <MediaActionButton
+          icon={Share2}
+          label={t("share")}
+          onClick={share}
+          busy={sharing}
+        />
         <MediaActionButton
           icon={Download}
           label={t("download")}
@@ -190,6 +199,7 @@ export function MediaVideoBubble({
   t: Translator;
 }) {
   const { downloading, download } = useMediaDownload(message, t);
+  const { sharing, share } = useMediaShare(message, t);
 
   return (
     <div className="relative w-fit">
@@ -213,6 +223,12 @@ export function MediaVideoBubble({
           />
         )}
         <MediaActionButton
+          icon={Share2}
+          label={t("share")}
+          onClick={share}
+          busy={sharing}
+        />
+        <MediaActionButton
           icon={Download}
           label={t("download")}
           onClick={download}
@@ -231,10 +247,17 @@ export function MediaAudioBubble({
   t: Translator;
 }) {
   const { downloading, download } = useMediaDownload(message, t);
+  const { sharing, share } = useMediaShare(message, t);
 
   return (
     <div className="flex items-center gap-2">
       <audio src={message.media_url} controls className="max-w-60" />
+      <MediaActionButton
+        icon={Share2}
+        label={t("share")}
+        onClick={share}
+        busy={sharing}
+      />
       <MediaActionButton
         icon={Download}
         label={t("download")}
@@ -253,6 +276,7 @@ export function MediaDocumentBubble({
   t: Translator;
 }) {
   const { downloading, download } = useMediaDownload(message, t);
+  const { sharing, share } = useMediaShare(message, t);
 
   return (
     <div className="flex items-center gap-2">
@@ -265,6 +289,12 @@ export function MediaDocumentBubble({
         <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
         <span className="truncate">{message.content_text || t("document")}</span>
       </a>
+      <MediaActionButton
+        icon={Share2}
+        label={t("share")}
+        onClick={share}
+        busy={sharing}
+      />
       <MediaActionButton
         icon={Download}
         label={t("download")}

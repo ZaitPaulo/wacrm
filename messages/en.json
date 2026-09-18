@@ -302,6 +302,10 @@
       "adBadgeTitle": "Came from a Meta ad",
       "download": "Download",
       "downloadFailed": "Couldn't download the attachment",
+      "share": "Forward to WhatsApp",
+      "shareRetry": "The file is ready: tap again to forward it.",
+      "shareFallback": "This browser can't share the file: it was downloaded so you can attach it in WhatsApp.",
+      "shareFailed": "Couldn't prepare the file for forwarding",
       "viewImage": "View image",
       "expandVideo": "Expand video",
       "imageAlt": "Shared image"
@@ -315,6 +319,10 @@
       "openOriginal": "Open original",
       "download": "Download",
       "downloadFailed": "Couldn't download the attachment",
+      "share": "Forward to WhatsApp",
+      "shareRetry": "The file is ready: tap again to forward it.",
+      "shareFallback": "This browser can't share the file: it was downloaded so you can attach it in WhatsApp.",
+      "shareFailed": "Couldn't prepare the file for forwarding",
       "failed": "This attachment is no longer available",
       "imageAlt": "Shared image",
       "you": "You"
