@@ -137,7 +137,9 @@ const WHATSAPP_OBJECT = 'whatsapp_business_account';
  * https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/
  */
 interface WhatsAppContact {
-  profile: { name: string; username?: string };
+  // Opcional: hay entregas que llegan sin `profile`, y leerlo sin
+  // guardia hacía reventar el evento en cada reintento de Meta.
+  profile?: { name?: string; username?: string };
   wa_id?: string;
   user_id?: string;
 }
@@ -478,7 +480,9 @@ async function persistWhatsAppChange(
   }
 
   // Handle incoming messages
-  if (!value.messages || !value.contacts) return;
+  // Sin `contacts` el mensaje se guarda igual: la identidad sale de
+  // `message.from`. Descartarlo perdía el mensaje sin dejar rastro.
+  if (!value.messages) return;
 
   const phoneNumberId = value.metadata.phone_number_id;
 
@@ -535,7 +539,8 @@ async function persistWhatsAppChange(
 
   for (let i = 0; i < value.messages.length; i++) {
     const message = value.messages[i];
-    const contact = value.contacts[i] || value.contacts[0];
+    const contact: WhatsAppContact =
+      value.contacts?.[i] ?? value.contacts?.[0] ?? {};
 
     await persistMessage(
       message,
@@ -723,12 +728,12 @@ async function persistMessage(
   const sender: InboundSender = {
     channel: 'whatsapp',
     externalId: phone || bsuid || '',
-    name: contact.profile.name || null,
+    name: contact.profile?.name || null,
     // Se manda SIEMPRE que Meta lo informe, también cuando la identidad
     // salió del teléfono: es lo que evita que la persona se duplique el
     // día que active la privacidad del número.
     alsoKnownAs: bsuid && bsuid !== phone ? bsuid : null,
-    username: contact.profile.username || null,
+    username: contact.profile?.username || null,
   };
 
   const common = {

@@ -220,7 +220,12 @@ const TEXT_MESSAGE = {
   text: { body: 'hello' },
 };
 
-function inboundRequest(message: Record<string, unknown> = TEXT_MESSAGE) {
+const DEFAULT_CONTACTS = [{ wa_id: '15551230000', profile: { name: 'Ada' } }];
+
+function inboundRequest(
+  message: Record<string, unknown> = TEXT_MESSAGE,
+  contacts: unknown[] | null = DEFAULT_CONTACTS
+) {
   const body = {
     entry: [
       {
@@ -229,7 +234,7 @@ function inboundRequest(message: Record<string, unknown> = TEXT_MESSAGE) {
             field: 'messages',
             value: {
               metadata: { phone_number_id: 'pn-1' },
-              contacts: [{ wa_id: '15551230000', profile: { name: 'Ada' } }],
+              ...(contacts ? { contacts } : {}),
               messages: [message],
             },
           },
@@ -312,6 +317,28 @@ describe('inbound webhook: idempotent insert (#367)', () => {
     expect(h.runAutomationsForTrigger).not.toHaveBeenCalled();
     expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled();
     expect(h.dispatchWebhookEvent).not.toHaveBeenCalled();
+  });
+});
+
+// Del 2026-09-18: 13 eventos reventaron con "Cannot read properties of
+// undefined (reading 'name')" y el mensaje se perdió, porque cada
+// reintento de Meta volvía a fallar igual.
+describe('inbound webhook: contacto incompleto', () => {
+  it('guarda el mensaje cuando el contacto llega sin profile', async () => {
+    const res = await POST(inboundRequest(TEXT_MESSAGE, [{ wa_id: '15551230000' }]));
+    for (const cb of h.state.afterCallbacks) await cb();
+
+    expect(status(res)).toBe(200);
+    expect(h.state.upsertCalls).toHaveLength(1);
+    expect(h.dispatchInboundToFlows).toHaveBeenCalledTimes(1);
+  });
+
+  it('guarda el mensaje cuando el cambio llega sin contacts', async () => {
+    const res = await POST(inboundRequest(TEXT_MESSAGE, null));
+    for (const cb of h.state.afterCallbacks) await cb();
+
+    expect(status(res)).toBe(200);
+    expect(h.state.upsertCalls).toHaveLength(1);
   });
 });
 
