@@ -2636,8 +2636,6 @@
     "contact": "Contact",
     "administration": "Administration",
     "privacy": "Privacy",
-    "ogTagline": "Find your next vehicle",
-    "ogAvailability": "{count} {count, plural, =1 {vehicle available} other {vehicles available}}",
     "searchPlaceholder": "Search by brand, model or year…",
     "sort": "Sort by",
     "sortLowestPrice": "Lowest price",

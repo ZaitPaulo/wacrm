@@ -29,10 +29,16 @@ const storefrontDir = path.resolve(appDir, '(storefront)')
 
 describe('Section 3: Storefront route group and visual system', () => {
   describe('3.1 File placement and route group isolation', () => {
-    it('contains page.tsx, loading.tsx, opengraph-image.tsx in (storefront)/', () => {
+    // La vista previa de la portada es una imagen fija desde el 2026-09-18:
+    // el cliente eligió un diseño sin datos que cambien (sin conteo de
+    // vehículos), así que no hace falta generarla en cada visita.
+    it('contains page.tsx, loading.tsx and a static opengraph-image in (storefront)/', () => {
       expect(fs.existsSync(path.join(storefrontDir, 'page.tsx'))).toBe(true)
       expect(fs.existsSync(path.join(storefrontDir, 'loading.tsx'))).toBe(true)
-      expect(fs.existsSync(path.join(storefrontDir, 'opengraph-image.tsx'))).toBe(true)
+      expect(fs.existsSync(path.join(storefrontDir, 'opengraph-image.jpg'))).toBe(true)
+      expect(fs.existsSync(path.join(storefrontDir, 'opengraph-image.alt.txt'))).toBe(true)
+      // Next no admite la imagen fija y la generada en el mismo segmento.
+      expect(fs.existsSync(path.join(storefrontDir, 'opengraph-image.tsx'))).toBe(false)
     })
 
     it('contains vehiculo/[id]/ routes in (storefront)/', () => {

@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     robots: { index: true, follow: true },
     alternates: { canonical: '/' },
-    // og:image lo aporta app/opengraph-image.tsx (imagen generada).
+    // og:image lo aporta (storefront)/opengraph-image.jpg, una imagen fija.
     openGraph: {
       title,
       description,

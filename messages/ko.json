@@ -2636,8 +2636,6 @@
     "contact": "연락처",
     "administration": "관리",
     "privacy": "개인정보 처리방침",
-    "ogTagline": "다음 차량을 찾아보세요",
-    "ogAvailability": "구매 가능 차량 {count}대",
     "searchPlaceholder": "제조사, 모델 또는 연식으로 검색…",
     "sort": "정렬 기준",
     "sortLowestPrice": "낮은 가격순",
