@@ -409,8 +409,11 @@
         "email": "Email",
         "company": "Company",
         "tags": "Tags",
-        "createdAt": "Created"
+        "createdAt": "Created",
+        "assignee": "Agent"
       },
+      "unassigned": "Unassigned",
+      "unknownAgent": "Unknown agent",
       "loading": "Loading contacts...",
       "noContactsMatch": "No contacts match your filters.",
       "noContactsYet": "No contacts yet.",

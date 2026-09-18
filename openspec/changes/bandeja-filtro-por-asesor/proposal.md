@@ -13,7 +13,7 @@ El dueño del negocio no tiene cómo ver qué conversaciones tiene asignadas cad
 
 ### New Capabilities
 
-- `inbox-assignee-filter`: ver y filtrar la bandeja por asesor asignado.
+- `inbox-assignee-filter`: ver y filtrar la bandeja por asesor asignado, y ver el asesor de cada contacto en Contactos.
 
 ### Modified Capabilities
 

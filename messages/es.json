@@ -402,8 +402,11 @@
         "email": "Correo",
         "company": "Empresa",
         "tags": "Etiquetas",
-        "createdAt": "Creado"
+        "createdAt": "Creado",
+        "assignee": "Asesor"
       },
+      "unassigned": "Sin asignar",
+      "unknownAgent": "Asesor desconocido",
       "loading": "Cargando contactos...",
       "noContactsMatch": "Ningún contacto coincide con los filtros.",
       "noContactsYet": "Todavía no hay contactos.",

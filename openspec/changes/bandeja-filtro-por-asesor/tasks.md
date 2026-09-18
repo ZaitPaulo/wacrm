@@ -15,3 +15,10 @@
 
 - [x] 3.1 Suite, typecheck y lint en verde
 - [x] 3.2 Probar en el navegador con un usuario owner y uno agent
+
+## 4. Columna "Asesor" en Contactos
+
+- [x] 4.1 Pruebas e implementación de `assigneesByContact` (`src/lib/contacts/contact-assignees.ts`)
+- [x] 4.2 Columna en la tabla, con una consulta de conversaciones por página y los nombres de `profiles`
+- [x] 4.3 Traducciones es/en/ko
+- [x] 4.4 Probado en local como dueño y como asesor

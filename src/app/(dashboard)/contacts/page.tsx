@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
+import {
+  assigneesByContact,
+  type ContactAssignees,
+} from '@/lib/contacts/contact-assignees';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -63,6 +67,9 @@ const PAGE_SIZE = 25;
 
 interface ContactWithTags extends Contact {
   tags?: Tag[];
+  /** Quién lo atiende. Ausente sin conversaciones, o para un asesor, que
+   *  no ve la columna. */
+  assignees?: ContactAssignees;
 }
 
 export default function ContactsPage() {
@@ -77,6 +84,13 @@ export default function ContactsPage() {
   // ofrecerle una trampa, no se le ofrece: dar de alta contactos es del
   // admin. Esto es cosmético; lo que manda es la RLS.
   const isRestrictedAgent = !useCan('view-all-conversations');
+  // Columna "Asesor": solo para quien ve todas las conversaciones. Un
+  // asesor solo ve sus propios contactos, así que siempre diría su nombre.
+  const showAssignee = !isRestrictedAgent;
+  const columnCount = showAssignee ? 9 : 8;
+  const [agentNames, setAgentNames] = useState<Map<string, string>>(
+    () => new Map()
+  );
 
   const [contacts, setContacts] = useState<ContactWithTags[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,16 +226,29 @@ export default function ContactsPage() {
       tagsByContact[ct.contact_id].push(ct.tag_id);
     });
 
+    // Quién atiende a cada contacto: la asignación vive en sus
+    // conversaciones. Una sola consulta para la página entera.
+    let assignees = new Map<string, ContactAssignees>();
+    if (showAssignee) {
+      const { data: convs } = await supabase
+        .from('conversations')
+        .select('contact_id, assigned_agent_id, last_message_at')
+        .in('contact_id', contactIds);
+      if (seq !== fetchSeq.current) return; // superseded by a newer fetch
+      assignees = assigneesByContact(convs ?? []);
+    }
+
     const enriched: ContactWithTags[] = contactRows.map((c) => ({
       ...c,
       tags: (tagsByContact[c.id] ?? [])
         .map((tid) => tagsMap[tid])
         .filter(Boolean),
+      assignees: assignees.get(c.id),
     }));
 
     setContacts(enriched);
     setLoading(false);
-  }, [supabase, page, search, selectedTagIds, tagsMap, t]);
+  }, [supabase, page, search, selectedTagIds, tagsMap, t, showAssignee]);
 
   // Load-once-on-mount-ish data fetches. Each setter inside runs
   // inside an async promise completion (Supabase await), not
@@ -236,6 +263,29 @@ export default function ContactsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchContacts();
   }, [fetchContacts]);
+
+  // Nombres de los asesores para la columna "Asesor".
+  useEffect(() => {
+    if (!showAssignee) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, full_name');
+      if (cancelled || !data) return;
+      setAgentNames(
+        new Map(
+          (data as { user_id: string; full_name: string }[]).map((p) => [
+            p.user_id,
+            p.full_name,
+          ])
+        )
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, showAssignee]);
 
   function openAddForm() {
     setEditContact(null);
@@ -579,6 +629,11 @@ export default function ContactsPage() {
               <TableHead className="text-muted-foreground hidden lg:table-cell">
                 {t('tableColumns.company')}
               </TableHead>
+              {showAssignee && (
+                <TableHead className="text-muted-foreground hidden md:table-cell">
+                  {t('tableColumns.assignee')}
+                </TableHead>
+              )}
               <TableHead className="text-muted-foreground hidden md:table-cell">
                 {t('tableColumns.tags')}
               </TableHead>
@@ -591,7 +646,7 @@ export default function ContactsPage() {
           <TableBody>
             {loading ? (
               <TableRow className="border-border">
-                <TableCell colSpan={8} className="py-12 text-center">
+                <TableCell colSpan={columnCount} className="py-12 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <Loader2 className="text-primary size-6 animate-spin" />
                     <p className="text-muted-foreground text-sm">
@@ -602,7 +657,7 @@ export default function ContactsPage() {
               </TableRow>
             ) : contacts.length === 0 ? (
               <TableRow className="border-border">
-                <TableCell colSpan={8} className="py-12 text-center">
+                <TableCell colSpan={columnCount} className="py-12 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <Users className="text-muted-foreground size-8" />
                     <p className="text-muted-foreground text-sm">
@@ -660,6 +715,16 @@ export default function ContactsPage() {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
+                  {showAssignee && (
+                    <TableCell className="hidden text-sm md:table-cell">
+                      <AssigneeCell
+                        assignees={contact.assignees}
+                        names={agentNames}
+                        unassignedLabel={t('unassigned')}
+                        unknownLabel={t('unknownAgent')}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="hidden md:table-cell">
                     <div className="flex flex-wrap gap-1">
                       {contact.tags && contact.tags.length > 0 ? (
@@ -880,5 +945,36 @@ export default function ContactsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * Quién atiende al contacto: los asesores de sus conversaciones, "Sin
+ * asignar" en ámbar si tiene conversación pero nadie la tomó, o un guion
+ * si nunca escribió.
+ */
+function AssigneeCell({
+  assignees,
+  names,
+  unassignedLabel,
+  unknownLabel,
+}: {
+  assignees: ContactAssignees | undefined;
+  names: Map<string, string>;
+  unassignedLabel: string;
+  unknownLabel: string;
+}) {
+  if (!assignees) return <span className="text-muted-foreground">-</span>;
+  if (assignees.agentIds.length === 0) {
+    return (
+      <span className="text-amber-600 dark:text-amber-500">
+        {unassignedLabel}
+      </span>
+    );
+  }
+  return (
+    <span className="text-foreground">
+      {assignees.agentIds.map((id) => names.get(id) ?? unknownLabel).join(', ')}
+    </span>
   );
 }

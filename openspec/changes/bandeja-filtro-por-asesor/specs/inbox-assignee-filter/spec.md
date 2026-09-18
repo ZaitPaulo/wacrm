@@ -32,3 +32,27 @@ Para los usuarios con permiso de ver todas las conversaciones, cada fila de la l
 
 - **WHEN** el dueño reasigna la conversación abierta a otro asesor
 - **THEN** la fila muestra el nuevo nombre sin recargar
+
+### Requirement: La tabla de contactos dice quién atiende a cada contacto
+
+Para los usuarios con permiso de ver todas las conversaciones, la tabla de Contactos SHALL tener una columna "Asesor". Como la asignación vive en la conversación y un contacto puede tener una por canal, la columna SHALL mostrar los asesores de sus conversaciones sin repetir, primero el de la más reciente; "Sin asignar" si tiene conversaciones pero ninguna con asesor; y un guion si no tiene conversaciones.
+
+#### Scenario: Contacto atendido
+
+- **WHEN** el dueño abre Contactos y un contacto tiene su conversación asignada a Caro
+- **THEN** la columna Asesor de ese contacto dice "Caro"
+
+#### Scenario: Contacto sin asesor
+
+- **WHEN** un contacto tiene conversación pero sin asesor
+- **THEN** la columna dice "Sin asignar"
+
+#### Scenario: Contacto que nunca escribió
+
+- **WHEN** un contacto no tiene conversaciones
+- **THEN** la columna muestra un guion
+
+#### Scenario: Un asesor no ve la columna
+
+- **WHEN** un usuario con rol `agent` abre Contactos
+- **THEN** la tabla no tiene columna Asesor
