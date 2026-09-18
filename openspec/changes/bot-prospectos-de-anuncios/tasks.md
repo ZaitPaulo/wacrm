@@ -32,10 +32,10 @@
 
 ## 5. La IA usa el contexto del anuncio (A)
 
-- [ ] 5.1 Prueba: `buildSystemPrompt` con `adContext` agrega la sección del anuncio; sin él no la agrega
-- [ ] 5.2 Leer el referral más reciente de la conversación en `auto-reply.ts` (una consulta, en el `Promise.all` existente) y pasarlo al prompt
-- [ ] 5.3 Nota de traspaso: "Origen: anuncio · <titular>" cuando la conversación tiene referral; prueba
-- [ ] 5.4 Bandeja: marca de origen con el titular en el mensaje que trae referral
+- [x] 5.1 Prueba: `buildSystemPrompt` con `adContext` agrega la sección del anuncio; sin él no la agrega
+- [x] 5.2 Leer el referral más reciente de la conversación en `auto-reply.ts` (una consulta, en el `Promise.all` existente) y pasarlo al prompt
+- [x] 5.3 Nota de traspaso: "Origen: anuncio · <titular>" cuando la conversación tiene referral; prueba
+- [x] 5.4 Bandeja: marca de origen con el titular en el mensaje que trae referral
 
 ## 6. Verificación y despliegue
 

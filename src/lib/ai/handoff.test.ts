@@ -156,6 +156,20 @@ describe('buildHandoffSummary — datos recolectados', () => {
     expect(summary).not.toContain('Ocupación')
   })
 
+  it('dice de qué anuncio vino el cliente', () => {
+    const summary = buildHandoffSummary({
+      messages,
+      replyCount: 2,
+      ad: { headline: 'Carros usados en Barranquilla' },
+    })
+    expect(summary).toContain('Origen: anuncio · Carros usados en Barranquilla')
+  })
+
+  it('marca el origen aunque el anuncio no traiga titular', () => {
+    const summary = buildHandoffSummary({ messages, replyCount: 2, ad: {} })
+    expect(summary).toContain('Origen: anuncio')
+  })
+
   it('mantiene la nota corta cuando no hubo petición (camino de fallo)', () => {
     const summary = buildHandoffSummary({ messages, replyCount: 0 })
     expect(summary).not.toContain('Motivo:')

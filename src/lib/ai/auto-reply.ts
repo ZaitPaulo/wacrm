@@ -14,6 +14,7 @@ import { evaluateHandoffGate } from './handoff-gate'
 import { pickHandoffAgent, primerNombre, type HandoffAgent } from './pick-agent'
 import { buildInventoryIndex, type InventoryIndex } from './inventory-index'
 import { ensureVehicleLinks } from './vehicle-links'
+import { loadAdContext } from './ad-context'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { attachPhotos, loadNewCustomerPhotos, type NewPhotos } from './photos'
@@ -185,7 +186,7 @@ export async function dispatchInboundToAiReply(
     // Tres lecturas independientes, en paralelo: la espera es la de la mas
     // lenta, no la suma. La lenta suelen ser las fotos —dos llamadas a
     // Meta cada una—, y no tienen por que sumarse al knowledge base.
-    const [photos, knowledge, inventory] = await Promise.all([
+    const [photos, knowledge, inventory, adContext] = await Promise.all([
       // No lanza por contrato. El catch es para que ni un fallo imprevisto
       // de las fotos acabe en traspaso: se responde sin ellas.
       loadNewCustomerPhotos(db, { accountId, conversationId }).catch(
@@ -204,6 +205,8 @@ export async function dispatchInboundToAiReply(
       // hay nada en su presupuesto viendo 5 fichas de 123. Con fotos es
       // ademas contra lo que se reconoce el carro de la captura.
       buildInventoryIndex(db, accountId),
+      // De qué anuncio vino el cliente. No lanza: sin él se responde igual.
+      loadAdContext(db, conversationId),
     ])
 
     // Las fotos se pegan ANTES de decidir si hay algo que responder: una
@@ -219,6 +222,7 @@ export async function dispatchInboundToAiReply(
       knowledge,
       inventory,
       hasPhotos: messages.some((m) => m.images?.length),
+      adContext,
     })
 
     const { text, handoff, usage } = await generateReply({
@@ -302,6 +306,7 @@ export async function dispatchInboundToAiReply(
           replyCount: conv.ai_reply_count ?? 0,
           request: handoff,
           urgent: gate.urgent,
+          ad: adContext,
         }),
       })
       return
@@ -323,6 +328,7 @@ export async function dispatchInboundToAiReply(
         summary: buildHandoffSummary({
           messages,
           replyCount: conv.ai_reply_count ?? 0,
+          ad: adContext,
         }),
       })
       return

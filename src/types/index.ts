@@ -276,6 +276,12 @@ export interface Message {
    * badge in the inbox. Migration 033.
    */
   ai_generated?: boolean;
+  /**
+   * El anuncio de Meta del que vino el mensaje (migración 526). Solo en
+   * el primer mensaje tras tocar un anuncio con clic a WhatsApp; se
+   * guarda saneado por `parseAdReferral`.
+   */
+  referral?: { source_type?: string; headline?: string; body?: string } | null;
 }
 
 export type ReactionActor = 'customer' | 'agent';

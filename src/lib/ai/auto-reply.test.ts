@@ -20,6 +20,8 @@ const h = vi.hoisted(() => ({
     profiles: [] as { user_id: string; full_name: string }[],
     openConversations: [] as (string | null)[],
     inventory: [] as Record<string, unknown>[],
+    /** Referral del anuncio de la conversación (migración 526). */
+    adReferral: null as Record<string, unknown> | null,
   },
 }))
 
@@ -44,6 +46,22 @@ vi.mock('./admin-client', () => ({
           in: () => chain,
           limit: () =>
             Promise.resolve({ data: h.state.autoResponders, error: null }),
+        }
+        return chain
+      }
+      if (table === 'messages') {
+        // loadAdContext: .select().eq().not().order().limit().maybeSingle()
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          not: () => chain,
+          order: () => chain,
+          limit: () => chain,
+          maybeSingle: () =>
+            Promise.resolve({
+              data: h.state.adReferral ? { referral: h.state.adReferral } : null,
+              error: null,
+            }),
         }
         return chain
       }
@@ -167,6 +185,7 @@ beforeEach(() => {
     { user_id: 'u-brayan', full_name: 'Brayan Hernández' },
   ]
   h.state.openConversations = ['u-juan', 'u-juan']
+  h.state.adReferral = null
   h.state.inventory = [
     {
       public_ref: 'XGCW8S',
@@ -622,6 +641,34 @@ describe('dispatchInboundToAiReply — a quién se asigna', () => {
 // El bot le dijo a un cliente que no había nada de 25 millones teniendo
 // un Sandero de 22 disponible: veía 5 fichas de 123, elegidas por
 // parecido de texto. Ahora recibe el catálogo entero.
+describe('dispatchInboundToAiReply — anuncio de origen', () => {
+  it('le pasa al modelo el anuncio del que vino el cliente', async () => {
+    h.state.adReferral = { source_type: 'ad', headline: 'Carros usados en Barranquilla' }
+
+    await dispatchInboundToAiReply(ARGS)
+
+    const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
+    expect(systemPrompt).toContain('Carros usados en Barranquilla')
+  })
+
+  it('sin anuncio, el prompt no lo menciona', async () => {
+    await dispatchInboundToAiReply(ARGS)
+    const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
+    expect(systemPrompt).not.toContain('came from one of our ads')
+  })
+
+  it('la nota del traspaso dice que vino de un anuncio', async () => {
+    h.state.adReferral = { source_type: 'ad', headline: 'Carros usados en Barranquilla' }
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(String(h.state.updatePayload?.ai_handoff_summary)).toContain(
+      'Origen: anuncio · Carros usados en Barranquilla',
+    )
+  })
+})
+
 describe('dispatchInboundToAiReply — inventario en el prompt', () => {
   it('le pasa al modelo el inventario disponible completo', async () => {
     await dispatchInboundToAiReply(ARGS)

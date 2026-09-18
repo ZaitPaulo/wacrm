@@ -236,3 +236,29 @@ describe('buildGateRetryInstruction — perfil de crédito', () => {
     expect(text).not.toContain('ID number')
   })
 })
+
+// El 2026-09-17, 17 de 36 prospectos del anuncio se fueron sin que nadie
+// respondiera a su "¿más información sobre esto?".
+describe('buildSystemPrompt — anuncio de origen', () => {
+  it('le dice al modelo de qué anuncio viene el cliente', () => {
+    const prompt = buildSystemPrompt({
+      userPrompt: null,
+      mode: 'auto_reply',
+      adContext: { headline: 'Carros usados en Barranquilla', body: 'Financiación con bancos aliados' },
+    })
+    expect(prompt).toContain('Carros usados en Barranquilla')
+    expect(prompt).toContain('Financiación con bancos aliados')
+    expect(prompt).toMatch(/"esto"|this ad/)
+  })
+
+  it('sirve aunque el anuncio no traiga texto', () => {
+    const prompt = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', adContext: {} })
+    expect(prompt).toContain('came from one of our ads')
+  })
+
+  it('no agrega nada sin anuncio', () => {
+    const sin = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply' })
+    expect(sin).not.toContain('came from one of our ads')
+    expect(buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', adContext: null })).toBe(sin)
+  })
+})

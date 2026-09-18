@@ -294,6 +294,8 @@
       "unsupported": "[Unsupported message type]",
       "aiBadge": "AI",
       "aiBadgeTitle": "Sent automatically by the AI assistant",
+      "adBadge": "Ad",
+      "adBadgeTitle": "Came from a Meta ad",
       "download": "Download",
       "downloadFailed": "Couldn't download the attachment",
       "viewImage": "View image",

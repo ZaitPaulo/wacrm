@@ -11,6 +11,7 @@ import {
   LayoutTemplate,
   CornerDownLeft,
   Sparkles,
+  Megaphone,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
@@ -268,6 +269,27 @@ export function MessageBubble({
               (always outbound, so it sits on the primary fill). Lets
               agents tell an AI reply from their own / a Flow's at a
               glance. */}
+          {/* Marca de anuncio — el cliente llegó tocando un anuncio de
+              Meta. Siempre entrante, así que va sobre la superficie
+              neutra. El titular dice cuál anuncio, para que el asesor
+              sepa a qué se refiere un "más información sobre esto". */}
+          {message.referral && (
+            <span
+              className="inline-flex max-w-[14rem] items-center gap-0.5 rounded-full bg-foreground/10 px-1.5 py-px text-[9px] font-semibold leading-none text-muted-foreground"
+              title={
+                message.referral.headline
+                  ? `${t("adBadgeTitle")}: ${message.referral.headline}`
+                  : t("adBadgeTitle")
+              }
+            >
+              <Megaphone className="h-2.5 w-2.5 shrink-0" />
+              <span className="truncate">
+                {message.referral.headline
+                  ? `${t("adBadge")} · ${message.referral.headline}`
+                  : t("adBadge")}
+              </span>
+            </span>
+          )}
           {message.ai_generated && (
             <span
               className="inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/20 px-1.5 py-px text-[9px] font-semibold uppercase leading-none tracking-wide text-primary-foreground"

@@ -287,6 +287,8 @@
       "unsupported": "[Tipo de mensaje no admitido]",
       "aiBadge": "IA",
       "aiBadgeTitle": "Enviado automáticamente por el asistente de IA",
+      "adBadge": "Anuncio",
+      "adBadgeTitle": "Llegó desde un anuncio de Meta",
       "download": "Descargar",
       "downloadFailed": "No se pudo descargar el archivo",
       "viewImage": "Ver imagen",

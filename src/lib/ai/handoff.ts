@@ -1,4 +1,5 @@
 import type { ChatMessage, HandoffRequest } from './types'
+import type { AdContext } from './ad-context'
 
 /** Longest the quoted customer message runs before we ellipsize it —
  *  keeps the internal note to a glanceable one-liner. */
@@ -27,8 +28,10 @@ export function buildHandoffSummary(args: {
   /** True cuando paso por la excepcion de urgencia, o sea que entra sin
    *  los datos completos y el asesor debe saberlo. */
   urgent?: boolean
+  /** El anuncio del que vino el cliente, si vino de uno. */
+  ad?: AdContext | null
 }): string {
-  const { messages, replyCount, request, urgent } = args
+  const { messages, replyCount, request, urgent, ad } = args
 
   const lastCustomer = [...messages]
     .reverse()
@@ -56,6 +59,10 @@ export function buildHandoffSummary(args: {
           `Ingresos: ${orMissing(request.ingresos ?? null)}`,
       )
     }
+  }
+
+  if (ad) {
+    lines.push(ad.headline ? `Origen: anuncio · ${ad.headline}` : 'Origen: anuncio')
   }
 
   if (lastCustomer) {
