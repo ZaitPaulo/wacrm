@@ -39,8 +39,8 @@
 
 ## 6. Verificación y despliegue
 
-- [ ] 6.1 Suite completa, `tsc --noEmit` y lint en verde
-- [ ] 6.2 Prueba local con un payload real de anuncio (referral de ejemplo de la documentación de Meta)
+- [x] 6.1 Suite completa, `tsc --noEmit` y lint en verde
+- [x] 6.2 Prueba local con un payload real de anuncio (referral de ejemplo de la documentación de Meta)
 - [ ] 6.3 Merge a `develop`, promover a `main`, respaldo y despliegue en el VPS; confirmar que la migración se aplicó
 - [ ] 6.4 Producción: reconfigurar la Bienvenida con la raíz "viene de un anuncio" (sí → nada)
 - [ ] 6.5 Producción: ajustar el `system_prompt` (crédito: pedir ocupación e ingresos aproximados; si viene de anuncio, mencionar la vitrina loramotors.co)
