@@ -2536,7 +2536,9 @@
     "emptyHint": "Vas a ver un aviso acá cuando alguien te asigne una conversación.",
     "unread": "Sin leer",
     "markReadFailed": "No se pudo marcar la notificación como leída",
-    "markAllFailed": "No se pudieron marcar todas como leídas"
+    "markAllFailed": "No se pudieron marcar todas como leídas",
+    "retry": "Reintentar",
+    "loadFailed": "No se pudieron cargar las notificaciones."
   },
   "SignupPage": {
     "titleInvite": "Crear cuenta y unirse",

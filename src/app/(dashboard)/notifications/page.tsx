@@ -39,11 +39,14 @@ export default function NotificationsPage() {
       .order("created_at", { ascending: false })
       .limit(100);
     if (fetchErr) {
-      setError(fetchErr.message);
+      // El mensaje de Supabase va al log, no a la pantalla: viene en
+      // inglés y no le dice nada útil al asesor.
+      console.error("Failed to load notifications:", fetchErr.message);
+      setError(t("loadFailed"));
       return;
     }
     setNotifications((data ?? []) as Notification[]);
-  }, [accountId]);
+  }, [accountId, t]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -150,7 +153,7 @@ export default function NotificationsPage() {
       <div className="flex h-64 flex-col items-center justify-center gap-2">
         <p className="text-sm text-destructive">{error}</p>
         <Button variant="outline" onClick={() => window.location.reload()}>
-          Retry
+          {t("retry")}
         </Button>
       </div>
     );
