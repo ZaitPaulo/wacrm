@@ -7,6 +7,6 @@
 
 ## 2. Despliegue
 
-- [ ] 2.1 Desplegar junto con los cambios pendientes
-- [ ] 2.2 Aplicar `prompt-produccion.md` al `system_prompt` de producción
+- [x] 2.1 Desplegar junto con los cambios pendientes
+- [x] 2.2 Aplicar `prompt-produccion.md` al `system_prompt` de producción
 - [ ] 2.3 Revisar los primeros traspasos con estos motivos
