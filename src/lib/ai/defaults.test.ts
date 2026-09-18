@@ -262,3 +262,16 @@ describe('buildSystemPrompt — anuncio de origen', () => {
     expect(buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', adContext: null })).toBe(sin)
   })
 })
+
+describe('buildSystemPrompt — respeta lo que ya dijo el cliente', () => {
+  it('pide ofrecer solo lo que encaja y no volver a preguntar', () => {
+    const prompt = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply' })
+    expect(prompt).toContain('only offer vehicles that fit it')
+    expect(prompt).toContain('Never ask again for something they already said')
+  })
+
+  it('prohíbe prometer seguimientos que nadie hace', () => {
+    const prompt = buildSystemPrompt({ userPrompt: null, mode: 'draft' })
+    expect(prompt).toContain('Do not promise follow-ups')
+  })
+})

@@ -231,6 +231,7 @@ export async function dispatchInboundToAiReply(
       messages,
     })
 
+
     // Record token spend on the account's BYO key. Fire-and-forget so it
     // never adds latency to the customer-facing send: `logAiUsage`
     // swallows its own errors, so the floating promise can't reject.
@@ -244,6 +245,14 @@ export async function dispatchInboundToAiReply(
       model: config.model,
       usage,
     })
+
+    // La generación tarda 10-15 s, más que la ventana de agrupación. Si
+    // el cliente escribió mientras tanto, esta respuesta ya llega tarde:
+    // el dispatch de su mensaje nuevo contesta con todo el contexto. Sin
+    // esto salían dos respuestas distintas a segundos una de otra
+    // (Mauricio, 2026-09-18). Se descarta también un traspaso: lo decide
+    // el nuevo.
+    if (await hasNewerCustomerMessage(db, conversationId, inbound)) return
 
     // El modelo PIDE transferir; el gate decide. Antes bastaba con que
     // lo pidiera, y por eso salian hilos sin un solo carro mostrado.

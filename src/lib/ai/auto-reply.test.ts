@@ -212,7 +212,9 @@ beforeEach(() => {
   h.engineSendText.mockResolvedValue({ whatsapp_message_id: 'm1' })
   h.delay.mockResolvedValue(undefined)
   // Default: nothing else happened while we waited.
-  h.hasNewerCustomerMessage.mockResolvedValue(false)
+  // mockReset: una respuesta encolada con mockResolvedValueOnce que un
+  // test no consumió no puede filtrarse al siguiente.
+  h.hasNewerCustomerMessage.mockReset().mockResolvedValue(false)
   h.hasOutboundSince.mockResolvedValue(false)
 })
 
@@ -415,6 +417,33 @@ describe('dispatchInboundToAiReply — reply window', () => {
     await dispatchInboundToAiReply(ARGS)
 
     expect(h.generateReply).not.toHaveBeenCalled()
+    expect(h.engineSendText).not.toHaveBeenCalled()
+  })
+
+  // 2026-09-18: Mauricio mandó dos mensajes a 9 s y recibió dos respuestas
+  // distintas a 5 s. Las dos generaciones corrían a la vez; ninguna veía
+  // a la otra hasta enviar.
+  it('descarta lo generado si el cliente escribió mientras se generaba', async () => {
+    h.hasNewerCustomerMessage
+      .mockReset()
+      .mockResolvedValueOnce(false) // al terminar la espera
+      .mockResolvedValueOnce(true) // justo antes de enviar
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText).not.toHaveBeenCalled()
+    // Tampoco traspasa: lo decide la respuesta del mensaje nuevo.
+    expect(h.state.updatePayload).toBeNull()
+  })
+
+  it('no traspasa si el cliente escribió mientras se generaba el traspaso', async () => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
+    h.hasNewerCustomerMessage.mockReset().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toBeNull()
     expect(h.engineSendText).not.toHaveBeenCalled()
   })
 

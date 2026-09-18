@@ -1005,7 +1005,7 @@ async function parseMessageContent(
       // Quick-reply tap on a TEMPLATE message. Meta delivers these under
       // their own `button` envelope rather than `interactive` above, so
       // without this case they fell through to `default` and landed in
-      // the inbox as "[Unsupported message type: button]" with a null
+      // the inbox as "[Mensaje no compatible con el CRM (button)…]" with a null
       // interactiveReplyId — which also meant the Flows engine and the
       // `interactive_reply` automation trigger never saw the tap, so
       // nothing chained off a broadcast reply (issue #478).
@@ -1026,7 +1026,10 @@ async function parseMessageContent(
     default:
       return {
         ...empty,
-        contentText: `[Unsupported message type: ${message.type}]`,
+        // En español: el asesor lo lee en la bandeja. Meta manda `unsupported`
+        // para lo que la API no entrega (mensajes de una sola vista, encuestas…),
+        // y el cliente cree que lo mandó bien: hay que pedirle que lo repita.
+        contentText: `[Mensaje no compatible con el CRM (${message.type}): pídele al cliente que lo escriba o lo reenvíe]`,
       };
   }
 }

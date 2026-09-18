@@ -342,6 +342,16 @@ describe('inbound webhook: contacto incompleto', () => {
   });
 });
 
+// El asesor lo lee en la bandeja: el texto va en español (2026-09-18).
+describe('inbound webhook: tipo de mensaje no compatible', () => {
+  it('guarda un aviso en español con el tipo que mandó Meta', async () => {
+    await runWebhook({ id: 'wamid.X', from: '15551230000', timestamp: '1700000000', type: 'unsupported' });
+    expect(h.state.upsertCalls[0].row.content_text).toBe(
+      '[Mensaje no compatible con el CRM (unsupported): pídele al cliente que lo escriba o lo reenvíe]',
+    );
+  });
+});
+
 describe('inbound webhook: origen publicitario', () => {
   it('guarda el referral de un mensaje que viene de un anuncio', async () => {
     await runWebhook({

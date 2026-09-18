@@ -148,3 +148,11 @@ SET body = replace(replace(replace(body,
       'Motivo: credito ·', 'Motivo: crédito ·')
 WHERE type = 'conversation_assigned'
   AND body ~ 'Motivo: (pide_humano|negociacion|credito) ·';
+
+-- Mensajes de un tipo que la API de WhatsApp no entrega, guardados con
+-- el aviso en inglés: el asesor lo lee en la bandeja.
+UPDATE messages
+SET content_text = regexp_replace(content_text,
+      '^\[Unsupported message type: (.*)\]$',
+      '[Mensaje no compatible con el CRM (\1): pídele al cliente que lo escriba o lo reenvíe]')
+WHERE content_text ~ '^\[Unsupported message type: .*\]$';
