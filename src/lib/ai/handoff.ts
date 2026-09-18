@@ -11,6 +11,8 @@ const REASON_LABELS: Record<HandoffReason, string> = {
   credito: 'crédito',
   visita: 'visita',
   papeles: 'papeles',
+  vende_su_carro: 'quiere vender su carro',
+  sin_stock: 'no hay lo que busca',
   otro: 'otro',
 }
 
@@ -61,10 +63,15 @@ export function buildHandoffSummary(args: {
   const lines = [`🤖 El bot traspasó la conversación ${replies}${urgency}.`]
 
   if (request) {
+    const motivo = `Motivo: ${REASON_LABELS[request.motivo] ?? request.motivo}`
     lines.push(
-      `Motivo: ${REASON_LABELS[request.motivo] ?? request.motivo} · Nombre: ${orMissing(request.nombre)} · ` +
-        `Presupuesto: ${orMissing(request.presupuesto)} · ` +
-        `Interés: ${orMissing(request.interes)} · Crédito: ${credito(request.credito)}`,
+      // Quien vende su carro no compra: presupuesto y crédito no aplican,
+      // y lo que el asesor necesita es qué carro ofrece.
+      request.motivo === 'vende_su_carro'
+        ? `${motivo} · Nombre: ${orMissing(request.nombre)} · Su carro: ${orMissing(request.interes)}`
+        : `${motivo} · Nombre: ${orMissing(request.nombre)} · ` +
+            `Presupuesto: ${orMissing(request.presupuesto)} · ` +
+            `Interés: ${orMissing(request.interes)} · Crédito: ${credito(request.credito)}`,
     )
     if (request.credito === true) {
       lines.push(

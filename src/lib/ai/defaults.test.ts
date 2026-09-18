@@ -275,3 +275,17 @@ describe('buildSystemPrompt — respeta lo que ya dijo el cliente', () => {
     expect(prompt).toContain('Do not promise follow-ups')
   })
 })
+
+describe('buildSystemPrompt — motivos con requisitos propios', () => {
+  const prompt = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply' })
+
+  it('explica cómo atender a quien quiere vender su carro, sin avalúo', () => {
+    expect(prompt).toContain('motivo=vende_su_carro')
+    expect(prompt).toContain('never give a valuation')
+  })
+
+  it('explica cuándo pasar a un asesor porque no hay lo que busca', () => {
+    expect(prompt).toContain('motivo=sin_stock')
+    expect(prompt).toContain('offer the closest ones first')
+  })
+})

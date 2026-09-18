@@ -154,3 +154,47 @@ describe('evaluateHandoffGate — urgencia', () => {
     expect(res.urgent).toBe(true)
   })
 })
+
+// Revisión del 2026-09-18: clientes que querían VENDERLE su carro al
+// concesionario no tenían a dónde ir, y a quien no le servía nada del
+// inventario se le prometía "te aviso cuando entre uno".
+describe('evaluateHandoffGate — quiere vender su carro', () => {
+  const vende = (o: Partial<HandoffRequest> = {}) =>
+    request({
+      motivo: 'vende_su_carro',
+      interes: 'Citroën C3 2024, 50 mil km, placa de Sincelejo',
+      presupuesto: null,
+      credito: null,
+      ocupacion: null,
+      ingresos: null,
+      ...o,
+    })
+
+  it('pasa con nombre y los datos del carro, sin presupuesto ni crédito', () => {
+    expect(evaluateHandoffGate({ request: vende(), attempts: 0 })).toEqual({
+      transfer: true,
+      missing: [],
+      urgent: false,
+    })
+  })
+
+  it('no pasa sin los datos del carro', () => {
+    const res = evaluateHandoffGate({ request: vende({ interes: null }), attempts: 0 })
+    expect(res.transfer).toBe(false)
+    expect(res.missing).toEqual(['interes'])
+  })
+})
+
+describe('evaluateHandoffGate — no hay lo que busca', () => {
+  const sinStock = (o: Partial<HandoffRequest> = {}) =>
+    request({ motivo: 'sin_stock', credito: null, ocupacion: null, ingresos: null, ...o })
+
+  it('pasa con nombre, presupuesto y lo que busca, aunque no se sepa si necesita crédito', () => {
+    expect(evaluateHandoffGate({ request: sinStock(), attempts: 0 }).transfer).toBe(true)
+  })
+
+  it('no pasa sin presupuesto', () => {
+    const res = evaluateHandoffGate({ request: sinStock({ presupuesto: null }), attempts: 0 })
+    expect(res.missing).toEqual(['presupuesto'])
+  })
+})

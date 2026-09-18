@@ -25,6 +25,21 @@ export const REQUIRED_HANDOFF_FIELDS = [
 export type RequiredHandoffField = (typeof REQUIRED_HANDOFF_FIELDS)[number]
 
 /**
+ * Motivos cuyo traspaso no pide los cuatro datos de una venta, sino los
+ * suyos (2026-09-18):
+ *   - quien quiere VENDER su carro no tiene presupuesto ni necesita
+ *     crédito: hace falta su nombre y los datos del carro, que van en
+ *     `interes`;
+ *   - a quien nada del inventario le sirve se lo pasa a un asesor para
+ *     que le busque o le haga seguimiento: hace falta saber qué busca y
+ *     con cuánto, no si financia.
+ */
+const FIELDS_BY_REASON: Partial<Record<HandoffRequest['motivo'], readonly RequiredHandoffField[]>> = {
+  vende_su_carro: ['nombre', 'interes'],
+  sin_stock: ['nombre', 'presupuesto', 'interes'],
+}
+
+/**
  * Lo que el asesor pregunta primero cuando el cliente necesita crédito
  * (revisión del 2026-09-18: 6 de 7 traspasos fueron por crédito). Solo
  * se exige con `credito === true`, y nunca deja al cliente atascado:
@@ -82,7 +97,8 @@ export function evaluateHandoffGate(args: {
     return { transfer: false, missing: ['nombre'], urgent }
   }
 
-  const missing = REQUIRED_HANDOFF_FIELDS.filter((f) => !isPresent(request, f))
+  const required = FIELDS_BY_REASON[request.motivo] ?? REQUIRED_HANDOFF_FIELDS
+  const missing = required.filter((f) => !isPresent(request, f))
   const missingProfile =
     request.credito === true
       ? CREDIT_PROFILE_FIELDS.filter((f) => !isPresent(request, f))

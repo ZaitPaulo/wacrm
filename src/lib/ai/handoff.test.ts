@@ -180,6 +180,34 @@ describe('buildHandoffSummary — datos recolectados', () => {
     expect(nota('negociacion')).toContain('Motivo: negociación')
   })
 
+  it('para quien vende su carro, dice qué carro ofrece y no pide presupuesto ni crédito', () => {
+    const summary = buildHandoffSummary({
+      messages,
+      replyCount: 4,
+      request: {
+        nombre: 'Luis Miguel',
+        presupuesto: null,
+        interes: 'Citroën C3 2024, 50 mil km, placa de Sincelejo, pide $62.000.000',
+        credito: null,
+        motivo: 'vende_su_carro',
+      },
+    })
+    expect(summary).toContain('Motivo: quiere vender su carro')
+    expect(summary).toContain('Su carro: Citroën C3 2024, 50 mil km, placa de Sincelejo, pide $62.000.000')
+    expect(summary).not.toContain('Presupuesto')
+    expect(summary).not.toContain('Crédito')
+  })
+
+  it('para quien no encontró lo que busca, lo dice así', () => {
+    const summary = buildHandoffSummary({
+      messages,
+      replyCount: 4,
+      request: { nombre: 'Miguel', presupuesto: '20 millones de contado', interes: 'carro 1.2 económico', credito: false, motivo: 'sin_stock' },
+    })
+    expect(summary).toContain('Motivo: no hay lo que busca')
+    expect(summary).toContain('Interés: carro 1.2 económico')
+  })
+
   it('mantiene la nota corta cuando no hubo petición (camino de fallo)', () => {
     const summary = buildHandoffSummary({ messages, replyCount: 0 })
     expect(summary).not.toContain('Motivo:')

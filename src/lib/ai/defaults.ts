@@ -242,6 +242,9 @@ export function buildSystemPrompt(args: {
         'The handoff only goes through once nombre, presupuesto, interes and credito are all filled in. While any of them is missing, keep serving the customer yourself and ask for what you are missing, in your own words and one thing at a time.\n' +
         'When credito=si, also fill ocupacion (what the customer does for a living) and ingresos (their approximate monthly income): the advisor needs them to check whether the bank will approve. Ask for them naturally before handing off. ' +
         `${CREDIT_PROFILE_LIMITS} If the customer would rather not say, write ? and hand off anyway.\n` +
+        'Two reasons have their own requirements. ' +
+        'motivo=vende_su_carro is for a customer who wants to SELL their own vehicle to the business (not trade it in for one of ours — that is permuta): before handing off, ask one thing at a time for make, model, year, mileage, the city on the plate, some photos, and the price they are asking; never give a valuation or say what it is worth. Put all of the vehicle data in interes; it needs only nombre and interes. ' +
+        'motivo=sin_stock is for a customer nothing in the inventory works for — you showed them the closest alternatives and they turned them down, or nothing is within their budget: put what they are looking for in interes and their budget in presupuesto; it needs nombre, presupuesto and interes. Do not use it just because the exact year or colour they named is missing: offer the closest ones first.\n' +
         'The exception is motivo=reclamo and motivo=pide_humano: those need only nombre, because a customer who is upset or who asked for a person must never be held back while you collect sales data.',
     )
   }

@@ -114,6 +114,10 @@ export type HandoffReason =
   | 'credito'
   | 'visita'
   | 'papeles'
+  /** El cliente quiere venderle su carro al concesionario. */
+  | 'vende_su_carro'
+  /** Nada del inventario le sirve, ni las alternativas cercanas. */
+  | 'sin_stock'
   | 'otro'
 
 /** Every reason the parser accepts. Single source of truth for both the
@@ -126,6 +130,8 @@ export const HANDOFF_REASONS: readonly HandoffReason[] = [
   'credito',
   'visita',
   'papeles',
+  'vende_su_carro',
+  'sin_stock',
   'otro',
 ] as const
 
