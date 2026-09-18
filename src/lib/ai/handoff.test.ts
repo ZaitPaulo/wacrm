@@ -81,7 +81,7 @@ describe('buildHandoffSummary — datos recolectados', () => {
         motivo: 'credito',
       },
     })
-    expect(summary).toContain('Motivo: credito')
+    expect(summary).toContain('Motivo: crédito')
     expect(summary).toContain('Nombre: Carlos')
     expect(summary).toContain('Presupuesto: 30000000')
     expect(summary).toContain('Interés: Kia Sportage 2019')
@@ -168,6 +168,16 @@ describe('buildHandoffSummary — datos recolectados', () => {
   it('marca el origen aunque el anuncio no traiga titular', () => {
     const summary = buildHandoffSummary({ messages, replyCount: 2, ad: {} })
     expect(summary).toContain('Origen: anuncio')
+  })
+
+  // El asesor lee la nota: un código interno como `pide_humano` no le
+  // dice nada.
+  it('escribe el motivo como texto legible', () => {
+    const base = { nombre: 'Ana', presupuesto: null, interes: null, credito: null }
+    const nota = (motivo: 'pide_humano' | 'negociacion') =>
+      buildHandoffSummary({ messages, replyCount: 1, request: { ...base, motivo } })
+    expect(nota('pide_humano')).toContain('Motivo: pidió hablar con una persona')
+    expect(nota('negociacion')).toContain('Motivo: negociación')
   })
 
   it('mantiene la nota corta cuando no hubo petición (camino de fallo)', () => {

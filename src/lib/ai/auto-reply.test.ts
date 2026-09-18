@@ -524,7 +524,7 @@ describe('dispatchInboundToAiReply — gate de datos del handoff', () => {
 
     expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
     expect(h.state.updatePayload?.ai_handoff_summary).toContain('Nombre: Carlos')
-    expect(h.state.updatePayload?.ai_handoff_summary).toContain('Motivo: credito')
+    expect(h.state.updatePayload?.ai_handoff_summary).toContain('Motivo: crédito')
   })
 
   it('transfiere un reclamo con solo el nombre', async () => {

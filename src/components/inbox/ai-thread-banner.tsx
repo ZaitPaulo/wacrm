@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Sparkles, Hand, Undo2, Loader2 } from "lucide-react";
+import { Sparkles, Hand, Undo2, Loader2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -87,6 +87,10 @@ export function AiThreadBanner({
   // state via realtime) changes.
   const [paused, setPaused] = useState(disabled);
   useEffect(() => setPaused(disabled), [conversationId, disabled]);
+  // El resumen del traspaso ocupa varias líneas: se muestra la primera y
+  // se despliega a pedido. Cada conversación abre plegada.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => setExpanded(false), [conversationId]);
 
   useEffect(() => {
     if (!accountId) return;
@@ -144,9 +148,27 @@ export function AiThreadBanner({
         <div className="min-w-0 flex-1">
           <p className="font-medium text-foreground">{t("pausedTitle")}</p>
           {handoffSummary && (
-            <p className="truncate text-muted-foreground" title={handoffSummary}>
-              {handoffSummary}
-            </p>
+            <>
+              <p
+                className={cn(
+                  "text-muted-foreground",
+                  expanded ? "whitespace-pre-line break-words" : "truncate",
+                )}
+              >
+                {handoffSummary}
+              </p>
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                aria-expanded={expanded}
+                className="mt-0.5 inline-flex items-center gap-0.5 text-xs font-medium text-primary hover:underline"
+              >
+                {expanded ? t("hideSummary") : t("showSummary")}
+                <ChevronDown
+                  className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")}
+                />
+              </button>
+            </>
           )}
         </div>
         <BannerButton onClick={() => toggle(false)} busy={busy} icon={Undo2}>

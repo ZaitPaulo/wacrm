@@ -129,3 +129,22 @@ UPDATE notifications
 SET title = 'Nueva conversación asignada'
 WHERE type = 'conversation_assigned'
   AND title = 'New conversation assigned';
+
+-- El motivo de los resúmenes del bot, legible. Se escribía con el código
+-- interno ("Motivo: pide_humano") y lo lee el asesor, en la conversación
+-- y en el aviso. Los motivos que ya se leen igual (reclamo, permuta,
+-- visita, papeles, otro) no cambian.
+UPDATE conversations
+SET ai_handoff_summary = replace(replace(replace(ai_handoff_summary,
+      'Motivo: pide_humano ·', 'Motivo: pidió hablar con una persona ·'),
+      'Motivo: negociacion ·', 'Motivo: negociación ·'),
+      'Motivo: credito ·', 'Motivo: crédito ·')
+WHERE ai_handoff_summary ~ 'Motivo: (pide_humano|negociacion|credito) ·';
+
+UPDATE notifications
+SET body = replace(replace(replace(body,
+      'Motivo: pide_humano ·', 'Motivo: pidió hablar con una persona ·'),
+      'Motivo: negociacion ·', 'Motivo: negociación ·'),
+      'Motivo: credito ·', 'Motivo: crédito ·')
+WHERE type = 'conversation_assigned'
+  AND body ~ 'Motivo: (pide_humano|negociacion|credito) ·';

@@ -251,8 +251,12 @@ export default function NotificationsPage() {
                         />
                       )}
                     </div>
+                    {/* Completo y con sus saltos de línea: el aviso de un
+                        traspaso del bot trae el resumen (nombre,
+                        presupuesto, carro, crédito), que es lo que el
+                        asesor necesita para entrar a la conversación. */}
                     {n.body && (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      <p className="mt-0.5 whitespace-pre-line break-words text-xs text-muted-foreground">
                         {n.body}
                       </p>
                     )}

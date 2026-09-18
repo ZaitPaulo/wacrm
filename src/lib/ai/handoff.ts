@@ -1,5 +1,18 @@
-import type { ChatMessage, HandoffRequest } from './types'
+import type { ChatMessage, HandoffReason, HandoffRequest } from './types'
 import type { AdContext } from './ad-context'
+
+/** Cómo lee el asesor cada motivo. El código (`pide_humano`) es para el
+ *  modelo y el gate; la nota la lee una persona. */
+const REASON_LABELS: Record<HandoffReason, string> = {
+  reclamo: 'reclamo',
+  pide_humano: 'pidió hablar con una persona',
+  negociacion: 'negociación',
+  permuta: 'permuta',
+  credito: 'crédito',
+  visita: 'visita',
+  papeles: 'papeles',
+  otro: 'otro',
+}
 
 /** Longest the quoted customer message runs before we ellipsize it —
  *  keeps the internal note to a glanceable one-liner. */
@@ -49,7 +62,7 @@ export function buildHandoffSummary(args: {
 
   if (request) {
     lines.push(
-      `Motivo: ${request.motivo} · Nombre: ${orMissing(request.nombre)} · ` +
+      `Motivo: ${REASON_LABELS[request.motivo] ?? request.motivo} · Nombre: ${orMissing(request.nombre)} · ` +
         `Presupuesto: ${orMissing(request.presupuesto)} · ` +
         `Interés: ${orMissing(request.interes)} · Crédito: ${credito(request.credito)}`,
     )

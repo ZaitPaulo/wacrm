@@ -363,7 +363,9 @@
       "tookOver": "Tomaste el control de este chat.",
       "resumed": "Se reanudó la IA.",
       "updateError": "No se pudo actualizar el asistente de IA.",
-      "networkError": "No se pudo conectar con el servidor."
+      "networkError": "No se pudo conectar con el servidor.",
+      "showSummary": "Ver resumen completo",
+      "hideSummary": "Ocultar resumen"
     },
     "mediaViewer": {
       "counter": "{index} de {total}",
