@@ -13,6 +13,7 @@ import {
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature';
 import { serverSupabaseUrl } from '@/lib/supabase/server-url';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
+import { parseAdReferral } from '@/lib/inbound/ad-referral';
 import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
@@ -66,6 +67,9 @@ interface WhatsAppMessage {
     address?: string;
   };
   reaction?: { message_id: string; emoji: string };
+  /** Llega cuando el mensaje viene de un anuncio con clic a WhatsApp.
+   *  Se sanea con `parseAdReferral` antes de guardarlo. */
+  referral?: unknown;
   /**
    * Set when the customer taps a button or list row on an interactive
    * message we sent. `button_reply.id` / `list_reply.id` is whatever id
@@ -809,6 +813,7 @@ async function persistMessage(
         // `contentType` ya dice `image` para un sticker; esto es lo único
         // que queda de que no era una foto.
         isSticker: message.type === 'sticker',
+        referral: parseAdReferral(message.referral),
       },
     }),
     batch,

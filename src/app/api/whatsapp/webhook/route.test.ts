@@ -342,6 +342,35 @@ describe('inbound webhook: contacto incompleto', () => {
   });
 });
 
+describe('inbound webhook: origen publicitario', () => {
+  it('guarda el referral de un mensaje que viene de un anuncio', async () => {
+    await runWebhook({
+      ...TEXT_MESSAGE,
+      text: { body: 'Hola. ¿Puedo obtener más información sobre esto?' },
+      referral: {
+        source_type: 'ad',
+        source_id: '120210000000000',
+        headline: 'Carros usados en Barranquilla',
+        ctwa_clid: 'ARAk',
+      },
+    });
+
+    expect(h.state.upsertCalls[0].row.referral).toEqual({
+      source_type: 'ad',
+      source_id: '120210000000000',
+      headline: 'Carros usados en Barranquilla',
+      ctwa_clid: 'ARAk',
+    });
+  });
+
+  // Sin la clave, un mensaje común no depende de que la migración 526
+  // ya esté aplicada: el orden de despliegue no puede perder mensajes.
+  it('no toca la columna en un mensaje sin referral', async () => {
+    await runWebhook();
+    expect(h.state.upsertCalls[0].row).not.toHaveProperty('referral');
+  });
+});
+
 describe('inbound webhook: atomic unread bump (#369)', () => {
   it('increments unread through the DB-side RPC, not a read-modify-write', async () => {
     await runWebhook();

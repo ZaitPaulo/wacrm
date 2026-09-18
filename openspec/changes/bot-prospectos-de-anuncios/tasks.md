@@ -18,9 +18,9 @@
 
 ## 3. Guardar el origen publicitario (A)
 
-- [ ] 3.1 Verificar el siguiente número de migración libre (repo y `openspec/changes/*`) y crear `5NN_message_referral.sql` con `messages.referral jsonb`
-- [ ] 3.2 Prueba de webhook: un mensaje con `referral` se guarda con él; uno con `referral` parcial también; sin `referral` queda nulo
-- [ ] 3.3 Declarar `referral` en `WhatsAppMessage`, llevarlo a `NormalizedInbound` y escribirlo en el upsert de `persistInbound`
+- [x] 3.1 Verificar el siguiente número de migración libre (repo y `openspec/changes/*`) y crear `5NN_message_referral.sql` con `messages.referral jsonb`
+- [x] 3.2 Prueba de webhook: un mensaje con `referral` se guarda con él; uno con `referral` parcial también; sin `referral` queda nulo
+- [x] 3.3 Declarar `referral` en `WhatsAppMessage`, llevarlo a `NormalizedInbound` y escribirlo en el upsert de `persistInbound`
 
 ## 4. La automatización cede el turno (A)
 

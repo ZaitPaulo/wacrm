@@ -12,6 +12,7 @@ import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply';
 import { aiVisionMaxImages } from '@/lib/ai/defaults';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
 import { recordVehicleInquiry } from '@/lib/inventory/inquiries';
+import type { AdReferral } from './ad-referral';
 
 // ============================================================
 // El núcleo de la recepción, sin saber de qué canal viene.
@@ -101,6 +102,11 @@ export interface NormalizedMessage {
    * despertaría a la IA como una foto sin texto.
    */
   isSticker: boolean;
+  /**
+   * De qué anuncio viene el mensaje (migración 526). Solo WhatsApp lo
+   * llena, y solo en el primer mensaje tras tocar un anuncio.
+   */
+  referral?: AdReferral | null;
 }
 
 /** Una reacción. No es un mensaje y no se guarda como tal. */
@@ -306,6 +312,10 @@ export async function persistInbound(
         // added the column; null for every other content_type so
         // existing inserts behave identically.
         interactive_reply_id: inbound.interactiveReplyId,
+        // Solo cuando hay: así un mensaje común no depende de que la
+        // migración 526 ya esté aplicada, y el orden en que se despliegan
+        // código y migración no puede costar mensajes.
+        ...(inbound.referral ? { referral: inbound.referral } : {}),
       },
       { onConflict: 'conversation_id,message_id', ignoreDuplicates: true }
     )
