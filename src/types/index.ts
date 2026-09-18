@@ -645,7 +645,10 @@ export type ConditionSubject =
   | 'contact_field'
   | 'tag_presence'
   | 'message_content'
-  | 'time_of_day';
+  | 'time_of_day'
+  /** El mensaje que disparó la automatización vino de un anuncio de
+   *  Meta (migración 526). No lleva operando. */
+  | 'from_ad';
 
 export interface ConditionStepConfig {
   subject: ConditionSubject;

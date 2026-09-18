@@ -214,6 +214,13 @@ describe("validateStepsForActivation", () => {
     ]);
   });
 
+  it("no exige operando para la condición from_ad", () => {
+    const issues = validateStepsForActivation([
+      { step_type: "condition", step_config: { subject: "from_ad" } },
+    ]);
+    expect(issues).toEqual([]);
+  });
+
   it("flags condition subject/operand independently", () => {
     const issues = validateStepsForActivation([
       { step_type: "condition", step_config: {} },

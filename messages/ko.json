@@ -1166,7 +1166,8 @@
           "tag_presence": "태그 존재 여부",
           "contact_field": "연락처 필드",
           "message_content": "메시지 내용",
-          "time_of_day": "시간대"
+          "time_of_day": "시간대",
+          "from_ad": "광고에서 유입"
         },
         "operandLabel": "피연산자",
         "placeholderTime": "HH:mm-HH:mm",

@@ -363,6 +363,28 @@ describe('inbound webhook: origen publicitario', () => {
     });
   });
 
+  // La Bienvenida decide con `from_ad` si ceder el turno; si cede, nadie
+  // responde antes que la IA y la IA contesta (ai-reply-gating).
+  it('le avisa a las automatizaciones y despierta a la IA', async () => {
+    await runWebhook({
+      ...TEXT_MESSAGE,
+      text: { body: 'Hola. ¿Puedo obtener más información sobre esto?' },
+      referral: { source_type: 'ad', source_id: '1' },
+    });
+
+    expect(h.runAutomationsForTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ from_ad: true }) }),
+    );
+    expect(h.dispatchInboundToAiReply).toHaveBeenCalledTimes(1);
+  });
+
+  it('un mensaje orgánico llega con from_ad en falso', async () => {
+    await runWebhook();
+    expect(h.runAutomationsForTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ from_ad: false }) }),
+    );
+  });
+
   // Sin la clave, un mensaje común no depende de que la migración 526
   // ya esté aplicada: el orden de despliegue no puede perder mensajes.
   it('no toca la columna en un mensaje sin referral', async () => {

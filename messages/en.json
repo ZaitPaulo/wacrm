@@ -1166,7 +1166,8 @@
           "tag_presence": "Tag presence",
           "contact_field": "Contact field",
           "message_content": "Message content",
-          "time_of_day": "Time of day"
+          "time_of_day": "Time of day",
+          "from_ad": "Came from an ad"
         },
         "operandLabel": "Operand",
         "placeholderTime": "HH:mm-HH:mm",

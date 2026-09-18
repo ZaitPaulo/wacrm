@@ -50,6 +50,9 @@ export interface AutomationContext {
   agent_id?: string
   /** Button / list-row id the customer tapped, for interactive_reply. */
   interactive_reply_id?: string
+  /** El mensaje disparador trae origen publicitario, para la condición
+   *  `from_ad`. */
+  from_ad?: boolean
 }
 
 export interface DispatchInput {
@@ -1017,6 +1020,8 @@ async function evaluateCondition(cfg: ConditionStepConfig, args: ExecuteArgs): P
       const text = (args.context.message_text ?? '').toString()
       return text.toLowerCase().includes((cfg.value ?? '').toLowerCase())
     }
+    case 'from_ad':
+      return args.context.from_ad === true
     case 'time_of_day': {
       // operand form "HH:mm-HH:mm" — true if now is within that window
       // (supports over-midnight ranges like "18:00-09:00").

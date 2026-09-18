@@ -80,7 +80,19 @@ vi.mock("./admin-client", () => {
       }
       return { data: { steps_executed: [], status: "success" }, error: null };
     }
-    if (table === "automation_steps") return { data: state.steps, error: null };
+    if (table === "automation_steps") {
+      // Respeta el árbol: la raíz pide `parent_step_id IS NULL` (que el
+      // builder no registra) y una rama pide su padre y su lado. Sin
+      // esto, una condición se encontraría a sí misma como hija.
+      const parent = ops.filters.find((f) => f[1] === "parent_step_id")?.[2];
+      const branch = ops.filters.find((f) => f[1] === "branch")?.[2];
+      const data = state.steps.filter((s) =>
+        parent === undefined
+          ? s.parent_step_id == null
+          : s.parent_step_id === parent && s.branch === branch,
+      );
+      return { data, error: null };
+    }
     if (table === "deals") {
       if (type === "insert") {
         state.dealInserts.push(ops.payload as Record<string, unknown>);
@@ -939,5 +951,50 @@ describe("hide_owner_vehicle", () => {
       "hide_owner_vehicle",
       "update_contact_field",
     ]);
+  });
+});
+
+// ------------------------------------------------------------
+// Condición "viene de un anuncio": la Bienvenida la usa para cederle a
+// la IA el primer turno de un prospecto de anuncio (2026-09-18).
+// ------------------------------------------------------------
+
+describe("condición from_ad", () => {
+  beforeEach(() => {
+    h.state.owned = { id: "c1" };
+    h.state.automations = [dealAutomation()];
+    h.state.steps = [
+      {
+        id: "cond",
+        automation_id: "a1",
+        step_type: "condition",
+        position: 0,
+        parent_step_id: null,
+        step_config: { subject: "from_ad" },
+      },
+    ];
+  });
+
+  async function runWith(context: Record<string, unknown>) {
+    await runAutomationsForTrigger({
+      accountId: ACCOUNT,
+      triggerType: "first_inbound_message",
+      contactId: "c1",
+      context,
+    });
+  }
+
+  it("toma la rama sí cuando el mensaje vino de un anuncio", async () => {
+    await runWith({ from_ad: true });
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({ step_type: "condition", detail: "branch=yes" }),
+    );
+  });
+
+  it("toma la rama no con un mensaje orgánico", async () => {
+    await runWith({});
+    expect(stepResults()).toContainEqual(
+      expect.objectContaining({ step_type: "condition", detail: "branch=no" }),
+    );
   });
 });

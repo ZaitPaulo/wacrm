@@ -178,7 +178,8 @@ function validateOne(step: StepLike, path: string, issues: ValidationIssue[]): v
       if (!nonEmpty(c.subject)) {
         issues.push({ path: `${path}.subject`, code: 'conditionSubjectRequired' })
       }
-      if (!nonEmpty(c.operand)) {
+      // `from_ad` es un sí o no sobre el mensaje: no tiene operando.
+      if (c.subject !== 'from_ad' && !nonEmpty(c.operand)) {
         issues.push({ path: `${path}.operand`, code: 'conditionOperandRequired' })
       }
       break

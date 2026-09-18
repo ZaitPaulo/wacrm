@@ -1158,7 +1158,8 @@
           "tag_presence": "Presencia de etiqueta",
           "contact_field": "Campo del contacto",
           "message_content": "Contenido del mensaje",
-          "time_of_day": "Hora del día"
+          "time_of_day": "Hora del día",
+          "from_ad": "Viene de un anuncio"
         },
         "operandLabel": "Operando",
         "placeholderTime": "HH:mm-HH:mm",

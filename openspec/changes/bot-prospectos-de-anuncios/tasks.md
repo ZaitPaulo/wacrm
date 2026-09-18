@@ -24,11 +24,11 @@
 
 ## 4. La automatización cede el turno (A)
 
-- [ ] 4.1 Pruebas del motor: condición `from_ad` verdadera con referral en el contexto, falsa sin él
-- [ ] 4.2 Pasar `from_ad` en el contexto de `runAutomationsForTrigger` desde `fanOutInbound`
-- [ ] 4.3 Implementar el `case 'from_ad'` en `evaluateCondition` y aceptarlo en `validate.ts`
-- [ ] 4.4 Editor: opción "Viene de un anuncio" en el selector de condiciones, sin operando; textos en `es` (y `en` si existe el catálogo)
-- [ ] 4.5 Prueba de integración: Bienvenida con raíz `from_ad` y rama sí vacía → no envía, y la IA no queda bloqueada por `hasOutboundSince`
+- [x] 4.1 Pruebas del motor: condición `from_ad` verdadera con referral en el contexto, falsa sin él
+- [x] 4.2 Pasar `from_ad` en el contexto de `runAutomationsForTrigger` desde `fanOutInbound`
+- [x] 4.3 Implementar el `case 'from_ad'` en `evaluateCondition` y aceptarlo en `validate.ts`
+- [x] 4.4 Editor: opción "Viene de un anuncio" en el selector de condiciones, sin operando; textos en `es` (y `en` si existe el catálogo)
+- [x] 4.5 Prueba de integración: Bienvenida con raíz `from_ad` y rama sí vacía → no envía, y la IA no queda bloqueada por `hasOutboundSince`
 
 ## 5. La IA usa el contexto del anuncio (A)
 

@@ -499,6 +499,7 @@ export async function fanOutInbound(ctx: InboundFanout): Promise<void> {
         message_text: inboundText,
         conversation_id: conversationId,
         interactive_reply_id: inbound.interactiveReplyId ?? undefined,
+        from_ad: !!inbound.referral,
       },
     }).catch((err) => console.error('[automations] dispatch failed:', err));
   }
