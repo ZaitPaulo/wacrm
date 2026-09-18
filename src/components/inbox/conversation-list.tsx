@@ -4,14 +4,17 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   CONVERSATION_SELECT,
+  matchesAssigneeFilter,
   matchesContactFilters,
   normalizeConversations,
+  type AssigneeFilter,
 } from '@/lib/inbox/conversations';
+import { useCan } from '@/hooks/use-can';
 import { cn } from '@/lib/utils';
-import type { Conversation, ConversationStatus, Tag } from '@/types';
+import type { Conversation, ConversationStatus, Profile, Tag } from '@/types';
 import type { MessageChannel } from '@/lib/contacts/channel-identity';
 import { ChannelBadge } from './channel-badge';
-import { Search, ChevronDown, X } from 'lucide-react';
+import { Search, ChevronDown, X, UserRound } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { dateLocale } from '@/lib/date-locale';
 import { useTranslations } from 'next-intl';
@@ -80,6 +83,11 @@ export function ConversationList({
     []
   );
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  // Filtro por asesor: solo para quien ve todas las conversaciones. Un
+  // asesor solo ve las suyas (migración 520), así que no le aporta nada.
+  const canViewAll = useCan('view-all-conversations');
+  const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>('all');
+  const [profiles, setProfiles] = useState<Profile[]>([]);
 
   // Keep the latest callback in a ref so the fetch effect below can
   // have a stable, empty-dep identity. Previously the fetch useCallback
@@ -148,6 +156,49 @@ export function ConversationList({
     };
   }, []);
 
+  // Los nombres de los asesores, para el filtro y para cada fila. La misma
+  // consulta que hace el hilo para su menú de asignar.
+  useEffect(() => {
+    if (!canViewAll) return;
+    const supabase = createClient();
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('full_name');
+      if (cancelled) return;
+      if (error) {
+        console.error('Failed to fetch profiles:', error.message);
+        return;
+      }
+      setProfiles((data as Profile[]) ?? []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewAll]);
+
+  const profileNames = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of profiles) m.set(p.user_id, p.full_name);
+    return m;
+  }, [profiles]);
+
+  // Cuántas conversaciones cargadas tiene cada opción del filtro.
+  const assigneeCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    let unassigned = 0;
+    for (const c of conversations) {
+      if (c.assigned_agent_id) {
+        m.set(c.assigned_agent_id, (m.get(c.assigned_agent_id) ?? 0) + 1);
+      } else {
+        unassigned++;
+      }
+    }
+    return { byAgent: m, unassigned };
+  }, [conversations]);
+
   // Company options are derived from the loaded conversations — there's no
   // separate companies table, and only companies with a live conversation
   // are worth offering as an inbox filter.
@@ -192,6 +243,10 @@ export function ConversationList({
       );
     }
 
+    if (assigneeFilter !== 'all') {
+      result = result.filter((c) => matchesAssigneeFilter(c, assigneeFilter));
+    }
+
     if (filter === 'unread') {
       result = result.filter((c) => c.unread_count > 0);
     } else if (filter !== 'all') {
@@ -219,7 +274,15 @@ export function ConversationList({
     }
 
     return result;
-  }, [conversations, filter, search, selectedTagIds, selectedCompany]);
+  }, [
+    conversations,
+    filter,
+    search,
+    selectedTagIds,
+    selectedCompany,
+    selectedChannels,
+    assigneeFilter,
+  ]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -250,6 +313,23 @@ export function ConversationList({
   );
 
   const activeFilter = FILTER_OPTIONS.find((o) => o.value === filter);
+
+  /** Cómo se nombra al asignado de una fila, o null si no aplica. */
+  const assigneeLabel = useCallback(
+    (conv: Conversation): string | null => {
+      if (!canViewAll) return null;
+      if (!conv.assigned_agent_id) return t('unassigned');
+      return profileNames.get(conv.assigned_agent_id) ?? t('unknownAgent');
+    },
+    [canViewAll, profileNames, t]
+  );
+
+  const assigneeTriggerLabel =
+    assigneeFilter === 'all'
+      ? t('agent')
+      : assigneeFilter === 'unassigned'
+        ? t('unassigned')
+        : (profileNames.get(assigneeFilter) ?? t('unknownAgent'));
 
   return (
     // w-full on mobile so the list occupies the whole viewport when it's
@@ -294,6 +374,49 @@ export function ConversationList({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {canViewAll && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  'hover:bg-muted inline-flex h-7 max-w-40 items-center justify-center gap-1 rounded-md px-2 text-xs',
+                  assigneeFilter !== 'all'
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <UserRound className="h-3 w-3 shrink-0" />
+                <span className="truncate">{assigneeTriggerLabel}</span>
+                <ChevronDown className="h-3 w-3 shrink-0" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="border-border bg-popover max-h-72 w-60"
+              >
+                <AssigneeOption
+                  label={t('allAgents')}
+                  count={conversations.length}
+                  selected={assigneeFilter === 'all'}
+                  onSelect={() => setAssigneeFilter('all')}
+                />
+                <AssigneeOption
+                  label={t('unassigned')}
+                  count={assigneeCounts.unassigned}
+                  selected={assigneeFilter === 'unassigned'}
+                  onSelect={() => setAssigneeFilter('unassigned')}
+                />
+                {profiles.map((p) => (
+                  <AssigneeOption
+                    key={p.user_id}
+                    label={p.full_name}
+                    count={assigneeCounts.byAgent.get(p.user_id) ?? 0}
+                    selected={assigneeFilter === p.user_id}
+                    onSelect={() => setAssigneeFilter(p.user_id)}
+                  />
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {tags.length > 0 && (
             <DropdownMenu>
@@ -494,6 +617,7 @@ export function ConversationList({
                 conversation={conv}
                 isActive={conv.id === activeConversationId}
                 onSelect={handleSelect}
+                assignee={assigneeLabel(conv)}
                 t={t}
               />
             ))}
@@ -504,10 +628,40 @@ export function ConversationList({
   );
 }
 
+/** Una opción del filtro por asesor, con su conteo a la derecha. */
+function AssigneeOption({
+  label,
+  count,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  count: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <DropdownMenuItem
+      onClick={onSelect}
+      className={cn(
+        'flex items-center justify-between gap-2 text-sm',
+        selected ? 'text-primary' : 'text-popover-foreground'
+      )}
+    >
+      <span className="truncate">{label}</span>
+      <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+        {count}
+      </span>
+    </DropdownMenuItem>
+  );
+}
+
 interface ConversationItemProps {
   conversation: Conversation;
   isActive: boolean;
   onSelect: (conversation: Conversation) => void;
+  /** Nombre del asesor asignado; null cuando no se muestra. */
+  assignee: string | null;
   t: ReturnType<typeof useTranslations>;
 }
 
@@ -515,6 +669,7 @@ function ConversationItem({
   conversation,
   isActive,
   onSelect,
+  assignee,
   t,
 }: ConversationItemProps) {
   const contact = conversation.contact;
@@ -583,6 +738,19 @@ function ConversationItem({
             />
           </div>
         </div>
+        {assignee && (
+          <p
+            className={cn(
+              'mt-0.5 flex items-center gap-1 truncate text-[11px]',
+              conversation.assigned_agent_id
+                ? 'text-muted-foreground'
+                : 'text-amber-600 dark:text-amber-500'
+            )}
+          >
+            <UserRound className="h-3 w-3 shrink-0" />
+            <span className="truncate">{assignee}</span>
+          </p>
+        )}
       </div>
     </button>
   );

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  matchesAssigneeFilter,
   matchesContactFilters,
   normalizeConversation,
 } from "./conversations";
@@ -141,5 +142,29 @@ describe("normalizeConversation", () => {
     };
     // A contactless row passes through untouched (consumers use `?.`).
     expect(normalizeConversation(raw).contact).toBeNull();
+  });
+});
+
+// El dueño no tenía cómo ver qué conversaciones tiene cada asesor
+// (2026-09-18): el filtro de la bandeja se decide con esta regla.
+describe("matchesAssigneeFilter", () => {
+  const deBrayan = { ...makeConversation(null), assigned_agent_id: "u-brayan" };
+  const sinAsesor = makeConversation(null);
+
+  it("con 'all' deja pasar todo", () => {
+    expect(matchesAssigneeFilter(deBrayan, "all")).toBe(true);
+    expect(matchesAssigneeFilter(sinAsesor, "all")).toBe(true);
+  });
+
+  it("con 'unassigned' solo deja pasar las que no tienen asesor", () => {
+    expect(matchesAssigneeFilter(sinAsesor, "unassigned")).toBe(true);
+    expect(matchesAssigneeFilter({ ...sinAsesor, assigned_agent_id: null as unknown as undefined }, "unassigned")).toBe(true);
+    expect(matchesAssigneeFilter(deBrayan, "unassigned")).toBe(false);
+  });
+
+  it("con un id solo deja pasar las de ese asesor", () => {
+    expect(matchesAssigneeFilter(deBrayan, "u-brayan")).toBe(true);
+    expect(matchesAssigneeFilter(deBrayan, "u-juan")).toBe(false);
+    expect(matchesAssigneeFilter(sinAsesor, "u-juan")).toBe(false);
   });
 });

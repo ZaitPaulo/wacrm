@@ -217,6 +217,10 @@
       "company": "Company",
       "allCompanies": "All companies",
       "clearAll": "Clear all",
+      "agent": "Agent",
+      "allAgents": "All agents",
+      "unassigned": "Unassigned",
+      "unknownAgent": "Unknown agent",
       "noConversations": "No conversations found",
       "noMessagesYet": "No messages yet",
       "unknown": "Unknown"

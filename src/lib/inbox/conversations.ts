@@ -69,3 +69,23 @@ export function matchesContactFilters(
 
   return true;
 }
+
+/**
+ * Filtro de la bandeja por asesor: `'all'`, `'unassigned'` o el
+ * `user_id` de un integrante de la cuenta.
+ */
+export type AssigneeFilter = "all" | "unassigned" | (string & {});
+
+/**
+ * Si una conversación pasa el filtro por asesor. Solo filtra lo que la
+ * RLS ya dejó ver: no cambia quién ve qué (migración 520).
+ */
+export function matchesAssigneeFilter(
+  conversation: Conversation,
+  filter: AssigneeFilter,
+): boolean {
+  if (filter === "all") return true;
+  const assignee = conversation.assigned_agent_id ?? null;
+  if (filter === "unassigned") return assignee === null;
+  return assignee === filter;
+}
