@@ -135,14 +135,17 @@ function aiConfig(overrides: Partial<AiConfig> = {}): AiConfig {
   }
 }
 
-/** Peticion de transferencia con los cuatro datos: la que el gate deja
- *  pasar. Los tests que prueban el bloqueo quitan campos. */
+/** Peticion de transferencia con los cuatro datos y el perfil de
+ *  credito: la que el gate deja pasar. Los tests que prueban el bloqueo
+ *  quitan campos. */
 function handoffRequest(overrides: Partial<HandoffRequest> = {}): HandoffRequest {
   return {
     nombre: 'Carlos',
     presupuesto: '30000000',
     interes: 'Kia Sportage 2019',
     credito: true,
+    ocupacion: 'comerciante',
+    ingresos: '3 millones',
     motivo: 'visita',
     ...overrides,
   }

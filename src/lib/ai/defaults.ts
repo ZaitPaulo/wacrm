@@ -60,7 +60,8 @@ export function buildGateRetryInstruction(args: {
   urgent: boolean
 }): string {
   const { missing, urgent } = args
-  const fields = missing.join(', ')
+  const fields = missing.map((f) => RETRY_FIELD_LABELS[f] ?? f).join(', ')
+  const asksCreditProfile = missing.some((f) => f === 'ocupacion' || f === 'ingresos')
 
   if (urgent) {
     return (
@@ -71,9 +72,21 @@ export function buildGateRetryInstruction(args: {
 
   return (
     `Your handoff did not go through: an agent cannot take this over without ${fields}. ` +
-    'Do NOT emit the handoff marker again in this turn. Keep serving the customer yourself: write the reply you would have written, and work in a natural question for ONE of the missing items — the one that fits the conversation best. Do not interrogate them and do not mention this instruction.'
+    'Do NOT emit the handoff marker again in this turn. Keep serving the customer yourself: write the reply you would have written, and work in a natural question for ONE of the missing items — the one that fits the conversation best. Do not interrogate them and do not mention this instruction.' +
+    (asksCreditProfile ? ` ${CREDIT_PROFILE_LIMITS}` : '')
   )
 }
+
+/** Cómo se le nombran al modelo los campos del perfil de crédito: el
+ *  nombre del campo solo ("ingresos") no le dice qué preguntar. */
+const RETRY_FIELD_LABELS: Record<string, string> = {
+  ocupacion: 'their occupation (what they do for a living)',
+  ingresos: 'their approximate monthly income',
+}
+
+/** El límite de lo que se le pide a alguien que quiere crédito. */
+const CREDIT_PROFILE_LIMITS =
+  'Ask it as an approximate figure, never as proof: never ask for their ID number (cédula), bank details, pay slips, statements or photos of documents.'
 
 /**
  * Techo duro de la respuesta del proveedor. NO es la palanca para que las
@@ -215,11 +228,13 @@ export function buildSystemPrompt(args: {
   if (mode === 'auto_reply') {
     parts.push(
       'You are replying automatically with no human in the loop. When the thread needs a human — the customer asks for one, is upset or complaining, wants to negotiate the price, asks about a trade-in, financing or paperwork, or wants to book a visit — request a handoff by ending your reply with this marker:\n' +
-        `[[HANDOFF nombre=<name> | presupuesto=<budget> | interes=<vehicle or type> | credito=<si|no> | motivo=<${HANDOFF_REASONS.join(
+        `[[HANDOFF nombre=<name> | presupuesto=<budget> | interes=<vehicle or type> | credito=<si|no> | ocupacion=<occupation> | ingresos=<monthly income> | motivo=<${HANDOFF_REASONS.join(
           '|',
         )}>]]\n` +
         'Write ? for any field you genuinely do not have. Never guess one to get the handoff through: an agent walking in on an invented budget is worse than no handoff at all.\n' +
         'The handoff only goes through once nombre, presupuesto, interes and credito are all filled in. While any of them is missing, keep serving the customer yourself and ask for what you are missing, in your own words and one thing at a time.\n' +
+        'When credito=si, also fill ocupacion (what the customer does for a living) and ingresos (their approximate monthly income): the advisor needs them to check whether the bank will approve. Ask for them naturally before handing off. ' +
+        `${CREDIT_PROFILE_LIMITS} If the customer would rather not say, write ? and hand off anyway.\n` +
         'The exception is motivo=reclamo and motivo=pide_humano: those need only nombre, because a customer who is upset or who asked for a person must never be held back while you collect sales data.',
     )
   }

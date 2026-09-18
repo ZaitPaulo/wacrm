@@ -124,6 +124,38 @@ describe('buildHandoffSummary — datos recolectados', () => {
     expect(summary).toContain('Crédito: no')
   })
 
+  it('con crédito, agrega ocupación e ingresos', () => {
+    const summary = buildHandoffSummary({
+      messages,
+      replyCount: 4,
+      request: {
+        nombre: 'Laura',
+        presupuesto: '30 millones inicial',
+        interes: 'camioneta 4x4',
+        credito: true,
+        ocupacion: 'comerciante independiente',
+        ingresos: null,
+        motivo: 'credito',
+      },
+    })
+    expect(summary).toContain('Ocupación: comerciante independiente · Ingresos: (falta)')
+  })
+
+  it('de contado no muestra la línea del perfil de crédito', () => {
+    const summary = buildHandoffSummary({
+      messages,
+      replyCount: 1,
+      request: {
+        nombre: 'Luis',
+        presupuesto: '50000000',
+        interes: 'sedán',
+        credito: false,
+        motivo: 'visita',
+      },
+    })
+    expect(summary).not.toContain('Ocupación')
+  })
+
   it('mantiene la nota corta cuando no hubo petición (camino de fallo)', () => {
     const summary = buildHandoffSummary({ messages, replyCount: 0 })
     expect(summary).not.toContain('Motivo:')

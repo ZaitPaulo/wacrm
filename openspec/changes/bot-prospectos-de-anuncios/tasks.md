@@ -9,12 +9,12 @@
 
 ## 2. Perfil de crédito en el traspaso (E)
 
-- [ ] 2.1 Pruebas de `evaluateHandoffGate`: con crédito exige `ocupacion` e `ingresos`; de contado no; salida con `attempts >= 1` cuando solo faltan esos dos; sin salida si falta uno de los cuatro obligatorios
-- [ ] 2.2 Agregar `ocupacion` e `ingresos` a `HandoffRequest` (`types.ts`) y al parser del sentinel, con sus pruebas
-- [ ] 2.3 Implementar la regla en `handoff-gate.ts`
-- [ ] 2.4 `buildHandoffSummary`: línea "Ocupación · Ingresos" cuando hay crédito, con faltantes marcados; pruebas
-- [ ] 2.5 `buildGateRetryInstruction`: nombres legibles para los campos nuevos y la aclaración de no pedir cédula ni datos bancarios; pruebas
-- [ ] 2.6 Documentar en el formato del sentinel del prompt (`defaults.ts`) los dos campos nuevos
+- [x] 2.1 Pruebas de `evaluateHandoffGate`: con crédito exige `ocupacion` e `ingresos`; de contado no; salida con `attempts >= 1` cuando solo faltan esos dos; sin salida si falta uno de los cuatro obligatorios
+- [x] 2.2 Agregar `ocupacion` e `ingresos` a `HandoffRequest` (`types.ts`) y al parser del sentinel, con sus pruebas
+- [x] 2.3 Implementar la regla en `handoff-gate.ts`
+- [x] 2.4 `buildHandoffSummary`: línea "Ocupación · Ingresos" cuando hay crédito, con faltantes marcados; pruebas
+- [x] 2.5 `buildGateRetryInstruction`: nombres legibles para los campos nuevos y la aclaración de no pedir cédula ni datos bancarios; pruebas
+- [x] 2.6 Documentar en el formato del sentinel del prompt (`defaults.ts`) los dos campos nuevos
 
 ## 3. Guardar el origen publicitario (A)
 

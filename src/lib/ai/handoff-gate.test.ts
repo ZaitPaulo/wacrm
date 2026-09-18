@@ -8,6 +8,8 @@ function request(overrides: Partial<HandoffRequest> = {}): HandoffRequest {
     presupuesto: '30000000',
     interes: 'Kia Sportage 2019',
     credito: true,
+    ocupacion: 'comerciante independiente',
+    ingresos: '3 millones',
     motivo: 'visita',
     ...overrides,
   }
@@ -63,6 +65,49 @@ describe('evaluateHandoffGate — datos incompletos', () => {
   it('sigue bloqueando al quinto intento no urgente', () => {
     const res = evaluateHandoffGate({ request: request({ presupuesto: null }), attempts: 5 })
     expect(res.transfer).toBe(false)
+  })
+})
+
+// Lo primero que preguntaban los asesores al recibir un traspaso por
+// crédito (2026-09-18) era a qué se dedica el cliente y cuánto gana.
+describe('evaluateHandoffGate — perfil de crédito', () => {
+  it('con crédito, bloquea si faltan ocupación e ingresos y los nombra', () => {
+    const res = evaluateHandoffGate({
+      request: request({ ocupacion: null, ingresos: null }),
+      attempts: 0,
+    })
+    expect(res.transfer).toBe(false)
+    expect(res.missing).toEqual(['ocupacion', 'ingresos'])
+  })
+
+  it('de contado no los exige', () => {
+    const res = evaluateHandoffGate({
+      request: request({ credito: false, ocupacion: null, ingresos: null }),
+      attempts: 0,
+    })
+    expect(res.transfer).toBe(true)
+  })
+
+  it('no deja atascado a quien no quiere decir sus ingresos', () => {
+    const res = evaluateHandoffGate({ request: request({ ingresos: null }), attempts: 1 })
+    expect(res).toEqual({ transfer: true, missing: [], urgent: false })
+  })
+
+  it('la salida no aplica mientras falte uno de los cuatro datos', () => {
+    const res = evaluateHandoffGate({
+      request: request({ presupuesto: null, ingresos: null }),
+      attempts: 3,
+    })
+    expect(res.transfer).toBe(false)
+    expect(res.missing).toEqual(['presupuesto', 'ingresos'])
+  })
+
+  it('un marcador sin los campos nuevos cuenta como si faltaran', () => {
+    const viejo: HandoffRequest = request()
+    delete viejo.ocupacion
+    delete viejo.ingresos
+    const res = evaluateHandoffGate({ request: viejo, attempts: 0 })
+    expect(res.missing).toEqual(['ocupacion', 'ingresos'])
   })
 })
 

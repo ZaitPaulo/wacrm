@@ -139,6 +139,8 @@ function parseHandoffFields(body: string): HandoffRequest {
     presupuesto: fieldValue(declared.get('presupuesto')),
     interes: fieldValue(declared.get('interes')),
     credito: parseCredito(declared.get('credito') ?? ''),
+    ocupacion: fieldValue(declared.get('ocupacion')),
+    ingresos: fieldValue(declared.get('ingresos')),
     // An invented reason degrades to `otro`, which is non-urgent. That
     // direction is the safe one: a made-up reason can't buy the model a
     // shortcut past the data gate.

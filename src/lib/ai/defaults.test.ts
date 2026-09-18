@@ -3,6 +3,7 @@ import {
   aiReplyDebounceMs,
   aiVisionDownloadTimeoutMs,
   aiVisionMaxImages,
+  buildGateRetryInstruction,
   buildSystemPrompt,
 } from './defaults'
 import { HANDOFF_REASONS } from './types'
@@ -154,6 +155,14 @@ describe('buildSystemPrompt — handoff instructions', () => {
     expect(prompt).toContain('motivo=pide_humano')
   })
 
+  it('pide ocupación e ingresos cuando hay crédito, sin documentos', () => {
+    const prompt = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply' })
+    expect(prompt).toContain('ocupacion=')
+    expect(prompt).toContain('ingresos=')
+    expect(prompt).toMatch(/credito=si[^]*ocupacion[^]*ingresos/)
+    expect(prompt).toMatch(/[Nn]ever ask for their ID number/)
+  })
+
   it('says nothing about handoffs in draft mode', () => {
     const prompt = buildSystemPrompt({ userPrompt: null, mode: 'draft' })
     expect(prompt).not.toContain('HANDOFF')
@@ -207,5 +216,23 @@ describe('buildSystemPrompt — inventario', () => {
   it('también llega en modo borrador', () => {
     const prompt = buildSystemPrompt({ userPrompt: null, mode: 'draft', inventory: index })
     expect(prompt).toContain('Current inventory')
+  })
+})
+
+describe('buildGateRetryInstruction — perfil de crédito', () => {
+  it('nombra los campos nuevos en palabras que el modelo entiende', () => {
+    const text = buildGateRetryInstruction({ missing: ['ocupacion', 'ingresos'], urgent: false })
+    expect(text).toContain('what they do for a living')
+    expect(text).toContain('approximate monthly income')
+  })
+
+  it('prohíbe pedir cédula o datos bancarios cuando pide el perfil', () => {
+    const text = buildGateRetryInstruction({ missing: ['ingresos'], urgent: false })
+    expect(text).toMatch(/[Nn]ever ask for their ID number/)
+  })
+
+  it('no agrega esa advertencia cuando falta otro dato', () => {
+    const text = buildGateRetryInstruction({ missing: ['presupuesto'], urgent: false })
+    expect(text).not.toContain('ID number')
   })
 })

@@ -50,6 +50,12 @@ export function buildHandoffSummary(args: {
         `Presupuesto: ${orMissing(request.presupuesto)} · ` +
         `Interés: ${orMissing(request.interes)} · Crédito: ${credito(request.credito)}`,
     )
+    if (request.credito === true) {
+      lines.push(
+        `Ocupación: ${orMissing(request.ocupacion ?? null)} · ` +
+          `Ingresos: ${orMissing(request.ingresos ?? null)}`,
+      )
+    }
   }
 
   if (lastCustomer) {

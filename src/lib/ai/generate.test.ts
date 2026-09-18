@@ -59,9 +59,20 @@ describe('parseGeneration', () => {
         presupuesto: '30000000',
         interes: 'Kia Sportage 2019',
         credito: true,
+        ocupacion: null,
+        ingresos: null,
         motivo: 'credito',
       },
       usage: null,
+    })
+  })
+
+  it('lee ocupación e ingresos del perfil de crédito', () => {
+    const raw =
+      '[[HANDOFF nombre=Laura | presupuesto=30 millones | interes=4x4 | credito=si | ocupacion=comerciante | ingresos=? | motivo=credito]]'
+    expect(parseGeneration(raw).handoff).toMatchObject({
+      ocupacion: 'comerciante',
+      ingresos: null,
     })
   })
 
@@ -76,6 +87,8 @@ describe('parseGeneration', () => {
       presupuesto: null,
       interes: null,
       credito: false,
+      ocupacion: null,
+      ingresos: null,
       motivo: 'visita',
     })
   })
@@ -89,6 +102,8 @@ describe('parseGeneration', () => {
       presupuesto: '80 millones',
       interes: 'camioneta',
       credito: null,
+      ocupacion: null,
+      ingresos: null,
       motivo: 'permuta',
     })
   })
@@ -104,6 +119,8 @@ describe('parseGeneration', () => {
         presupuesto: null,
         interes: null,
         credito: null,
+        ocupacion: null,
+        ingresos: null,
         motivo: 'otro',
       },
       usage: null,

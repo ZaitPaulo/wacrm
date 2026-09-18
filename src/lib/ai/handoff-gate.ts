@@ -24,11 +24,21 @@ export const REQUIRED_HANDOFF_FIELDS = [
 
 export type RequiredHandoffField = (typeof REQUIRED_HANDOFF_FIELDS)[number]
 
+/**
+ * Lo que el asesor pregunta primero cuando el cliente necesita crédito
+ * (revisión del 2026-09-18: 6 de 7 traspasos fueron por crédito). Solo
+ * se exige con `credito === true`, y nunca deja al cliente atascado:
+ * ver `evaluateHandoffGate`.
+ */
+export const CREDIT_PROFILE_FIELDS = ['ocupacion', 'ingresos'] as const
+
+export type CreditProfileField = (typeof CREDIT_PROFILE_FIELDS)[number]
+
 export interface HandoffGateResult {
   /** Whether the transfer goes through. */
   transfer: boolean
   /** Fields still needed. Empty when `transfer` is true. */
-  missing: RequiredHandoffField[]
+  missing: (RequiredHandoffField | CreditProfileField)[]
   /** Whether the request was urgent (complaint / asked for a person). */
   urgent: boolean
 }
@@ -41,7 +51,10 @@ export interface HandoffGateResult {
  * truthiness would trap every cash buyer behind a question they already
  * answered.
  */
-function isPresent(request: HandoffRequest, field: RequiredHandoffField): boolean {
+function isPresent(
+  request: HandoffRequest,
+  field: RequiredHandoffField | CreditProfileField,
+): boolean {
   const value = request[field]
   if (field === 'credito') return value !== null
   return typeof value === 'string' && value.trim() !== ''
@@ -70,7 +83,24 @@ export function evaluateHandoffGate(args: {
   }
 
   const missing = REQUIRED_HANDOFF_FIELDS.filter((f) => !isPresent(request, f))
-  // No attempt-based escape here on purpose: a sale can wait. If it
-  // couldn't, the gate would evaporate a few turns into every thread.
-  return { transfer: missing.length === 0, missing, urgent }
+  const missingProfile =
+    request.credito === true
+      ? CREDIT_PROFILE_FIELDS.filter((f) => !isPresent(request, f))
+      : []
+
+  // No attempt-based escape for the four required fields: a sale can
+  // wait. If it couldn't, the gate would evaporate a few turns into
+  // every thread.
+  if (missing.length > 0) {
+    return { transfer: false, missing: [...missing, ...missingProfile], urgent }
+  }
+
+  // El perfil de crédito ahorra tiempo al asesor, pero no es condición
+  // para vender: se pide una vez, y si el cliente no lo quiere dar, el
+  // siguiente intento pasa. `attempts` no distingue qué faltó antes; al
+  // llegar aquí los cuatro datos ya están, así que da igual.
+  if (missingProfile.length > 0 && attempts < 1) {
+    return { transfer: false, missing: missingProfile, urgent }
+  }
+  return { transfer: true, missing: [], urgent }
 }

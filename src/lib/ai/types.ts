@@ -161,6 +161,12 @@ export interface HandoffRequest {
   interes: string | null
   /** Whether they need financing. Null when the model didn't ask. */
   credito: boolean | null
+  /** Perfil de crédito: solo se exige con `credito === true`. Opcionales
+   *  porque un marcador sin ellos sigue siendo válido; ausente y null
+   *  cuentan igual, como dato faltante. */
+  ocupacion?: string | null
+  /** Ingresos mensuales aproximados, tal como los dijo el cliente. */
+  ingresos?: string | null
   motivo: HandoffReason
 }
 
