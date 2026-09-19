@@ -44,4 +44,4 @@
 - [x] 6.3 Merge a `develop`, promover a `main`, respaldo y despliegue en el VPS; confirmar que la migración se aplicó
 - [x] 6.4 Producción: reconfigurar la Bienvenida con la raíz "viene de un anuncio" (sí → nada)
 - [x] 6.5 Producción: ajustar el `system_prompt` (crédito: pedir ocupación e ingresos aproximados; si viene de anuncio, mencionar la vitrina loramotors.co)
-- [ ] 6.6 Revisar en la base los primeros prospectos de anuncio tras el despliegue: referral guardado, primera respuesta de la IA, enlaces presentes
+- [x] 6.6 Revisar en la base los primeros prospectos de anuncio tras el despliegue: referral guardado, primera respuesta de la IA, enlaces presentes — hecho el 2026-09-18 19:10: 4 prospectos del anuncio "Chatea con nosotros", referral guardado en los 4, la IA contestó el primer mensaje y los carros salieron con su enlace

@@ -3,7 +3,6 @@
 ## Purpose
 Qué datos exige el asistente antes de transferir a un humano, y cómo evita transferir cuando todavía puede atender él mismo.
 ## Requirements
-
 ### Requirement: El modelo declara los datos del cliente al pedir una transferencia
 
 En modo `auto_reply`, el modelo SHALL pedir la transferencia a un asesor emitiendo un sentinel que incluya los datos que recolectó del cliente: nombre, presupuesto, vehículo de interés, si requiere crédito, y el motivo de la transferencia.
@@ -86,7 +85,7 @@ Este escape NO SHALL aplicar a las transferencias no urgentes: una conversación
 
 ### Requirement: El asesor recibe los datos recolectados
 
-Cuando una transferencia se concrete, la nota interna que queda en la conversación SHALL incluir los datos que el modelo recolectó y el motivo declarado, para que el asesor sepa con qué contexto entra.
+Cuando una transferencia se concrete, la nota interna que queda en la conversación SHALL incluir los datos que el modelo recolectó y el motivo declarado, para que el asesor sepa con qué contexto entra. Si el cliente requiere crédito, la nota SHALL incluir también ocupación e ingresos aproximados.
 
 Los campos que no se obtuvieron SHALL aparecer marcados como faltantes, no omitidos en silencio.
 
@@ -95,8 +94,74 @@ Los campos que no se obtuvieron SHALL aparecer marcados como faltantes, no omiti
 - **WHEN** una conversación se transfiere con los cuatro datos
 - **THEN** la nota interna incluye nombre, presupuesto, vehículo de interés, crédito y motivo
 
+#### Scenario: Transferencia por crédito con perfil
+
+- **WHEN** una conversación se transfiere con crédito = sí, ocupación "comerciante independiente" e ingresos "3 millones"
+- **THEN** la nota interna incluye ocupación e ingresos además de los cuatro datos
+
 #### Scenario: Transferencia urgente incompleta
 
 - **WHEN** una conversación se transfiere por urgencia sin presupuesto ni vehículo de interés
 - **THEN** la nota interna muestra esos dos campos marcados como faltantes
 - **AND** indica que la transferencia fue por urgencia
+
+### Requirement: Con crédito, el traspaso lleva el perfil del cliente
+
+Cuando el modelo declare que el cliente requiere crédito, el sentinel de transferencia SHALL incluir además la ocupación del cliente y sus ingresos mensuales aproximados. Ambos campos admiten el valor desconocido, igual que los demás.
+
+El modelo SHALL pedir estos dos datos con naturalidad antes de transferir por crédito. NO SHALL pedir cédula, datos bancarios, extractos, desprendibles de pago ni fotos de documentos.
+
+Cuando el cliente no requiere crédito, estos dos campos NO SHALL exigirse.
+
+#### Scenario: Traspaso por crédito con perfil completo
+
+- **WHEN** el modelo pide transferir con nombre, presupuesto, vehículo de interés, crédito = sí, ocupación e ingresos
+- **THEN** la conversación se transfiere al asesor
+
+#### Scenario: Traspaso por crédito sin perfil
+
+- **WHEN** el modelo pide transferir con los cuatro datos, crédito = sí, y sin ocupación ni ingresos
+- **THEN** la conversación no se transfiere en ese turno
+- **AND** el cliente recibe un mensaje que le pregunta a qué se dedica y cuánto gana más o menos al mes
+
+#### Scenario: Comprador de contado
+
+- **WHEN** el modelo pide transferir con los cuatro datos y crédito = no, sin ocupación ni ingresos
+- **THEN** la conversación se transfiere al asesor
+
+### Requirement: El perfil de crédito no deja al cliente atascado
+
+Si la conversación ya tuvo al menos una transferencia rechazada y en el intento actual los únicos datos que faltan son la ocupación o los ingresos, la transferencia SHALL concretarse. Los cuatro datos obligatorios conservan sus reglas: esta salida no aplica mientras falte alguno de ellos.
+
+#### Scenario: El cliente no quiere decir sus ingresos
+
+- **WHEN** el modelo pide transferir por crédito por segunda vez, con los cuatro datos y todavía sin ingresos
+- **THEN** la conversación se transfiere al asesor
+- **AND** la nota interna muestra los ingresos marcados como faltantes
+
+### Requirement: Los datos obligatorios dependen del motivo
+
+El sistema SHALL exigir para cada motivo de traspaso los datos que tienen sentido para él:
+
+- `vende_su_carro` (el cliente quiere venderle su carro al concesionario): nombre y datos del carro, declarados en `interes`. Presupuesto y crédito NO SHALL exigirse.
+- `sin_stock` (nada del inventario le sirve): nombre, presupuesto y lo que busca. Crédito NO SHALL exigirse.
+- Los demás motivos no urgentes conservan los cuatro datos obligatorios.
+
+La nota del traspaso SHALL nombrar el motivo en español; para `vende_su_carro` SHALL mostrar el carro que ofrece en lugar de presupuesto, interés y crédito.
+
+#### Scenario: Cliente que vende su carro
+
+- **WHEN** el modelo pide transferir con motivo `vende_su_carro`, nombre "Luis Miguel" e interés "Citroën C3 2024, 50 mil km, placa de Sincelejo", sin presupuesto ni crédito
+- **THEN** la conversación se transfiere
+- **AND** la nota dice "Motivo: quiere vender su carro · Nombre: Luis Miguel · Su carro: Citroën C3 2024, 50 mil km, placa de Sincelejo"
+
+#### Scenario: Vendedor sin datos del carro
+
+- **WHEN** el modelo pide transferir con motivo `vende_su_carro` y sin interés
+- **THEN** la conversación no se transfiere y falta `interes`
+
+#### Scenario: Nada del inventario le sirve
+
+- **WHEN** el modelo pide transferir con motivo `sin_stock`, nombre, presupuesto "20 millones de contado" e interés "carro 1.2 económico", sin crédito
+- **THEN** la conversación se transfiere con la nota "Motivo: no hay lo que busca"
+

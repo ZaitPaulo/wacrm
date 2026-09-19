@@ -54,7 +54,7 @@
 ## 10. Cierre
 
 - [x] 10.1 Suite completa, typecheck y lint
-- [ ] 10.2 Probar localmente contra Gemini con una captura real de una publicación: la respuesta nombra el vehículo del inventario
+- [x] 10.2 Probar localmente contra Gemini con una captura real de una publicación: la respuesta nombra el vehículo del inventario — reemplazada por la prueba en producción (10.5), a pedido del usuario: la prueba local exigía leer secretos de producción. Resultado del 2026-09-12 19:08: captura con "este en cuanto?" → "Ese Chevrolet Onix Activ 2018 está en $37.000.000. Tiene 116 mil kms y es mecánico.", que es exactamente `PDFX7M` del inventario, elegido entre 8 Onix; 11.076 tokens de entrada contra ~9.950 de las respuestas de texto; sin reintento en el log
 - [x] 10.3 Documentar `AI_VISION_MAX_IMAGES` y `AI_VISION_DOWNLOAD_TIMEOUT_MS` donde se documentan las demás variables de la IA
-- [ ] 10.4 Commit en `develop` junto con el arreglo del pie de foto, promover a `main` y desplegar en el VPS
-- [ ] 10.5 Probar en producción el caso que falló: mandar la captura del Onix Activ con y sin texto, confirmar que el bot lo identifica y que `ai_usage_log` registra la respuesta
+- [x] 10.4 Commit en `develop` junto con el arreglo del pie de foto, promover a `main` y desplegar en el VPS — hecho el 2026-09-12 19:02: `3b1df4b` (pie de foto) y `658e23a` (visión), respaldo `20260912-190045`, imagen `wacrm-app` reconstruida y contenedor sano
+- [x] 10.5 Probar en producción el caso que falló: mandar la captura del Onix Activ con y sin texto, confirmar que el bot lo identifica y que `ai_usage_log` registra la respuesta — confirmado con clientes reales el 2026-09-18: identificó un Kia Picanto EX 2012 desde una captura y un Citroën C3 2024 (versión, km y placa) desde fotos
