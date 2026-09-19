@@ -381,7 +381,9 @@
       "changeStageOf": "{deal}의 단계 변경 (현재: {stage})",
       "moveTo": "이동할 단계",
       "stageUpdated": "거래를 {stage}(으)로 이동했습니다",
-      "stageUpdateFailed": "단계를 변경하지 못했습니다"
+      "stageUpdateFailed": "단계를 변경하지 못했습니다",
+      "createDeal": "거래 만들기",
+      "addDeal": "이 연락처의 거래 만들기"
     },
     "aiBanner": {
       "pausedTitle": "이 대화에서 AI 어시스턴트가 일시 중지됨",
@@ -696,7 +698,20 @@
       "toastMarkedLost": "실패로 표시했습니다",
       "toastReopened": "딜이 재개되었습니다",
       "toastFailedDelete": "딜을 삭제하지 못했습니다",
-      "toastDeleted": "딜이 삭제되었습니다"
+      "toastDeleted": "딜이 삭제되었습니다",
+      "pipeline": "파이프라인",
+      "noPipelines": "파이프라인이 없습니다. 파이프라인에서 만드세요.",
+      "vehicle": "차량",
+      "vehiclePlaceholder": "차량 선택 (선택 사항)",
+      "vehicleNone": "차량 없음",
+      "vehicleSearch": "브랜드, 모델, 연식 또는 번호판으로 검색",
+      "vehicleEmpty": "일치하는 차량이 없습니다",
+      "vehicleSuggested": "추천 (쇼룸에서 문의함)",
+      "vehicleInventory": "재고",
+      "vehicleReserved": "예약됨",
+      "vehicleSold": "판매됨",
+      "vehicleHidden": "숨김",
+      "vehicleHint": "선택하면 금액이 차량 가격으로 채워집니다. 나중에 변경할 수 있습니다."
     },
     "settings": {
       "managePipeline": "파이프라인 관리",

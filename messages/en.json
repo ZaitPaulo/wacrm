@@ -381,7 +381,9 @@
       "changeStageOf": "Change stage of {deal} (currently: {stage})",
       "moveTo": "Move to",
       "stageUpdated": "Deal moved to {stage}",
-      "stageUpdateFailed": "Could not change the stage"
+      "stageUpdateFailed": "Could not change the stage",
+      "createDeal": "Create deal",
+      "addDeal": "Create a deal for this contact"
     },
     "aiBanner": {
       "pausedTitle": "AI assistant is paused here",
@@ -696,7 +698,20 @@
       "toastMarkedLost": "Marked as lost",
       "toastReopened": "Deal reopened",
       "toastFailedDelete": "Failed to delete deal",
-      "toastDeleted": "Deal deleted"
+      "toastDeleted": "Deal deleted",
+      "pipeline": "Pipeline",
+      "noPipelines": "There are no pipelines. Create one in Pipelines.",
+      "vehicle": "Vehicle",
+      "vehiclePlaceholder": "Choose a vehicle (optional)",
+      "vehicleNone": "No vehicle",
+      "vehicleSearch": "Search by make, model, year or plate",
+      "vehicleEmpty": "No vehicle matches",
+      "vehicleSuggested": "Suggested (asked about in the showroom)",
+      "vehicleInventory": "Inventory",
+      "vehicleReserved": "Reserved",
+      "vehicleSold": "Sold",
+      "vehicleHidden": "Hidden",
+      "vehicleHint": "Picking one sets the value to its price. You can change it afterwards."
     },
     "settings": {
       "managePipeline": "Manage Pipeline",

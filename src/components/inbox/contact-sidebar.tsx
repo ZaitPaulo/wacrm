@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getAllowedTargetStages } from "@/lib/pipelines/stage-transitions";
+import { formatVehicleLabel } from "@/lib/pipelines/deal-vehicle";
+import { DealForm } from "@/components/pipelines/deal-form";
 import type {
   Contact,
   Deal,
@@ -27,6 +29,7 @@ import {
   Plus,
   X,
   ChevronDown,
+  Car,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +60,8 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   const [contactTagIds, setContactTagIds] = useState<string[]>([]);
   const [savingTags, setSavingTags] = useState(false);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  /** Formulario para crear un negocio con este contacto ya puesto. */
+  const [dealFormOpen, setDealFormOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   /** Nombre de usuario de WhatsApp, cuando esa persona tiene uno. */
@@ -93,7 +98,9 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
       await Promise.all([
       supabase
         .from("deals")
-        .select("*, pipeline:pipelines(*), stage:pipeline_stages(*)")
+        .select(
+          "*, pipeline:pipelines(*), stage:pipeline_stages(*), vehicle:inventory_vehicles!deals_vehicle_fkey(id, brand, model, year, license_plate)"
+        )
         .eq("contact_id", contact.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -461,11 +468,29 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
           <div>
             <div className="flex items-center gap-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               <DollarSign className="h-3 w-3" />
-              {tSidebar("deals")}
+              <span className="flex-1">{tSidebar("deals")}</span>
+              <button
+                type="button"
+                onClick={() => setDealFormOpen(true)}
+                className="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label={tSidebar("addDeal")}
+                title={tSidebar("addDeal")}
+              >
+                <Plus className="h-3 w-3" />
+              </button>
             </div>
             <div className="mt-2 space-y-2">
               {deals.length === 0 ? (
-                <p className="px-1 text-xs text-muted-foreground">{tSidebar("noDeals")}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDealFormOpen(true)}
+                  className="w-full justify-center gap-1.5 border-dashed text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="h-3 w-3" />
+                  {tSidebar("createDeal")}
+                </Button>
               ) : (
                 deals.map((deal) => (
                   <div
@@ -481,6 +506,17 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
                         {deal.value.toLocaleString()}
                       </span>
                     </div>
+                    {deal.vehicle && (
+                      <div
+                        className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground"
+                        title={formatVehicleLabel(deal.vehicle)}
+                      >
+                        <Car className="h-3 w-3 shrink-0" />
+                        <span className="truncate">
+                          {formatVehicleLabel(deal.vehicle)}
+                        </span>
+                      </div>
+                    )}
                     {/* El embudo del contacto no vive en el contacto: lo lleva
                         el negocio, asi que la ubicacion se lee aqui como
                         "<embudo> · <etapa>". */}
@@ -565,6 +601,18 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
           </div>
         </div>
       </ScrollArea>
+
+      {/* Crear negocio desde la conversacion: contacto fijo y embudo a
+          elegir (propone "Ventas"). Al guardar se recarga el panel, que trae
+          etapas y reglas, asi la tarjeta sale ya con su selector de etapa. */}
+      <DealForm
+        open={dealFormOpen}
+        onOpenChange={setDealFormOpen}
+        fixedContactId={contact.id}
+        onSaved={() => {
+          void fetchContactData();
+        }}
+      />
     </div>
   );
 }

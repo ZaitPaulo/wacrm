@@ -416,10 +416,20 @@ export interface Deal {
   status?: DealStatus;
   created_at: string;
   updated_at?: string;
+  /**
+   * Vehículo del inventario de este negocio — migración 529. Opcional; queda
+   * en null si el vehículo se borra (FK compuesta con `account_id`).
+   */
+  vehicle_id?: string | null;
   contact?: Contact;
   pipeline?: Pipeline;
   stage?: PipelineStage;
   assignee?: Profile;
+  /**
+   * Embed `vehicle:inventory_vehicles!deals_vehicle_fkey(id, brand, model, year, license_plate)`.
+   * Null cuando el negocio no tiene vehículo.
+   */
+  vehicle?: Pick<DealVehicle, 'id' | 'brand' | 'model' | 'year' | 'license_plate'> | null;
 }
 
 export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
@@ -754,6 +764,15 @@ export interface AutomationLog {
 // Inventory (compraventa de vehículos) — migración 500.
 // ============================================================
 export type VehicleStatus = 'available' | 'reserved' | 'sold' | 'hidden';
+
+/**
+ * Columnas mínimas de un vehículo que usa el negocio: el selector del
+ * formulario (con precio y estado) y la línea del vehículo en las tarjetas.
+ */
+export type DealVehicle = Pick<
+  InventoryVehicle,
+  'id' | 'brand' | 'model' | 'year' | 'license_plate' | 'price' | 'status'
+>;
 
 export interface InventoryVehicle {
   id: string;

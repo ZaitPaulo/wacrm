@@ -1,8 +1,9 @@
 "use client";
 
 import type { Deal, PipelineStage } from "@/types";
-import { Calendar, Check, X } from "lucide-react";
+import { Calendar, Car, Check, X } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
+import { formatVehicleLabel } from "@/lib/pipelines/deal-vehicle";
 import { useTranslations } from "next-intl";
 
 interface DealCardProps {
@@ -30,6 +31,7 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
   const t = useTranslations("Pipelines.card");
   const contactLabel = deal.contact?.name || deal.contact?.phone || t("noContact");
   const assigneeLabel = deal.assignee?.full_name || null;
+  const vehicleLabel = deal.vehicle ? formatVehicleLabel(deal.vehicle) : null;
 
   return (
     <button
@@ -79,6 +81,15 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
         </span>
         <span className="truncate text-xs text-muted-foreground">{contactLabel}</span>
       </div>
+
+      {vehicleLabel && (
+        <div className="mt-1.5 flex min-w-0 items-center gap-2" title={vehicleLabel}>
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
+            <Car className="h-3.5 w-3.5" />
+          </span>
+          <span className="truncate text-xs text-muted-foreground">{vehicleLabel}</span>
+        </div>
+      )}
 
       <div className="mt-2 flex items-center justify-between">
         <span className="text-sm font-bold text-primary">

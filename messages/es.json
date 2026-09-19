@@ -357,7 +357,9 @@
       "changeStageOf": "Cambiar la etapa de {deal} (ahora: {stage})",
       "moveTo": "Mover a",
       "stageUpdated": "Negocio movido a {stage}",
-      "stageUpdateFailed": "No se pudo cambiar la etapa"
+      "stageUpdateFailed": "No se pudo cambiar la etapa",
+      "createDeal": "Crear negocio",
+      "addDeal": "Crear un negocio para este contacto"
     },
     "aiBanner": {
       "pausedTitle": "El asistente de IA está pausado acá",
@@ -689,7 +691,20 @@
       "toastMarkedLost": "Marcado como perdido",
       "toastReopened": "Negocio reabierto",
       "toastFailedDelete": "No se pudo eliminar el negocio",
-      "toastDeleted": "Negocio eliminado"
+      "toastDeleted": "Negocio eliminado",
+      "pipeline": "Embudo",
+      "noPipelines": "No hay embudos. Crea uno en Embudos.",
+      "vehicle": "Vehículo",
+      "vehiclePlaceholder": "Elige un vehículo (opcional)",
+      "vehicleNone": "Sin vehículo",
+      "vehicleSearch": "Busca por marca, modelo, año o placa",
+      "vehicleEmpty": "Ningún vehículo coincide",
+      "vehicleSuggested": "Sugeridos (consultó por la vitrina)",
+      "vehicleInventory": "Inventario",
+      "vehicleReserved": "Reservado",
+      "vehicleSold": "Vendido",
+      "vehicleHidden": "Oculto",
+      "vehicleHint": "Al elegirlo, el valor toma su precio. Puedes cambiarlo después."
     },
     "settings": {
       "managePipeline": "Administrar embudo",

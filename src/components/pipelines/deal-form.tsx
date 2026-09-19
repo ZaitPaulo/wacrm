@@ -1,18 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { CURRENCIES } from "@/lib/currency";
+import {
+  applyVehicleSelection,
+  formatVehicleTitle,
+  pickDefaultPipeline,
+  type VehicleInquiryRef,
+} from "@/lib/pipelines/deal-vehicle";
 import type {
   Contact,
   Conversation,
   Deal,
   DealStatus,
+  DealVehicle,
+  Pipeline,
   PipelineStage,
   Profile,
 } from "@/types";
+import { VehiclePicker } from "@/components/pipelines/vehicle-picker";
 import {
   Sheet,
   SheetContent,
@@ -30,6 +39,7 @@ import {
   MessageSquare,
   DollarSign,
   Loader2,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -38,24 +48,60 @@ interface DealFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   deal?: Deal | null;
-  pipelineId: string;
-  stages: PipelineStage[];
+  /**
+   * Embudo fijo (tablero). Si no viene, el formulario carga los embudos de la
+   * cuenta, propone uno con `pickDefaultPipeline` y deja elegirlo.
+   */
+  pipelineId?: string;
+  /** Etapas del embudo fijo. Va junto con `pipelineId`. */
+  stages?: PipelineStage[];
   defaultStageId?: string;
+  /**
+   * Contacto fijo (bandeja): se muestra su nombre, no se puede cambiar y no se
+   * carga la lista de contactos de la cuenta.
+   */
+  fixedContactId?: string;
   onSaved: () => void;
 }
+
+/** Columnas del vehículo que usa el selector (ver `DealVehicle`). */
+const VEHICLE_COLUMNS = "id, brand, model, year, license_plate, price, status";
 
 export function DealForm({
   open,
   onOpenChange,
   deal,
-  pipelineId,
-  stages,
+  pipelineId: pipelineIdProp,
+  stages: stagesProp,
   defaultStageId,
+  fixedContactId,
   onSaved,
 }: DealFormProps) {
   const t = useTranslations("Pipelines.form");
   const supabase = createClient();
   const { accountId, defaultCurrency } = useAuth();
+
+  // Sin embudo fijo, el formulario elige embudo por su cuenta.
+  const managesPipeline = !pipelineIdProp;
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [ownPipelineId, setOwnPipelineId] = useState("");
+  const [ownStages, setOwnStages] = useState<PipelineStage[]>([]);
+  const pipelineId = pipelineIdProp || ownPipelineId;
+  const stages = stagesProp ?? ownStages;
+  // Cada carga de etapas toma un número; una respuesta vieja (se cambió de
+  // embudo mientras tanto) se descarta.
+  const stagesSeqRef = useRef(0);
+
+  const [fixedContact, setFixedContact] = useState<Pick<
+    Contact,
+    "id" | "name" | "phone"
+  > | null>(null);
+
+  const [vehicles, setVehicles] = useState<DealVehicle[]>([]);
+  const [inquiries, setInquiries] = useState<VehicleInquiryRef[]>([]);
+  const [vehicleId, setVehicleId] = useState("");
+  /** Título que puso el último vehículo elegido (ver `applyVehicleSelection`). */
+  const [autoTitle, setAutoTitle] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
@@ -94,17 +140,24 @@ export function DealForm({
       setAssignedTo(deal.assigned_to ?? "");
       setExpectedCloseDate(deal.expected_close_date ?? "");
       setNotes(deal.notes ?? "");
+      setVehicleId(deal.vehicle_id ?? "");
     } else {
       setTitle("");
       setValue("");
       setCurrency(defaultCurrency);
-      setContactId("");
-      setStageId(defaultStageId || stages[0]?.id || "");
+      setContactId(fixedContactId ?? "");
+      // Con embudo propio, la etapa la pone la carga de embudos (abajo).
+      setStageId(defaultStageId || stagesProp?.[0]?.id || "");
       setAssignedTo("");
       setExpectedCloseDate("");
       setNotes("");
+      setVehicleId("");
     }
-  }, [open, deal, defaultStageId, stages, defaultCurrency]);
+    // Al editar un negocio con vehículo, su "Marca Modelo Año" cuenta como
+    // título autollenado: si el título sigue siendo ese, cambiar de vehículo
+    // lo reemplaza; si el asesor lo cambió, se respeta.
+    setAutoTitle(deal?.vehicle ? formatVehicleTitle(deal.vehicle) : null);
+  }, [open, deal, defaultStageId, stagesProp, defaultCurrency, fixedContactId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Load supporting data once the sheet is open
@@ -113,17 +166,158 @@ export function DealForm({
     let cancelled = false;
     (async () => {
       const [c, p] = await Promise.all([
-        supabase.from("contacts").select("*").order("name"),
+        // Con contacto fijo solo hace falta su nombre, no la lista entera.
+        fixedContactId
+          ? supabase
+              .from("contacts")
+              .select("id, name, phone")
+              .eq("id", fixedContactId)
+              .maybeSingle()
+          : supabase.from("contacts").select("*").order("name"),
         supabase.from("profiles").select("*").order("full_name"),
       ]);
       if (cancelled) return;
-      setContacts((c.data ?? []) as Contact[]);
+      if (fixedContactId) {
+        setFixedContact(
+          (c.data as Pick<Contact, "id" | "name" | "phone"> | null) ?? null,
+        );
+        setContacts([]);
+      } else {
+        setFixedContact(null);
+        setContacts((c.data ?? []) as Contact[]);
+      }
       setProfiles((p.data ?? []) as Profile[]);
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, supabase]);
+  }, [open, supabase, fixedContactId]);
+
+  // Inventario ofrecible (disponibles y reservados), una vez por apertura. Si
+  // el negocio que se edita tiene un vehículo que ya no lo es (vendido u
+  // oculto), se trae aparte para que siga viéndose como el elegido.
+  const linkedVehicleId = deal?.vehicle_id ?? null;
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("inventory_vehicles")
+        .select(VEHICLE_COLUMNS)
+        .in("status", ["available", "reserved"]);
+      let list = (data ?? []) as DealVehicle[];
+      if (linkedVehicleId && !list.some((v) => v.id === linkedVehicleId)) {
+        const { data: linked } = await supabase
+          .from("inventory_vehicles")
+          .select(VEHICLE_COLUMNS)
+          .eq("id", linkedVehicleId)
+          .maybeSingle();
+        if (linked) list = [...list, linked as DealVehicle];
+      }
+      if (cancelled) return;
+      setVehicles(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, supabase, linkedVehicleId]);
+
+  // Lo que el contacto consultó desde la vitrina: son los sugeridos.
+  useEffect(() => {
+    if (!open || !contactId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInquiries([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("vehicle_inquiries")
+        .select("vehicle_id, created_at")
+        .eq("contact_id", contactId)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (cancelled) return;
+      setInquiries((data ?? []) as VehicleInquiryRef[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, contactId, supabase]);
+
+  /**
+   * Carga las etapas de un embudo (modo sin embudo fijo) y pone la etapa:
+   * `keepStageId` si es de ese embudo, o la de menor posición.
+   */
+  const loadOwnStages = useCallback(
+    async (targetPipelineId: string, keepStageId?: string) => {
+      const seq = ++stagesSeqRef.current;
+      const { data } = await supabase
+        .from("pipeline_stages")
+        .select("*")
+        .eq("pipeline_id", targetPipelineId)
+        .order("position");
+      if (seq !== stagesSeqRef.current) return;
+      const list = (data ?? []) as PipelineStage[];
+      setOwnStages(list);
+      setStageId(
+        keepStageId && list.some((s) => s.id === keepStageId)
+          ? keepStageId
+          : (list[0]?.id ?? ""),
+      );
+    },
+    [supabase],
+  );
+
+  // Sin embudo fijo: cargar los embudos de la cuenta y proponer uno (el del
+  // negocio al editar; si no, "Ventas" o el más antiguo).
+  const dealPipelineId = deal?.pipeline_id;
+  const dealStageId = deal?.stage_id;
+  useEffect(() => {
+    if (!open || !managesPipeline) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("pipelines")
+        .select("*")
+        .order("created_at");
+      if (cancelled) return;
+      const list = (data ?? []) as Pipeline[];
+      setPipelines(list);
+      const initial =
+        list.find((p) => p.id === dealPipelineId) ?? pickDefaultPipeline(list);
+      setOwnPipelineId(initial?.id ?? "");
+      if (initial) {
+        await loadOwnStages(initial.id, dealStageId);
+      } else {
+        setOwnStages([]);
+        setStageId("");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, managesPipeline, supabase, dealPipelineId, dealStageId, loadOwnStages]);
+
+  function handlePipelineChange(nextPipelineId: string) {
+    setOwnPipelineId(nextPipelineId);
+    setOwnStages([]);
+    setStageId("");
+    if (nextPipelineId) void loadOwnStages(nextPipelineId);
+  }
+
+  function handleVehicleChange(vehicle: DealVehicle | null) {
+    if (!vehicle) {
+      // Quitar el vehículo no toca ni el título ni el valor.
+      setVehicleId("");
+      return;
+    }
+    const next = applyVehicleSelection({ title, autoTitle }, vehicle);
+    setVehicleId(vehicle.id);
+    setTitle(next.title);
+    setAutoTitle(next.autoTitle);
+    setValue(String(next.value));
+  }
 
   // Fetch linked conversation for the selected contact (newest open one).
   // Clearing on no-selection is sync with prop state; the populated
@@ -152,7 +346,7 @@ export function DealForm({
   }, [open, contactId, supabase]);
 
   async function handleSave() {
-    if (!title.trim() || !contactId || !stageId) {
+    if (!title.trim() || !contactId || !stageId || !pipelineId) {
       toast.error(t("toastRequired"));
       return;
     }
@@ -168,6 +362,7 @@ export function DealForm({
       assigned_to: assignedTo || null,
       notes: notes.trim() || null,
       expected_close_date: expectedCloseDate || null,
+      vehicle_id: vehicleId || null,
     };
 
     if (deal) {
@@ -271,20 +466,35 @@ export function DealForm({
 
             <div className="grid gap-2">
               <Label className="text-muted-foreground">{t("contact")}</Label>
-              <select
-                value={contactId}
-                onChange={(e) => setContactId(e.target.value)}
-                className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-              >
-                <option value="">{t("selectContact")}</option>
-                {contacts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name || c.phone}
-                  </option>
-                ))}
-              </select>
+              {fixedContactId ? (
+                // Abierto desde la conversación: el contacto no se cambia.
+                <div className="flex h-9 w-full items-center gap-2 rounded-lg border border-border bg-muted/50 px-2.5 text-sm text-foreground">
+                  <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">
+                    {/* El panel no se remonta al cambiar de conversación: sin
+                        este id se vería un instante el contacto anterior. */}
+                    {fixedContact && fixedContact.id === fixedContactId
+                      ? fixedContact.name || fixedContact.phone || "—"
+                      : "…"}
+                  </span>
+                </div>
+              ) : (
+                <select
+                  value={contactId}
+                  onChange={(e) => setContactId(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">{t("selectContact")}</option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name || c.phone}
+                    </option>
+                  ))}
+                </select>
+              )}
 
-              {linkedConversation && (
+              {/* Desde la bandeja ya se está en la conversación: el enlace sobra. */}
+              {linkedConversation && !fixedContactId && (
                 <Link
                   href="/inbox"
                   className="mt-1 inline-flex items-center gap-1.5 self-start rounded-md bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-primary/20"
@@ -293,6 +503,41 @@ export function DealForm({
                   {t("linkToConversation")}
                 </Link>
               )}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="deal-vehicle" className="text-muted-foreground">
+                {t("vehicle")}
+              </Label>
+              <VehiclePicker
+                id="deal-vehicle"
+                vehicles={vehicles}
+                inquiries={inquiries}
+                value={vehicleId}
+                fallbackSelected={
+                  deal?.vehicle && deal.vehicle.id === vehicleId
+                    ? deal.vehicle
+                    : null
+                }
+                onChange={handleVehicleChange}
+                currency={defaultCurrency}
+                labels={{
+                  placeholder: t("vehiclePlaceholder"),
+                  none: t("vehicleNone"),
+                  search: t("vehicleSearch"),
+                  empty: t("vehicleEmpty"),
+                  suggested: t("vehicleSuggested"),
+                  inventory: t("vehicleInventory"),
+                  status: {
+                    reserved: t("vehicleReserved"),
+                    sold: t("vehicleSold"),
+                    hidden: t("vehicleHidden"),
+                  },
+                }}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {t("vehicleHint")}
+              </p>
             </div>
 
             <div className="grid grid-cols-[1fr_110px] gap-3">
@@ -334,6 +579,29 @@ export function DealForm({
                 className="border-border bg-muted text-foreground"
               />
             </div>
+
+            {managesPipeline && (
+              <div className="grid gap-2">
+                <Label className="text-muted-foreground">{t("pipeline")}</Label>
+                {pipelines.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t("noPipelines")}
+                  </p>
+                ) : (
+                  <select
+                    value={ownPipelineId}
+                    onChange={(e) => handlePipelineChange(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary"
+                  >
+                    {pipelines.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
             <div className="grid gap-2">
               <Label className="text-muted-foreground">{t("stage")}</Label>
@@ -439,7 +707,9 @@ export function DealForm({
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={saving || !title.trim() || !contactId || !stageId}
+                disabled={
+                  saving || !title.trim() || !contactId || !stageId || !pipelineId
+                }
                 className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {saving ? t("saving") : deal ? t("saveChanges") : t("createDeal")}
