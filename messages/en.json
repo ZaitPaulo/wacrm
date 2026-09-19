@@ -377,7 +377,11 @@
       "removeTag": "Remove tag {tag}",
       "tagUpdateFailed": "Could not update the tag",
       "noPhone": "No phone number",
-      "noPhoneHint": "This person messages with their WhatsApp username and does not share their number."
+      "noPhoneHint": "This person messages with their WhatsApp username and does not share their number.",
+      "changeStageOf": "Change stage of {deal} (currently: {stage})",
+      "moveTo": "Move to",
+      "stageUpdated": "Deal moved to {stage}",
+      "stageUpdateFailed": "Could not change the stage"
     },
     "aiBanner": {
       "pausedTitle": "AI assistant is paused here",
@@ -716,7 +720,15 @@
       "toastMoveOrDeleteDeals": "Move or delete deals in this stage first",
       "toastFailedDeleteStage": "Failed to delete stage",
       "toastFailedDeletePipeline": "Failed to delete pipeline",
-      "toastDeleted": "Pipeline deleted"
+      "toastDeleted": "Pipeline deleted",
+      "transitions": "Allowed transitions",
+      "transitionsHint": "If you check none, deals can be moved to any stage from the inbox. If you check any, stages without targets become final.",
+      "transitionsLoading": "Loading transitions...",
+      "transitionsNeedTwoStages": "Add at least two stages to configure transitions.",
+      "transitionsNone": "No rules: deals can be moved to any stage from the inbox.",
+      "transitionsFrom": "From {stage} it can move to",
+      "finalStage": "Final",
+      "toastFailedSaveTransitions": "The pipeline was saved, but the transitions were not. Please try again."
     },
     "analytics": {
       "totalDeals": "Total Deals",

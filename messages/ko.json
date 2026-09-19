@@ -377,7 +377,11 @@
       "removeTag": "{tag} 태그 제거",
       "tagUpdateFailed": "태그를 업데이트하지 못했습니다",
       "noPhone": "전화번호 없음",
-      "noPhoneHint": "이 사용자는 WhatsApp 사용자 이름으로 메시지를 보내며 전화번호를 공유하지 않습니다."
+      "noPhoneHint": "이 사용자는 WhatsApp 사용자 이름으로 메시지를 보내며 전화번호를 공유하지 않습니다.",
+      "changeStageOf": "{deal}의 단계 변경 (현재: {stage})",
+      "moveTo": "이동할 단계",
+      "stageUpdated": "거래를 {stage}(으)로 이동했습니다",
+      "stageUpdateFailed": "단계를 변경하지 못했습니다"
     },
     "aiBanner": {
       "pausedTitle": "이 대화에서 AI 어시스턴트가 일시 중지됨",
@@ -716,7 +720,15 @@
       "toastMoveOrDeleteDeals": "먼저 이 단계의 딜을 이동하거나 삭제하세요",
       "toastFailedDeleteStage": "단계를 삭제하지 못했습니다",
       "toastFailedDeletePipeline": "파이프라인을 삭제하지 못했습니다",
-      "toastDeleted": "파이프라인이 삭제되었습니다"
+      "toastDeleted": "파이프라인이 삭제되었습니다",
+      "transitions": "허용된 전환",
+      "transitionsHint": "아무것도 선택하지 않으면 받은편지함에서 어떤 단계로든 이동할 수 있습니다. 하나라도 선택하면 대상이 없는 단계는 최종 단계가 됩니다.",
+      "transitionsLoading": "전환을 불러오는 중...",
+      "transitionsNeedTwoStages": "전환을 설정하려면 단계를 두 개 이상 추가하세요.",
+      "transitionsNone": "규칙 없음: 받은편지함에서 어떤 단계로든 이동할 수 있습니다.",
+      "transitionsFrom": "{stage}에서 이동 가능한 단계",
+      "finalStage": "최종",
+      "toastFailedSaveTransitions": "파이프라인은 저장되었지만 전환은 저장되지 않았습니다. 다시 시도하세요."
     },
     "analytics": {
       "totalDeals": "전체 딜",

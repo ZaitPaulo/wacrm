@@ -353,7 +353,11 @@
       "removeTag": "Quitar la etiqueta {tag}",
       "tagUpdateFailed": "No se pudo actualizar la etiqueta",
       "noPhone": "Sin teléfono",
-      "noPhoneHint": "Esta persona escribe con su nombre de usuario de WhatsApp y no comparte su número."
+      "noPhoneHint": "Esta persona escribe con su nombre de usuario de WhatsApp y no comparte su número.",
+      "changeStageOf": "Cambiar la etapa de {deal} (ahora: {stage})",
+      "moveTo": "Mover a",
+      "stageUpdated": "Negocio movido a {stage}",
+      "stageUpdateFailed": "No se pudo cambiar la etapa"
     },
     "aiBanner": {
       "pausedTitle": "El asistente de IA está pausado acá",
@@ -709,7 +713,15 @@
       "toastMoveOrDeleteDeals": "Primero mueve o elimina los negocios de esta etapa",
       "toastFailedDeleteStage": "No se pudo eliminar la etapa",
       "toastFailedDeletePipeline": "No se pudo eliminar el embudo",
-      "toastDeleted": "Embudo eliminado"
+      "toastDeleted": "Embudo eliminado",
+      "transitions": "Transiciones permitidas",
+      "transitionsHint": "Si no marcas ninguna, desde la bandeja se puede mover a cualquier etapa. Si marcas alguna, las etapas sin destinos quedan como finales.",
+      "transitionsLoading": "Cargando transiciones...",
+      "transitionsNeedTwoStages": "Agrega al menos dos etapas para configurar transiciones.",
+      "transitionsNone": "Sin reglas: desde la bandeja se puede mover a cualquier etapa.",
+      "transitionsFrom": "Desde {stage} puede pasar a",
+      "finalStage": "Final",
+      "toastFailedSaveTransitions": "Se guardó el embudo, pero no las transiciones. Inténtalo de nuevo."
     },
     "analytics": {
       "totalDeals": "Negocios totales",

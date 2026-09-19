@@ -17,7 +17,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { createClient } from "@/lib/supabase/client";
-import type { Pipeline, PipelineStage } from "@/types";
+import type {
+  Pipeline,
+  PipelineStage,
+  PipelineStageTransition,
+} from "@/types";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -79,6 +84,13 @@ export function PipelineSettings({
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Reglas de transicion del embudo (a que etapas se puede mover un negocio
+  // desde la bandeja). `savedRules` es lo que hay en la base, para calcular
+  // el diff al guardar; `ruleKeys` es lo marcado en el formulario, como
+  // claves "origen:destino".
+  const [savedRules, setSavedRules] = useState<PipelineStageTransition[]>([]);
+  const [ruleKeys, setRuleKeys] = useState<Set<string>>(new Set());
+  const [rulesLoading, setRulesLoading] = useState(false);
 
   // Reset form state when the dialog opens or its prop inputs change
   // — legitimate prop-driven sync.
@@ -89,7 +101,93 @@ export function PipelineSettings({
     setLocalStages([...stages].sort((a, b) => a.position - b.position));
     setShowDeleteConfirm(false);
   }, [open, pipeline, stages]);
+
+  // Carga las reglas del embudo cada vez que se abre el dialogo. `cancelled`
+  // evita que una respuesta tardia de otro embudo pise el formulario.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setRulesLoading(true);
+    createClient()
+      .from("pipeline_stage_transitions")
+      .select("*")
+      .eq("pipeline_id", pipeline.id)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        const rules = error ? [] : ((data as PipelineStageTransition[]) ?? []);
+        setSavedRules(rules);
+        setRuleKeys(new Set(rules.map(ruleKey)));
+        setRulesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, pipeline.id]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  /**
+   * Marca o desmarca en el formulario la regla `fromId → toId`. No escribe en
+   * la base: eso lo hace `saveRules` al guardar.
+   */
+  function toggleRule(fromId: string, toId: string, checked: boolean) {
+    setRuleKeys((prev) => {
+      const next = new Set(prev);
+      const key = `${fromId}:${toId}`;
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
+
+  /**
+   * Reemplaza las reglas del embudo en la base por las marcadas: borra las
+   * quitadas (por id) e inserta las nuevas. Solo cuenta reglas entre etapas
+   * que siguen en el embudo; las de etapas borradas ya las quito la cascada.
+   * Devuelve false si alguna de las dos escrituras falla.
+   */
+  async function saveRules(): Promise<boolean> {
+    const stageIds = new Set(localStages.map((s) => s.id));
+    const wanted = new Set(
+      [...ruleKeys].filter((k) => {
+        const [from, to] = k.split(":");
+        return stageIds.has(from) && stageIds.has(to);
+      }),
+    );
+    const current = savedRules.filter(
+      (r) => stageIds.has(r.from_stage_id) && stageIds.has(r.to_stage_id),
+    );
+    const currentKeys = new Set(current.map(ruleKey));
+
+    const toDelete = current.filter((r) => !wanted.has(ruleKey(r)));
+    const toInsert = [...wanted]
+      .filter((k) => !currentKeys.has(k))
+      .map((k) => {
+        const [from_stage_id, to_stage_id] = k.split(":");
+        return { pipeline_id: pipeline.id, from_stage_id, to_stage_id };
+      });
+
+    let ok = true;
+    if (toDelete.length > 0) {
+      // `.select("id")`: sin permiso, la RLS filtra las filas y el delete no
+      // da error pero tampoco borra nada; asi se detecta.
+      const { data, error } = await supabase
+        .from("pipeline_stage_transitions")
+        .delete()
+        .in(
+          "id",
+          toDelete.map((r) => r.id),
+        )
+        .select("id");
+      if (error || (data?.length ?? 0) !== toDelete.length) ok = false;
+    }
+    if (toInsert.length > 0) {
+      const { error } = await supabase
+        .from("pipeline_stage_transitions")
+        .insert(toInsert);
+      if (error) ok = false;
+    }
+    return ok;
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -126,10 +224,29 @@ export function PipelineSettings({
       supabase.from("pipeline_stages").upsert(stageRows, { onConflict: "id" }),
     ]);
 
+    if (renameRes.error || stagesRes.error) {
+      setSaving(false);
+      toast.error(t("toastFailedSave"));
+      return;
+    }
+
+    // Las reglas van despues de las etapas: si estas fallan, no se toca nada.
+    const rulesOk = await saveRules();
     setSaving(false);
 
-    if (renameRes.error || stagesRes.error) {
-      toast.error(t("toastFailedSave"));
+    if (!rulesOk) {
+      // El embudo y sus etapas si quedaron guardados; el dialogo sigue
+      // abierto para poder reintentar las reglas. Se relee lo que quedo en
+      // la base (pudo guardarse a medias) para que el reintento haga el diff
+      // contra el estado real, sin tocar lo que el usuario tiene marcado.
+      const { data } = await supabase
+        .from("pipeline_stage_transitions")
+        .select("*")
+        .eq("pipeline_id", pipeline.id);
+      if (data) setSavedRules(data as PipelineStageTransition[]);
+      onPipelinesChanged();
+      onStagesChanged();
+      toast.error(t("toastFailedSaveTransitions"));
       return;
     }
 
@@ -325,6 +442,15 @@ export function PipelineSettings({
                 </div>
               </div>
 
+              <TransitionsEditor
+                stages={localStages}
+                ruleKeys={ruleKeys}
+                loading={rulesLoading}
+                disabled={saving}
+                onToggle={toggleRule}
+                t={t}
+              />
+
               <Button
                 variant="outline"
                 onClick={onCreateNewPipeline}
@@ -361,6 +487,121 @@ export function PipelineSettings({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Clave "origen:destino" de una regla, para compararlas como conjunto. */
+function ruleKey(r: Pick<PipelineStageTransition, "from_stage_id" | "to_stage_id">) {
+  return `${r.from_stage_id}:${r.to_stage_id}`;
+}
+
+/**
+ * Sección "Transiciones permitidas": una fila por etapa con una casilla por
+ * cada otra etapa del embudo. Solo pinta y avisa; guardar lo hace el
+ * formulario con el resto del embudo.
+ */
+function TransitionsEditor({
+  stages,
+  ruleKeys,
+  loading,
+  disabled,
+  onToggle,
+  t,
+}: {
+  stages: PipelineStage[];
+  ruleKeys: Set<string>;
+  loading: boolean;
+  disabled: boolean;
+  onToggle: (fromId: string, toId: string, checked: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any;
+}) {
+  // Solo cuentan las reglas entre etapas que siguen en el embudo.
+  const hasAnyRule = stages.some((from) =>
+    stages.some((to) => ruleKeys.has(`${from.id}:${to.id}`)),
+  );
+
+  return (
+    <div className="grid gap-2">
+      <Label className="text-muted-foreground">{t("transitions")}</Label>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {t("transitionsHint")}
+      </p>
+
+      {loading ? (
+        <p className="text-xs text-muted-foreground">{t("transitionsLoading")}</p>
+      ) : stages.length < 2 ? (
+        <p className="text-xs text-muted-foreground">
+          {t("transitionsNeedTwoStages")}
+        </p>
+      ) : (
+        <>
+          {!hasAnyRule && (
+            <p className="rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
+              {t("transitionsNone")}
+            </p>
+          )}
+          <div className="space-y-2">
+            {stages.map((from) => {
+              const targets = stages.filter((s) => s.id !== from.id);
+              const isFinal =
+                hasAnyRule &&
+                !targets.some((to) => ruleKeys.has(`${from.id}:${to.id}`));
+              const headingId = `transition-from-${from.id}`;
+              return (
+                <div
+                  key={from.id}
+                  role="group"
+                  aria-labelledby={headingId}
+                  className="rounded-lg border border-border bg-muted/50 p-2"
+                >
+                  <div
+                    id={headingId}
+                    className="flex items-center gap-2 text-sm font-medium text-foreground"
+                  >
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: from.color }}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">
+                      {t("transitionsFrom", { stage: from.name || "—" })}
+                    </span>
+                    {isFinal && (
+                      <span className="ml-auto shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+                        {t("finalStage")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-2 pl-4">
+                    {targets.map((to) => (
+                      <label
+                        key={to.id}
+                        className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground has-[[data-disabled]]:cursor-not-allowed"
+                      >
+                        <Checkbox
+                          checked={ruleKeys.has(`${from.id}:${to.id}`)}
+                          onCheckedChange={(checked) =>
+                            onToggle(from.id, to.id, checked === true)
+                          }
+                          disabled={disabled}
+                        />
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: to.color }}
+                          aria-hidden="true"
+                        />
+                        {to.name || "—"}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

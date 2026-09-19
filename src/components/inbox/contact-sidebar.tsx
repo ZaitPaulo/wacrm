@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { addContactTag, deleteContactTag } from "@/lib/contacts/tag-api";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { Contact, Deal, ContactNote, Tag } from "@/types";
+import { getAllowedTargetStages } from "@/lib/pipelines/stage-transitions";
+import type {
+  Contact,
+  Deal,
+  ContactNote,
+  Tag,
+  PipelineStage,
+  PipelineStageTransition,
+} from "@/types";
 import {
   Phone,
   Mail,
@@ -18,6 +26,7 @@ import {
   StickyNote,
   Plus,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,11 +61,31 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   const [addingNote, setAddingNote] = useState(false);
   /** Nombre de usuario de WhatsApp, cuando esa persona tiene uno. */
   const [username, setUsername] = useState<string | null>(null);
+  // Etapas y reglas de transicion de los embudos de los negocios del
+  // contacto: con ellas se calcula a que etapas se puede mover cada negocio
+  // desde aqui (las reglas solo aplican en la bandeja, no en el tablero).
+  const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([]);
+  const [stageTransitions, setStageTransitions] = useState<
+    PipelineStageTransition[]
+  >([]);
+  /** Negocio cuyo selector de etapa esta abierto (uno a la vez). */
+  const [stagePickerDealId, setStagePickerDealId] = useState<string | null>(
+    null
+  );
+  /** Negocio cuya etapa se esta guardando. */
+  const [savingStageDealId, setSavingStageDealId] = useState<string | null>(
+    null
+  );
+  // Cada carga toma un numero; si al volver de una consulta ya hay otra
+  // carga mas nueva (se cambio de contacto), la respuesta vieja se descarta
+  // en vez de pisar los datos del contacto actual.
+  const fetchSeqRef = useRef(0);
 
   const fetchContactData = useCallback(async () => {
     if (!contact) return;
 
     const supabase = createClient();
+    const seq = ++fetchSeqRef.current;
 
     // Fetch deals, notes, tags — y el nombre de usuario del canal — en
     // paralelo.
@@ -90,7 +119,8 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
           .limit(1),
       ]);
 
-    if (dealsRes.data) setDeals(dealsRes.data);
+    if (seq !== fetchSeqRef.current) return;
+
     if (notesRes.data) setNotes(notesRes.data);
     if (allTagsRes.data) setAllTags(allTagsRes.data);
     if (contactTagsRes.data) {
@@ -100,6 +130,41 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
       (identitiesRes.data?.[0] as { username?: string } | undefined)
         ?.username ?? null
     );
+
+    if (!dealsRes.data) return;
+    const loadedDeals = dealsRes.data as Deal[];
+
+    // Etapas y reglas de los embudos de esos negocios. Sin negocios no hay
+    // nada que consultar. Si la consulta de reglas falla (p. ej. la tabla aun
+    // no existe), se trata como "sin reglas": el embudo permite cualquier
+    // etapa y el panel sigue cargando.
+    const pipelineIds = [...new Set(loadedDeals.map((d) => d.pipeline_id))];
+    let loadedStages: PipelineStage[] = [];
+    let loadedTransitions: PipelineStageTransition[] = [];
+    if (pipelineIds.length > 0) {
+      const [stagesRes, transitionsRes] = await Promise.all([
+        supabase
+          .from("pipeline_stages")
+          .select("*")
+          .in("pipeline_id", pipelineIds)
+          .order("position"),
+        supabase
+          .from("pipeline_stage_transitions")
+          .select("*")
+          .in("pipeline_id", pipelineIds),
+      ]);
+      if (seq !== fetchSeqRef.current) return;
+      loadedStages = (stagesRes.data as PipelineStage[] | null) ?? [];
+      loadedTransitions = transitionsRes.error
+        ? []
+        : ((transitionsRes.data as PipelineStageTransition[] | null) ?? []);
+    }
+
+    // Negocios, etapas y reglas se publican juntos para que la pastilla de
+    // etapa no aparezca primero como texto y luego como selector.
+    setDeals(loadedDeals);
+    setPipelineStages(loadedStages);
+    setStageTransitions(loadedTransitions);
   }, [contact]);
 
   // Load on contact change. setContactData/setTags run inside async
@@ -143,6 +208,47 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
       setSavingTags(false);
     },
     [contact, contactTagIds, tSidebar]
+  );
+
+  /**
+   * Mueve el negocio a otra etapa desde la bandeja. Optimista: la tarjeta
+   * cambia al instante y, si la base lo rechaza, vuelve a la etapa anterior.
+   * No valida la regla: el selector solo ofrece destinos ya permitidos.
+   *
+   * @param deal Negocio a mover, tal como está en pantalla.
+   * @param target Etapa destino, una de `getAllowedTargetStages`.
+   */
+  const handleChangeStage = useCallback(
+    async (deal: Deal, target: PipelineStage) => {
+      const previous = { stage_id: deal.stage_id, stage: deal.stage };
+      setStagePickerDealId(null);
+      setSavingStageDealId(deal.id);
+      setDeals((prev) =>
+        prev.map((d) =>
+          d.id === deal.id ? { ...d, stage_id: target.id, stage: target } : d
+        )
+      );
+
+      const supabase = createClient();
+      // `.select("id")` para detectar tambien el caso en que la RLS filtra
+      // la fila: ahi no hay error, pero no se actualiza nada.
+      const { data, error } = await supabase
+        .from("deals")
+        .update({ stage_id: target.id })
+        .eq("id", deal.id)
+        .select("id");
+
+      if (error || !data || data.length === 0) {
+        setDeals((prev) =>
+          prev.map((d) => (d.id === deal.id ? { ...d, ...previous } : d))
+        );
+        toast.error(tSidebar("stageUpdateFailed"));
+      } else {
+        toast.success(tSidebar("stageUpdated", { stage: target.name }));
+      }
+      setSavingStageDealId(null);
+    },
+    [tSidebar]
   );
 
   const handleAddNote = useCallback(async () => {
@@ -387,15 +493,22 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
                           <span aria-hidden="true">·</span>
                         )}
                         {deal.stage && (
-                          <span
-                            className="shrink-0 rounded-full px-1.5 py-0.5"
-                            style={{
-                              backgroundColor: `${deal.stage.color}20`,
-                              color: deal.stage.color,
-                            }}
-                          >
-                            {deal.stage.name}
-                          </span>
+                          <DealStagePill
+                            deal={deal}
+                            targets={getAllowedTargetStages(
+                              deal.stage_id,
+                              pipelineStages,
+                              stageTransitions
+                            )}
+                            open={stagePickerDealId === deal.id}
+                            onOpenChange={(isOpen) =>
+                              setStagePickerDealId(isOpen ? deal.id : null)
+                            }
+                            saving={savingStageDealId === deal.id}
+                            onSelect={(target) =>
+                              handleChangeStage(deal, target)
+                            }
+                          />
                         )}
                       </div>
                     )}
@@ -453,5 +566,84 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
         </div>
       </ScrollArea>
     </div>
+  );
+}
+
+interface DealStagePillProps {
+  deal: Deal;
+  /** Etapas a las que se puede mover el negocio desde la bandeja. */
+  targets: PipelineStage[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  saving: boolean;
+  onSelect: (target: PipelineStage) => void;
+}
+
+/**
+ * Pastilla con la etapa actual del negocio. Si hay destinos permitidos es el
+ * disparador de un selector con esas etapas; si no (etapa final), es solo
+ * texto, sin nada que invite a hacer clic.
+ */
+function DealStagePill({
+  deal,
+  targets,
+  open,
+  onOpenChange,
+  saving,
+  onSelect,
+}: DealStagePillProps) {
+  const tSidebar = useTranslations("Inbox.sidebar");
+  const stage = deal.stage;
+  if (!stage) return null;
+
+  const pillStyle = {
+    backgroundColor: `${stage.color}20`,
+    color: stage.color,
+  };
+
+  if (targets.length === 0) {
+    return (
+      <span className="shrink-0 rounded-full px-1.5 py-0.5" style={pillStyle}>
+        {stage.name}
+      </span>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger
+        disabled={saving}
+        aria-label={tSidebar("changeStageOf", {
+          deal: deal.title,
+          stage: stage.name,
+        })}
+        className="inline-flex shrink-0 cursor-pointer items-center gap-0.5 rounded-full py-0.5 pl-1.5 pr-1 outline-none transition-[filter] hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted disabled:cursor-wait disabled:opacity-60"
+        style={pillStyle}
+      >
+        {stage.name}
+        <ChevronDown className="h-2.5 w-2.5" aria-hidden="true" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-56 gap-1 p-1.5">
+        <p className="px-1.5 pb-0.5 pt-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          {tSidebar("moveTo")}
+        </p>
+        {targets.map((target) => (
+          <button
+            key={target.id}
+            type="button"
+            onClick={() => onSelect(target)}
+            disabled={saving}
+            className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-popover-foreground outline-none transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: target.color }}
+              aria-hidden="true"
+            />
+            <span className="truncate">{target.name}</span>
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }

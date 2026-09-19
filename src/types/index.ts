@@ -381,6 +381,19 @@ export interface PipelineStage {
   created_at: string;
 }
 
+/**
+ * Par origen → destino permitido al cambiar la etapa de un negocio desde la
+ * bandeja (tabla `pipeline_stage_transitions`). Un embudo sin reglas permite
+ * cualquier cambio.
+ */
+export interface PipelineStageTransition {
+  id: string;
+  pipeline_id: string;
+  from_stage_id: string;
+  to_stage_id: string;
+  created_at: string;
+}
+
 export type DealStatus = 'open' | 'won' | 'lost';
 
 export interface Deal {
