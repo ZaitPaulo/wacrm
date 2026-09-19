@@ -11,7 +11,7 @@
  * chats. Al reemplazarla, súbele la versión.
  */
 export const STOREFRONT_OG_IMAGE = {
-  path: 'og/portada-v2.jpg',
+  path: 'og/portada-v3.jpg',
   width: 1200,
   height: 630,
   type: 'image/jpeg',
