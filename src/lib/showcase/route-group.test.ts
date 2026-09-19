@@ -23,22 +23,25 @@ vi.mock('@/lib/showcase/data', () => ({
 import { getShowcaseAccount } from '@/lib/showcase/data'
 import { DEFAULT_BRAND_COLOR, type ShowcaseAccount } from '@/lib/showcase/format'
 import StorefrontLayout from '@/app/(storefront)/layout'
+import { STOREFRONT_OG_IMAGE } from '@/lib/showcase/og-image'
 
 const appDir = path.resolve(process.cwd(), 'src/app')
 const storefrontDir = path.resolve(appDir, '(storefront)')
 
 describe('Section 3: Storefront route group and visual system', () => {
   describe('3.1 File placement and route group isolation', () => {
-    // La vista previa de la portada es una imagen fija desde el 2026-09-18:
-    // el cliente eligió un diseño sin datos que cambien (sin conteo de
-    // vehículos), así que no hace falta generarla en cada visita.
-    it('contains page.tsx, loading.tsx and a static opengraph-image in (storefront)/', () => {
+    // La vista previa de la portada es una imagen fija servida desde public/
+    // (2026-09-18). Como archivo de metadatos de Next salía sin
+    // Content-Length y WhatsApp la mostraba en miniatura; desde public/ lleva
+    // su tamaño declarado, igual que las fichas de vehículos.
+    it('contains page.tsx and loading.tsx, and serves the home preview from public/', () => {
       expect(fs.existsSync(path.join(storefrontDir, 'page.tsx'))).toBe(true)
       expect(fs.existsSync(path.join(storefrontDir, 'loading.tsx'))).toBe(true)
-      expect(fs.existsSync(path.join(storefrontDir, 'opengraph-image.jpg'))).toBe(true)
-      expect(fs.existsSync(path.join(storefrontDir, 'opengraph-image.alt.txt'))).toBe(true)
-      // Next no admite la imagen fija y la generada en el mismo segmento.
-      expect(fs.existsSync(path.join(storefrontDir, 'opengraph-image.tsx'))).toBe(false)
+      expect(fs.existsSync(path.join(process.cwd(), 'public', STOREFRONT_OG_IMAGE.path))).toBe(true)
+      // Un opengraph-image en el segmento taparía la imagen de los metadatos.
+      for (const ext of ['tsx', 'jpg', 'png']) {
+        expect(fs.existsSync(path.join(storefrontDir, `opengraph-image.${ext}`))).toBe(false)
+      }
     })
 
     it('contains vehiculo/[id]/ routes in (storefront)/', () => {

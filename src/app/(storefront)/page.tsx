@@ -5,6 +5,7 @@ import { getShowcase } from '@/lib/showcase/data'
 import { getBaseUrl } from '@/lib/showcase/site-url'
 import { Storefront } from '@/components/storefront/storefront'
 import { StoreFooter } from '@/components/storefront/footer'
+import { STOREFRONT_OG_IMAGE } from '@/lib/showcase/og-image'
 
 // Refleja los cambios del CRM al instante (inventario, precios, on/off).
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,13 @@ export async function generateMetadata(): Promise<Metadata> {
   }
   const name = data.account.public_name?.trim() || data.account.name
   const title = `${name} — Vehículos en venta`
+  const ogImage = {
+    url: `/${STOREFRONT_OG_IMAGE.path}`,
+    width: STOREFRONT_OG_IMAGE.width,
+    height: STOREFRONT_OG_IMAGE.height,
+    type: STOREFRONT_OG_IMAGE.type,
+    alt: STOREFRONT_OG_IMAGE.alt,
+  }
   const description = data.account.public_address
     ? `Explora los vehículos disponibles de ${name}. ${data.account.public_address}. Contáctanos por WhatsApp.`
     : `Explora los vehículos disponibles de ${name} y contáctanos por WhatsApp para comenzar tu compra.`
@@ -27,18 +35,20 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     robots: { index: true, follow: true },
     alternates: { canonical: '/' },
-    // og:image lo aporta (storefront)/opengraph-image.jpg, una imagen fija.
+    // Imagen fija servida desde public/ (ver lib/showcase/og-image).
     openGraph: {
       title,
       description,
       url: base,
       siteName: name,
       type: 'website',
+      images: [ogImage],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      images: [ogImage],
     },
   }
 }
