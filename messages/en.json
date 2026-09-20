@@ -247,7 +247,9 @@
       "selectConversation": "Select a conversation",
       "selectConversationHint": "Choose a conversation from the left to start messaging",
       "today": "Today",
-      "yesterday": "Yesterday"
+      "yesterday": "Yesterday",
+      "openContactDetails": "View contact details",
+      "contactDetails": "Contact details"
     },
     "sessionTimer": {
       "expired": "Expired",
@@ -283,7 +285,11 @@
       "send": "Send",
       "quickReplyNamePrompt": "Name this quick reply:",
       "quickReplySaved": "Saved as a quick reply.",
-      "quickReplySaveError": "Couldn't save the quick reply."
+      "quickReplySaveError": "Couldn't save the quick reply.",
+      "actions": "Actions",
+      "typeMessagePlaceholderShort": "Type a message…",
+      "sessionExpiredPlaceholderShort": "Session expired",
+      "readOnlyPlaceholderShort": "Read-only"
     },
     "bubble": {
       "photo": "Photo",

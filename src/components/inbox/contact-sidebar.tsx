@@ -43,9 +43,34 @@ import { useTranslations } from "next-intl";
 
 interface ContactSidebarProps {
   contact: Contact | null;
+  /**
+   * Anula la presentación del contenedor (`w-70` + `border-l`), que está
+   * pensada para el panel fijo de escritorio. En móvil este mismo
+   * componente se monta dentro de un `Sheet` a pantalla completa, donde
+   * ni el ancho fijo ni el borde izquierdo tienen sentido. Opcional: sin
+   * ella el panel de escritorio se comporta exactamente igual que antes.
+   */
+  className?: string;
 }
 
-export function ContactSidebar({ contact }: ContactSidebarProps) {
+/**
+ * Ficha del contacto de la conversación abierta: datos de contacto,
+ * etiquetas, negocios y notas, todo editable en el sitio.
+ *
+ * Se monta en dos lugares distintos, y es el **mismo** componente en los
+ * dos — no hay una versión móvil aparte:
+ *
+ * - En `lg` y más ancho, como panel lateral fijo de la bandeja.
+ * - Por debajo de `lg`, dentro de un `Sheet` que abre el header del
+ *   hilo. Ahí se le pasa `className` para anular el `w-70` y el
+ *   `border-l` que solo tienen sentido en el panel fijo.
+ *
+ * Carga sus datos (negocios, notas, etiquetas y el nombre de usuario del
+ * canal) en un efecto al cambiar de contacto, numerando cada carga para
+ * descartar respuestas viejas si se cambia de conversación a mitad de
+ * camino.
+ */
+export function ContactSidebar({ contact, className }: ContactSidebarProps) {
   const tSidebar = useTranslations("Inbox.sidebar");
   const tThread = useTranslations("Inbox.messageThread");
 
@@ -289,7 +314,7 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
 
   if (!contact) {
     return (
-      <div className="flex h-full w-70 items-center justify-center border-l border-border bg-card">
+      <div className={cn("flex h-full w-70 items-center justify-center border-l border-border bg-card", className)}>
         <p className="text-sm text-muted-foreground">{tThread("selectConversation")}</p>
       </div>
     );
@@ -302,7 +327,7 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
   const contactTags = allTags.filter((tag) => contactTagIds.includes(tag.id));
 
   return (
-    <div className="flex h-full w-70 flex-col border-l border-border bg-card">
+    <div className={cn("flex h-full w-70 flex-col border-l border-border bg-card", className)}>
       <ScrollArea className="flex-1">
         <div className="p-4">
           {/* Contact Info */}

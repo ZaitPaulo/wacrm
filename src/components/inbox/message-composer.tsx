@@ -23,6 +23,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -136,6 +137,25 @@ function formatDuration(seconds: number): string {
  *  Meta-accepted format means no server ffmpeg / transcode step. */
 const OPUS_ENCODER_PATH = '/opus/encoderWorker.min.js';
 
+/**
+ * Barra de escritura del hilo: texto, adjuntos, plantillas, mensajes
+ * interactivos, respuestas rápidas y redacción con IA.
+ *
+ * Dos reglas de negocio gobiernan qué se puede usar en cada momento, y
+ * **no coinciden**:
+ *
+ * - `readOnly` (rol sin permiso de envío) apaga absolutamente todo.
+ * - `sessionExpired` (la ventana de 24 h de WhatsApp se cerró) apaga el
+ *   texto libre y los medios, pero **no las plantillas**: son
+ *   justamente la única forma de reabrir el contacto.
+ *
+ * De ahí que el estado deshabilitado se evalúe por acción y nunca en el
+ * contenedor que las agrupa. Por debajo de `sm` las cuatro acciones se
+ * colapsan en un único menú `+` para devolverle ancho al campo de
+ * escritura, y ese disparador se mantiene siempre habilitado: apagarlo
+ * con `inputsDisabled` dejaría al asesor sin acceso a las plantillas
+ * precisamente cuando las necesita.
+ */
 export function MessageComposer({
   conversationId,
   sessionExpired,
@@ -152,6 +172,28 @@ export function MessageComposer({
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [drafting, setDrafting] = useState(false);
+
+  /**
+   * Pantalla angosta → placeholders cortos.
+   *
+   * El textarea es de una sola fila (`rows={1}`) y crece al escribir,
+   * pero el placeholder no lo hace crecer: el largo
+   * ("Escribe un mensaje… (Shift+Enter para saltar de línea)") se parte
+   * en dos renglones y el segundo queda cortado a media letra. Y encima
+   * el consejo no aplica en un teléfono, donde no hay Shift+Enter.
+   *
+   * Arranca en `false` a propósito — el texto largo es el que sale del
+   * servidor — y se corrige después de montar; leer `matchMedia` en el
+   * inicializador daría una hidratación distinta del HTML servido.
+   */
+  const [compactPlaceholder, setCompactPlaceholder] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 639.98px)');
+    const apply = () => setCompactPlaceholder(mql.matches);
+    apply();
+    mql.addEventListener('change', apply);
+    return () => mql.removeEventListener('change', apply);
+  }, []);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Interactive-message builder dialog + quick-reply picker.
@@ -667,6 +709,15 @@ export function MessageComposer({
         </div>
       ) : (
         <div className="flex items-end gap-2">
+          {/* Las cuatro acciones sueltas, de sm en adelante. El wrapper
+              usa `sm:contents`, no `sm:flex`: con `display: contents`
+              los cuatro hijos siguen siendo items directos del flex de
+              arriba, así que de 640px para arriba esta fila queda
+              exactamente como estaba, con su mismo `gap-2`. Por debajo
+              de sm se esconde entero y toma el relevo el menú único de
+              más abajo — cuatro botones de 36px dejaban al textarea con
+              ~140px, donde ni el placeholder entraba. */}
+          <div className="hidden sm:contents">
           {/* Attach menu — photo / video / document / voice. */}
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -770,6 +821,100 @@ export function MessageComposer({
               <Sparkles className="h-4 w-4" />
             )}
           </GatedButton>
+          </div>
+
+          {/* Menú único en móvil: las mismas ocho acciones, un solo
+              botón. Llama a las mismas funciones que los botones de
+              arriba — acá no hay lógica nueva, sólo otra presentación.
+
+              El disparador NO se deshabilita: el deshabilitado se
+              evalúa por ítem, porque las reglas difieren. Con la ventana
+              de 24h vencida los medios y lo interactivo no se pueden
+              enviar, pero las plantillas sí — son justamente la salida
+              para reabrir el contacto. Apagar el botón entero con
+              `inputsDisabled` dejaría al asesor sin esa salida. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              title={readOnly ? t('readOnlyTitle') : t('actions')}
+              aria-label={t('actions')}
+              className="text-muted-foreground hover:text-foreground inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 sm:hidden"
+            >
+              {busy || drafting ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Plus className="h-5 w-5" />
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="border-border bg-popover w-56"
+            >
+              <DropdownMenuItem
+                disabled={inputsDisabled || busy}
+                onClick={() => imageInputRef.current?.click()}
+              >
+                <ImageIcon className="mr-2 h-4 w-4" />
+                {t('photo')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={inputsDisabled || busy}
+                onClick={() => videoInputRef.current?.click()}
+              >
+                <Video className="mr-2 h-4 w-4" />
+                {t('video')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={inputsDisabled || busy}
+                onClick={() => documentInputRef.current?.click()}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                {t('document')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={inputsDisabled || busy}
+                onClick={() => void startRecording()}
+              >
+                <Mic className="mr-2 h-4 w-4" />
+                {t('voiceNote')}
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator className="bg-border" />
+
+              <DropdownMenuItem
+                disabled={inputsDisabled}
+                onClick={() => openInteractiveBuilder()}
+              >
+                <MessageSquareDashed className="mr-2 h-4 w-4" />
+                {t('interactiveMessage')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={inputsDisabled}
+                onClick={() => setQuickReplyOpen(true)}
+              >
+                <Zap className="mr-2 h-4 w-4" />
+                {t('quickReplies')}
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator className="bg-border" />
+
+              {/* Plantillas: sólo `readOnly`. Deliberadamente NO
+                  `inputsDisabled` — ver el comentario del disparador. */}
+              <DropdownMenuItem
+                disabled={readOnly}
+                onClick={() => onOpenTemplates()}
+              >
+                <LayoutTemplate className="mr-2 h-4 w-4" />
+                {t('templates')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={readOnly || drafting}
+                onClick={() => void handleDraft()}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                {t('draftWithAI')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <textarea
             ref={textareaRef}
@@ -778,10 +923,16 @@ export function MessageComposer({
             onKeyDown={handleKeyDown}
             placeholder={
               readOnly
-                ? t('readOnlyPlaceholder')
+                ? compactPlaceholder
+                  ? t('readOnlyPlaceholderShort')
+                  : t('readOnlyPlaceholder')
                 : sessionExpired
-                  ? t('sessionExpiredPlaceholder')
-                  : t('typeMessagePlaceholder')
+                  ? compactPlaceholder
+                    ? t('sessionExpiredPlaceholderShort')
+                    : t('sessionExpiredPlaceholder')
+                  : compactPlaceholder
+                    ? t('typeMessagePlaceholderShort')
+                    : t('typeMessagePlaceholder')
             }
             disabled={sessionExpired || readOnly}
             rows={1}
@@ -812,7 +963,13 @@ export function MessageComposer({
           `items-end` buttons below the textarea. Indented to line up
           under the textarea left edge. */}
       {!draft && !recording && (
-        <p className="text-muted-foreground mt-1 pl-[5.5rem] text-[10px]">
+        // Oculto por debajo de sm: el `pl-[5.5rem]` está calculado para
+        // alinearse bajo el textarea cuando hay cuatro botones de 36px a
+        // su izquierda, y con el menú único esa cuenta deja de valer —
+        // el texto se partía en dos renglones y se comía el alto de una
+        // burbuja. Es un texto de descubrimiento, no una instrucción: la
+        // acción sigue en el menú, rotulada "Redactar una respuesta con IA".
+        <p className="text-muted-foreground mt-1 hidden pl-[5.5rem] text-[10px] sm:block">
           {t('draftHint')}
         </p>
       )}

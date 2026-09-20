@@ -145,7 +145,7 @@ export function AiThreadBanner({
   if (paused) {
     return (
       <Banner tone="muted">
-        <div className="min-w-0 flex-1">
+        <div className="w-full min-w-0 sm:flex-1">
           <p className="font-medium text-foreground">{t("pausedTitle")}</p>
           {handoffSummary && (
             <>
@@ -184,7 +184,7 @@ export function AiThreadBanner({
   // Active on this thread.
   return (
     <Banner tone="primary">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <div className="flex w-full min-w-0 items-center gap-1.5 sm:flex-1">
         <Sparkles className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
         <span className="truncate font-medium text-foreground">
           {t("activeText")}
@@ -205,9 +205,14 @@ function Banner({
   children: React.ReactNode;
 }) {
   return (
+    // En móvil apila: el texto se queda con el ancho completo y el botón
+    // cae debajo. En una sola fila el resumen del traspaso competía con
+    // el botón y salía truncado a mitad de frase ("El bot traspasó la
+    // conversación tras 1 re…"), que es justo lo que hay que leer para
+    // decidir si se retoma la IA. Desde sm vuelve a la fila de siempre.
     <div
       className={cn(
-        "flex items-center gap-3 border-b px-3 py-2 text-xs sm:px-4",
+        "flex flex-col items-start gap-2 border-b px-3 py-2 text-xs sm:flex-row sm:items-center sm:gap-3 sm:px-4",
         tone === "primary"
           ? "border-primary/20 bg-primary/5"
           : "border-border bg-muted/40",
@@ -234,7 +239,11 @@ function BannerButton({
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="inline-flex flex-shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+      // En móvil el banner apila, así que el botón ya no compite por el
+      // ancho: se le da altura de toque cómoda. Desde sm vuelve a la
+      // pastilla compacta de siempre, con su `flex-shrink-0` para no
+      // ceder ancho al texto de al lado.
+      className="inline-flex min-h-9 flex-shrink-0 items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 sm:min-h-0 sm:px-2.5 sm:py-1"
     >
       {busy ? (
         <Loader2 className="h-3 w-3 animate-spin" />
