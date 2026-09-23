@@ -12,6 +12,8 @@ import { delay, hasNewerCustomerMessage, hasOutboundSince } from './reply-window
 import { buildHandoffSummary } from './handoff'
 import { evaluateHandoffGate } from './handoff-gate'
 import { pickHandoffAgent, primerNombre, type HandoffAgent } from './pick-agent'
+import { createHandoffDeal } from './handoff-deal'
+import type { HandoffRequest } from './types'
 import { buildInventoryIndex, type InventoryIndex } from './inventory-index'
 import { ensureVehicleLinks } from './vehicle-links'
 import { loadAdContext } from './ad-context'
@@ -317,6 +319,10 @@ export async function dispatchInboundToAiReply(
           urgent: gate.urgent,
           ad: adContext,
         }),
+        // Lo mismo que va a la nota va al negocio: nombre, vehículo de
+        // interés y motivo, para que el asesor no tenga que releer el
+        // hilo entero desde la tarjeta del embudo.
+        request: handoff,
       })
       return
     }
@@ -396,25 +402,30 @@ export async function dispatchInboundToAiReply(
   }
 }
 
-/**
- * Saca la conversacion del bot y se la da a una persona.
- *
- * Hace las tres cosas juntas porque por separado ninguna sirve: (a) apaga
- * la autorespuesta en este hilo —pegajoso hasta que alguien la reactive—,
- * (b) lo asigna al asesor configurado, y null lo deja en la cola
- * compartida, y (c) deja una nota interna con contexto. Asignar dispara
- * `on_conversation_assigned`, que avisa al asesor.
- *
- * Y avisa al cliente. Antes de que eso existiera el asistente
- * simplemente dejaba de responder: el asesor se enteraba, el cliente no,
- * y no habia forma de distinguir "ya va alguien" de "esto se rompio".
- */
 /** El texto con el enlace de cada vehículo que nombra y no lo trae. Sin
  *  índice no hay contra qué reconocerlos, y sale tal cual. */
 function withVehicleLinks(text: string, inventory: InventoryIndex | null): string {
   return inventory ? ensureVehicleLinks(text, inventory.entries) : text
 }
 
+/**
+ * Saca la conversacion del bot y se la da a una persona.
+ *
+ * Hace las cosas juntas porque por separado ninguna sirve: (a) apaga la
+ * autorespuesta en este hilo —pegajoso hasta que alguien la reactive—,
+ * (b) resuelve el asesor: respeta al que ya tenga el hilo, y si no hay,
+ * usa el fijo de Ajustes o, en su defecto, `pickHandoffAgent`
+ * (continuidad por historial, luego carga); (c) deja una nota interna con
+ * contexto, y (d) crea el negocio del embudo a nombre de ese asesor.
+ * Asignar dispara `on_conversation_assigned`, que avisa al asesor.
+ *
+ * Y avisa al cliente. Antes de que eso existiera el asistente
+ * simplemente dejaba de responder: el asesor se enteraba, el cliente no,
+ * y no habia forma de distinguir "ya va alguien" de "esto se rompio".
+ *
+ * No lanza por el negocio: si su creacion falla se registra y el
+ * traspaso sigue.
+ */
 async function handOffToHuman(args: {
   db: ReturnType<typeof supabaseAdmin>
   accountId: string
@@ -424,6 +435,9 @@ async function handOffToHuman(args: {
   handoffAgentId: string | null
   assignedAgentId: string | null
   summary: string
+  /** Lo que el bot recolectó, para que el negocio no nazca en blanco.
+   *  Ausente en el traspaso por fallo del proveedor. */
+  request?: HandoffRequest | null
 }): Promise<void> {
   const update: Record<string, unknown> = {
     ai_autoreply_disabled: true,
@@ -432,25 +446,72 @@ async function handOffToHuman(args: {
 
   // A quien le toca. Nunca se pisa una asignacion humana existente: si el
   // hilo ya tiene dueño, ese sigue siendo el suyo.
+  //
+  // El dueño se RELEE aca en vez de fiarse de `args.assignedAgentId`.
+  // Ese valor es la foto del principio del dispatch, y el dispatch se
+  // sale si ya habia asesor (el gate de "a human owns this thread"), asi
+  // que en la foto siempre es null. Pero entre la foto y este punto
+  // pasan segundos —la ventana de respuesta, la generacion—, y en ese
+  // rato un asesor puede haber tomado el hilo. Con la foto, el traspaso
+  // lo pisaba y el negocio nacia sin su dueño.
+  const duenoActual = await asignadoAhora(args.db, args.conversationId, args.assignedAgentId)
   let destinatario: HandoffAgent | null = null
-  if (!args.assignedAgentId) {
+  // Quien queda como asesor del negocio: el que recibe el hilo ahora, o
+  // el que ya lo tenia. Solo el primero se escribe en la conversacion.
+  let asesorDelNegocio: HandoffAgent | null = null
+  if (duenoActual) {
+    // El hilo ya tiene dueño humano: el negocio es suyo. Si no, nace en
+    // "Sin asignar" mientras la conversacion le cuenta a el en la tabla
+    // de rendimiento.
+    asesorDelNegocio = await asesorPorUsuario(args.db, args.accountId, duenoActual)
+  } else {
     if (args.handoffAgentId) {
       // Un asesor fijo en Ajustes es una decision explicita del admin y
       // no se sustituye por el reparto. Se busca su nombre solo para
       // podercelo decir al cliente.
-      destinatario = {
-        userId: args.handoffAgentId,
-        fullName: await nombreDeAsesor(args.db, args.handoffAgentId),
-      }
+      destinatario = await asesorPorUsuario(args.db, args.accountId, args.handoffAgentId)
     } else {
-      // Sin asesor fijo, reparte por carga. Antes esto dejaba el hilo en
-      // la cola compartida, que en la practica era nadie.
-      destinatario = await pickHandoffAgent(args.db, args.accountId)
+      // Sin asesor fijo: continuidad si el hilo ya tuvo asesor, y si no,
+      // reparto por carga. Antes esto dejaba el hilo en la cola
+      // compartida, que en la practica era nadie.
+      destinatario = await pickHandoffAgent(
+        args.db,
+        args.accountId,
+        args.conversationId,
+      )
     }
     if (destinatario) update.assigned_agent_id = destinatario.userId
+    asesorDelNegocio = destinatario
   }
 
   await args.db.from('conversations').update(update).eq('id', args.conversationId)
+
+  // El negocio del embudo, con el asesor que acaba de recibir el hilo.
+  //
+  // Va DESPUES del update y no dentro: si el insert del negocio fallara
+  // antes, el cliente se quedaria sin asesor por una tarjeta. Y va
+  // antes del aviso al cliente solo por orden de lectura — no puede
+  // lanzar, asi que no retrasa ni bloquea nada.
+  //
+  // Un hilo que YA tenia dueño humano tambien pasa por aqui: no es un
+  // traspaso nuevo, pero si nunca se le creo la tarjeta, esta es la
+  // ocasion. El indice unico se encarga de que no haya una segunda.
+  const negocio = await createHandoffDeal(args.db, {
+    accountId: args.accountId,
+    conversationId: args.conversationId,
+    contactId: args.contactId,
+    ownerUserId: args.configOwnerUserId,
+    assignedProfileId: asesorDelNegocio?.profileId ?? null,
+    request: args.request ?? null,
+    summary: args.summary,
+  })
+  if (negocio.status === 'failed' || negocio.status === 'skipped') {
+    // Se registra y se sigue: perder una tarjeta del embudo es
+    // preferible a dejar a un cliente esperando.
+    console.warn(
+      `[ai auto-reply] sin negocio para la conversacion ${args.conversationId}: ${negocio.reason}`,
+    )
+  }
 
   await notifyCustomerOfHandoff({
     accountId: args.accountId,
@@ -461,16 +522,54 @@ async function handOffToHuman(args: {
   })
 }
 
-/** Nombre del asesor fijo, para el aviso al cliente. Un fallo aqui solo
- *  cuesta el nombre en el mensaje, nunca la transferencia. */
-async function nombreDeAsesor(
+/**
+ * Quien tiene asignada la conversacion EN ESTE MOMENTO.
+ *
+ * Si la lectura falla se usa la foto que traia el dispatch: es lo que se
+ * hacia antes, y un traspaso no se cae por una lectura.
+ */
+async function asignadoAhora(
   db: ReturnType<typeof supabaseAdmin>,
+  conversationId: string,
+  foto: string | null,
+): Promise<string | null> {
+  const { data, error } = await db
+    .from('conversations')
+    .select('assigned_agent_id')
+    .eq('id', conversationId)
+    .maybeSingle()
+  if (error || !data) return foto
+  return (data as { assigned_agent_id: string | null }).assigned_agent_id
+}
+
+/**
+ * Un asesor de la cuenta —el fijo de Ajustes o el que ya tenia el hilo—
+ * resuelto a `HandoffAgent` a partir de su `user_id`.
+ *
+ * Se lee su perfil por dos cosas: el nombre, para poder decirselo al
+ * cliente, y `profiles.id`, que es lo que pide `deals.assigned_to` —no
+ * su `user_id`, que es lo que guardan la configuracion y
+ * `conversations.assigned_agent_id`—. Se filtra por cuenta porque un
+ * mismo usuario puede tener perfil en mas de una.
+ *
+ * Un fallo aqui solo cuesta el nombre en el mensaje y el asignado de la
+ * tarjeta, nunca la transferencia.
+ */
+async function asesorPorUsuario(
+  db: ReturnType<typeof supabaseAdmin>,
+  accountId: string,
   userId: string,
-): Promise<string> {
+): Promise<HandoffAgent> {
   const { data } = await db
     .from('profiles')
-    .select('full_name')
+    .select('id, full_name')
+    .eq('account_id', accountId)
     .eq('user_id', userId)
     .maybeSingle()
-  return (data as { full_name: string | null } | null)?.full_name ?? ''
+  const perfil = data as { id: string; full_name: string | null } | null
+  return {
+    userId,
+    fullName: perfil?.full_name ?? '',
+    profileId: perfil?.id ?? null,
+  }
 }

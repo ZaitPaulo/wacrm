@@ -371,3 +371,47 @@ describe('sendMessageToConversation — template persistence (#483)', () => {
     expect(captured.conversation?.last_message_text).toBe('[template]');
   });
 });
+
+describe('sendMessageToConversation — autoría del saliente (sender_id)', () => {
+  // `messages.sender_id` existe desde la migración 001 y hasta el
+  // 2026-09-21 nunca se escribió: los 111 mensajes de asesor de
+  // producción lo tenían en NULL. Sin él no se sabe quién contestó, y
+  // el tiempo de respuesta del asesor no se puede separar del de la IA.
+  it('guarda el asesor que manda el mensaje', async () => {
+    const captured: CapturedWrites = {};
+    await sendMessageToConversation(sendPathDb([], captured), 'acct-1', {
+      conversationId: 'cv-1',
+      messageType: 'text',
+      contentText: 'voy saliendo para allá',
+      senderId: 'u-juan',
+    });
+    expect(captured.message?.sender_id).toBe('u-juan');
+    expect(captured.message?.sender_type).toBe('agent');
+  });
+
+  // La API pública v1 se autentica con una llave de cuenta, no con una
+  // sesión: ahí no hay asesor. NULL es la respuesta correcta, y tiene
+  // que ser NULL explícito y no la columna sin escribir.
+  it('deja sender_id en null cuando no hay persona detrás', async () => {
+    const captured: CapturedWrites = {};
+    await sendMessageToConversation(sendPathDb([], captured), 'acct-1', {
+      conversationId: 'cv-1',
+      messageType: 'text',
+      contentText: 'enviado por la API',
+    });
+    expect(captured.message).toHaveProperty('sender_id');
+    expect(captured.message?.sender_id).toBeNull();
+  });
+
+  it('también lo guarda en una plantilla', async () => {
+    const captured: CapturedWrites = {};
+    await sendMessageToConversation(sendPathDb([TEMPLATE_ROW], captured), 'acct-1', {
+      conversationId: 'cv-1',
+      messageType: 'template',
+      templateName: 'order_update',
+      templateParams: ['A123', 'Friday'],
+      senderId: 'u-brayan',
+    });
+    expect(captured.message?.sender_id).toBe('u-brayan');
+  });
+});

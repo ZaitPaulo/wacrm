@@ -168,6 +168,10 @@ export async function POST(request: Request) {
         templateMessageParams: template_message_params,
         interactivePayload: interactive_payload,
         replyToMessageId: reply_to_message_id,
+        // Este es el único camino de salida con una persona detrás: la
+        // sesión de la bandeja. Sin esto `messages.sender_id` queda en
+        // NULL y el tiempo de respuesta del asesor no se puede medir.
+        senderId: userId,
       });
 
       return NextResponse.json({

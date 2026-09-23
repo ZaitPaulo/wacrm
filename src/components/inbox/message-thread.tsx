@@ -7,6 +7,7 @@ import { useCan } from '@/hooks/use-can';
 import { usePresence } from '@/hooks/use-presence';
 import { PresenceDot } from '@/components/presence/presence-dot';
 import { presenceLabel } from '@/lib/presence';
+import { assignmentErrorKey } from '@/lib/inbox/assignment-errors';
 import { cn } from '@/lib/utils';
 import type {
   Conversation,
@@ -899,25 +900,55 @@ export function MessageThread({
     [conversation, user?.id]
   );
 
+  /**
+   * Cambia el asesor asignado a través del endpoint, NO con un UPDATE
+   * directo desde el navegador.
+   *
+   * El UPDATE directo llevaba fallando desde septiembre para todo `agent`
+   * —"new row violates row-level security policy"— porque la política de
+   * SELECT de la migración 520 también se aplica a la fila resultante: al
+   * pasarle el hilo a un compañero, el asesor se lo deja invisible a sí
+   * mismo en la misma sentencia. Nadie lo reportó porque a los `admin`
+   * sí les funcionaba. El endpoint hace las comprobaciones en código y
+   * escribe con service-role; ver su documentación para el detalle.
+   */
   const handleAssignChange = useCallback(
     async (agentId: string | null) => {
       if (!conversation) return;
 
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('conversations')
-        .update({ assigned_agent_id: agentId })
-        .eq('id', conversation.id);
+      try {
+        const res = await fetch(
+          `/api/conversations/${conversation.id}/assignee`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assigned_agent_id: agentId }),
+          }
+        );
 
-      if (error) {
-        console.error('Failed to update assignment:', error);
-        toast.error('Failed to update assignment');
+        if (!res.ok) {
+          // El detalle técnico queda en la consola; el asesor lee una
+          // frase que le dice qué pasó y qué puede hacer.
+          const payload = await res.json().catch(() => ({}));
+          console.error(
+            'Failed to update assignment:',
+            res.status,
+            payload?.error ?? ''
+          );
+          toast.error(
+            t(assignmentErrorKey(res.status, { unassigning: agentId === null }))
+          );
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to update assignment:', err);
+        toast.error(t('assignFailed'));
         return;
       }
 
       onAssignChange(conversation.id, agentId);
     },
-    [conversation, onAssignChange]
+    [conversation, onAssignChange, t]
   );
 
   // Empty state — same WhatsApp-style doodle background as the active

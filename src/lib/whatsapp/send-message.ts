@@ -88,6 +88,20 @@ export interface SendMessageParams {
   /** Structured payload for `messageType === 'interactive'`. */
   interactivePayload?: InteractiveMessagePayload | null;
   replyToMessageId?: string | null;
+  /**
+   * Quién manda este mensaje, para `messages.sender_id`.
+   *
+   * La columna existe desde la migración 001 y hasta hoy nunca se
+   * escribió: los 111 mensajes de asesor de producción la tienen en
+   * NULL, así que no hay forma de saber quién contestó ni cuánto
+   * tardó. Es lo único que hace calculable el tiempo de respuesta
+   * humano separado del de la IA.
+   *
+   * Opcional porque no todos los caminos tienen una persona detrás: la
+   * API pública v1 se autentica con una llave de cuenta, no con una
+   * sesión, y ahí `sender_id` queda en NULL con razón — no hubo asesor.
+   */
+  senderId?: string | null;
 }
 
 export interface SendMessageResult {
@@ -201,6 +215,7 @@ export async function sendMessageToConversation(
     templateMessageParams,
     interactivePayload,
     replyToMessageId,
+    senderId,
   } = params;
 
   if (!conversationId) {
@@ -522,6 +537,13 @@ export async function sendMessageToConversation(
     .insert({
       conversation_id: conversationId,
       sender_type: 'agent',
+      // Quién lo mandó. `sender_type` solo dice "un humano", y con eso
+      // no se puede medir a nadie: el tiempo de respuesta por asesor
+      // sale de emparejar el entrante con el siguiente saliente DE ESE
+      // asesor. Null cuando no hay persona detrás (la API v1 se
+      // autentica con llave de cuenta), y eso se lee como "no hubo
+      // asesor", no como un dato que falte.
+      sender_id: senderId ?? null,
       content_type: messageType,
       content_text: persistedText,
       media_url: mediaUrl || null,

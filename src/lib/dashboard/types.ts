@@ -154,3 +154,100 @@ export interface ActivityItem {
   /** Optional deep-link for the whole row (not all items have a target). */
   href?: string
 }
+
+// ------------------------------------------------------------
+// Rendimiento por asesor
+//
+// Es la única métrica del dashboard que NO se agrega en el cliente: la
+// calcula la RPC `agent_performance_metrics()` (migración 532). El
+// porqué está en `queries.ts`, junto a la función que la carga.
+// ------------------------------------------------------------
+
+/**
+ * Rol con el que un miembro está en la cuenta (`account_role_enum` en la
+ * base). Se declara acá y no se importa de `@/types` para que el tipo de
+ * la fila no arrastre dependencias del modelo entero.
+ */
+export type AccountRole = 'owner' | 'admin' | 'agent' | 'viewer'
+
+/** Una etapa del embudo con cuántos negocios abiertos tiene el asesor. */
+export interface AgentStageBreakdown {
+  stageId: string
+  stageName: string
+  /** Color de la etapa tal como lo guarda `pipeline_stages`. */
+  color: string
+  pipelineId: string
+  /** Posición dentro del embudo; las etapas ya vienen ordenadas por ella. */
+  position: number
+  deals: number
+}
+
+/**
+ * Una fila de la tabla de rendimiento.
+ *
+ * Hay fila para todo miembro con rol `agent` —aunque esté en cero— y
+ * para cualquier otro miembro CON CARTERA: en producción, la
+ * administradora que lleva la campaña de propietarios con 70
+ * conversaciones. Quien no atiende no aparece. Más una última fila
+ * "Sin asignar" con lo que no tiene detrás a ningún miembro vigente.
+ *
+ * OJO, son dos preguntas distintas: quién sale en una fila (quien
+ * atiende) no es quién puede VER la tabla (solo `owner` y `admin`).
+ */
+export interface AgentPerformanceRow {
+  /** `auth.users.id` del asesor. Null en la fila "Sin asignar". */
+  agentUserId: string | null
+  /** `profiles.id` del asesor — NO es el mismo id que `agentUserId`. */
+  agentProfileId: string | null
+  /** Null en la fila "Sin asignar"; la interfaz pone ahí su etiqueta. */
+  fullName: string | null
+  /**
+   * Con qué rol está esta persona en la cuenta. Null en la fila "Sin
+   * asignar", que no es una persona.
+   *
+   * Hace falta porque la tabla ya no lista solo asesores: un miembro con
+   * otro rol sale si tiene cartera, y una fila que aparece sin decir por
+   * qué está ahí es una interfaz que miente por omisión.
+   */
+  accountRole: AccountRole | null
+  /**
+   * La fila del trabajo sin dueño: lo que no tiene a nadie asignado y lo
+   * que quedó a nombre de alguien que ya no es miembro de la cuenta, sin
+   * importar el rol que tuviera. Va siempre al final de la lista.
+   *
+   * Cada conversación abierta cae en exactamente una fila, así que la
+   * suma de `openConversations` cuadra con el total de la cuenta.
+   */
+  isUnassigned: boolean
+  /** Conversaciones abiertas que tiene asignadas ahora. Sin ventana de tiempo. */
+  openConversations: number
+  /**
+   * De esas conversaciones abiertas, cuántas NO tienen ningún negocio
+   * abierto: clientes conversando que nunca entraron al embudo.
+   *
+   * Permite leer "10 de 13 · 3 sin negocio" en vez de poner 13 clientes
+   * al lado de un desglose de etapas que suma 10 sin explicar que son
+   * cosas distintas.
+   *
+   * NO se calcula restando `openConversations - openDeals`: los dos
+   * conteos se agrupan por claves distintas —`assigned_agent_id` uno y
+   * `deals.assigned_to` el otro—, así que un negocio asignado a alguien
+   * cuya conversación es de otro haría que la resta mintiera. Siempre
+   * `<= openConversations`.
+   */
+  openConversationsWithoutDeal: number
+  openDeals: number
+  /**
+   * Null cuando no tiene ningún negocio abierto: es "sin datos", no
+   * "todas las etapas en cero". Solo vienen las etapas con al menos uno.
+   */
+  dealsByStage: AgentStageBreakdown[] | null
+  /**
+   * Promedio de segundos hasta la primera respuesta del asesor. Null
+   * cuando no hay ninguna muestra —y en la fila "Sin asignar", donde no
+   * hay a quién medir—. Nunca 0 por ausencia de datos.
+   */
+  avgFirstResponseSeconds: number | null
+  /** Cuántos entrantes entraron en el promedio. */
+  responseSamples: number
+}

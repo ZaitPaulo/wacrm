@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
+import { autoreplyErrorKey } from "@/lib/inbox/autoreply-errors";
 
 // ------------------------------------------------------------
 // Account AI status is the same for every conversation, so cache it per
@@ -113,7 +114,9 @@ export function AiThreadBanner({
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          toast.error(j?.error ?? t("updateError"));
+          // El `error` de la ruta es inglés de log; lo que se le muestra
+          // al asesor sale del `code`, traducido (ver autoreply-errors.ts).
+          toast.error(t(autoreplyErrorKey(j?.code)));
           return;
         }
         setPaused(paused);

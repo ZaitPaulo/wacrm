@@ -5,6 +5,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { CURRENCIES } from "@/lib/currency";
+import { dealErrorKey } from "@/lib/pipelines/deal-errors";
+import { newDealFields } from "@/lib/pipelines/deal-payload";
 import {
   applyVehicleSelection,
   formatVehicleTitle,
@@ -371,7 +373,7 @@ export function DealForm({
         .update(payload)
         .eq("id", deal.id);
       if (error) {
-        toast.error(t("toastFailedSave"));
+        toast.error(t(dealErrorKey(error, "toastFailedSave")));
         setSaving(false);
         return;
       }
@@ -390,11 +392,20 @@ export function DealForm({
         setSaving(false);
         return;
       }
-      const { error } = await supabase
-        .from("deals")
-        .insert({ ...payload, user_id: user.id, account_id: accountId, status: "open" });
+      // El vínculo con la conversación va solo en el alta, y sale de la
+      // que el formulario ya cargó para este contacto. Ver
+      // `newDealFields`: sin él, el índice único parcial de la 532 no
+      // puede impedir un segundo negocio abierto sobre el mismo hilo.
+      const { error } = await supabase.from("deals").insert({
+        ...payload,
+        ...newDealFields({
+          userId: user.id,
+          accountId,
+          conversation: linkedConversation,
+        }),
+      });
       if (error) {
-        toast.error(t("toastFailedCreate"));
+        toast.error(t(dealErrorKey(error, "toastFailedCreate")));
         setSaving(false);
         return;
       }

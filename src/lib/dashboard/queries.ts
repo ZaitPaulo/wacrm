@@ -8,7 +8,9 @@ import {
   startOfLocalDay,
 } from './date-utils'
 import type {
+  AccountRole,
   ActivityItem,
+  AgentPerformanceRow,
   ConversationsSeriesPoint,
   MetricsBundle,
   PipelineDonutData,
@@ -395,4 +397,113 @@ export async function loadActivity(db: DB, limit = 20): Promise<ActivityItem[]> 
   return items
     .sort((a, b) => (a.at > b.at ? -1 : a.at < b.at ? 1 : 0))
     .slice(0, limit)
+}
+
+// --- 6. Rendimiento por asesor ----------------------------------------
+//
+// LA ÚNICA MÉTRICA DE ESTE ARCHIVO QUE NO SE AGREGA EN EL CLIENTE, y es
+// a propósito. El comentario del encabezado anticipaba este punto: "if a
+// tenant's dataset outgrows this, we'd migrate the heavy aggregations to
+// SQL RPCs". Este es el caso.
+//
+// Tres razones, en orden de peso:
+//
+//   1. EL TIEMPO DE RESPUESTA OBLIGA A RECORRER TODOS LOS MENSAJES. Hay
+//      que emparejar cada entrante con la siguiente respuesta DE ESE
+//      asesor, y por decisión del Director la tabla no lleva ventana de
+//      tiempo, así que el barrido es sobre el historial completo. Hoy
+//      son ~1.600 mensajes y en un año serán cientos de miles: traerlos
+//      al navegador para emparejarlos en memoria no es viable.
+//
+//   2. LA RLS NO ALCANZA A VER LO QUE HAY QUE MOSTRAR. La fila "Sin
+//      asignar" existe para sacar a la luz las conversaciones que nadie
+//      atiende, y la migración 520 se las esconde a media cuenta. Una
+//      función `SECURITY DEFINER` es lo que permite contarlas.
+//
+//   3. EL CONTROL DE ACCESO NO PUEDE VIVIR SOLO EN LA INTERFAZ. La RPC
+//      comprueba el rol adentro y le devuelve cero filas a un `agent`,
+//      así que esconder la tabla en el dashboard no es la única defensa.
+//
+// Si mañana aparece otra métrica pesada, que siga este camino en vez de
+// inventar un tercero.
+//
+// La RPC NO recibe `account_id`: saca la cuenta y el rol del perfil de
+// `auth.uid()`. Por eso no hay nada que filtrar acá.
+
+/** Forma cruda que devuelve la RPC, en snake_case como la base. */
+interface AgentPerformanceRpcRow {
+  agent_user_id: string | null
+  agent_profile_id: string | null
+  full_name: string | null
+  /** Llega como string: PostgREST serializa el enum por su etiqueta. */
+  account_role: AccountRole | null
+  is_unassigned: boolean
+  open_conversations: number | string
+  open_conversations_without_deal: number | string
+  open_deals: number | string
+  deals_by_stage: {
+    stage_id: string
+    stage_name: string
+    color: string | null
+    pipeline_id: string
+    position: number
+    deals: number
+  }[] | null
+  avg_first_response_seconds: number | string | null
+  response_samples: number | string
+}
+
+/**
+ * `bigint` y `numeric` llegan como string desde PostgREST: js perdería
+ * precisión en un bigint grande, así que el driver no se arriesga. Acá
+ * son conteos y un promedio de segundos, donde `Number` es exacto de
+ * sobra.
+ */
+function toNumber(value: number | string): number {
+  return typeof value === 'number' ? value : Number(value)
+}
+
+/**
+ * La tabla de rendimiento: una fila por miembro con rol `agent`, una por
+ * cualquier otro miembro con cartera asignada, y la fila "Sin asignar"
+ * al final. El orden lo decide la RPC y se respeta tal cual.
+ *
+ * Devuelve `[]` cuando quien consulta no es `owner` ni `admin` — la RPC
+ * no lanza en ese caso, devuelve vacío, para que la interfaz pueda
+ * tratar "no te toca" igual que "no hay nada que mostrar".
+ */
+export async function loadAgentPerformance(db: DB): Promise<AgentPerformanceRow[]> {
+  const { data, error } = await db.rpc('agent_performance_metrics')
+  if (error) throw error
+
+  return ((data ?? []) as AgentPerformanceRpcRow[]).map((row) => ({
+    agentUserId: row.agent_user_id,
+    agentProfileId: row.agent_profile_id,
+    fullName: row.full_name,
+    accountRole: row.account_role,
+    isUnassigned: row.is_unassigned,
+    openConversations: toNumber(row.open_conversations),
+    openConversationsWithoutDeal: toNumber(row.open_conversations_without_deal),
+    openDeals: toNumber(row.open_deals),
+    // Null se conserva como null: es "sin datos", y la interfaz lo
+    // distingue de un arreglo vacío o de una etapa en cero.
+    dealsByStage:
+      row.deals_by_stage === null
+        ? null
+        : row.deals_by_stage.map((s) => ({
+            stageId: s.stage_id,
+            stageName: s.stage_name,
+            color: s.color || '#64748b',
+            pipelineId: s.pipeline_id,
+            position: s.position,
+            deals: toNumber(s.deals),
+          })),
+    // Null se conserva: un asesor sin muestras tiene el tiempo ausente,
+    // no en cero. Cero minutos sería un resultado medido.
+    avgFirstResponseSeconds:
+      row.avg_first_response_seconds === null
+        ? null
+        : toNumber(row.avg_first_response_seconds),
+    responseSamples: toNumber(row.response_samples),
+  }))
 }

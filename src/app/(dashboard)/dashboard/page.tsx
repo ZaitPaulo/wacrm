@@ -19,6 +19,7 @@ import {
 
 import {
   loadActivity,
+  loadAgentPerformance,
   loadConversationsSeries,
   loadMetrics,
   loadPipelineDonut,
@@ -33,6 +34,7 @@ import {
 } from '@/lib/dashboard/vehicle-queries'
 import type {
   ActivityItem,
+  AgentPerformanceRow,
   ConversationsSeriesPoint,
   InventoryAging,
   InventorySnapshot,
@@ -55,6 +57,7 @@ import { InventoryAgingChart } from '@/components/dashboard/inventory-aging-char
 import { InventoryMixChart } from '@/components/dashboard/inventory-mix-chart'
 import { MarginPanel } from '@/components/dashboard/margin-panel'
 import { VehicleInterestList } from '@/components/dashboard/vehicle-interest-list'
+import { AgentPerformanceTable } from '@/components/dashboard/agent-performance-table'
 
 import { useTranslations } from 'next-intl'
 
@@ -73,6 +76,15 @@ export default function DashboardPage() {
   // panel que llegaría vacío; la restricción real la impone la RLS de
   // vehicle_acquisitions, que a un 'agent' le devuelve cero filas.
   const showMargins = useCan('view-margins')
+
+  // El rendimiento por asesor es de owner/admin. El gate va por
+  // `canEditSettings` (vía `useCan`) y NO por el largo del arreglo:
+  // `loadAgentPerformance` devuelve `[]` tanto cuando la RPC le niega el
+  // acceso a un `agent` como cuando de verdad no hay filas, y desde acá
+  // esos dos casos son indistinguibles. La frontera real la pone la RPC,
+  // que comprueba el rol adentro; esto solo evita montar una tabla que
+  // llegaría vacía.
+  const showAgentPerformance = useCan('edit-settings')
 
   const [metrics, setMetrics] = useState<MetricsBundle | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(true)
@@ -113,6 +125,17 @@ export default function DashboardPage() {
   const [interest, setInterest] = useState<VehicleInterest | null>(null)
   const [interestLoading, setInterestLoading] = useState(true)
 
+  // --- Rendimiento por asesor --------------------------------------
+  // A diferencia del resto, esta sección sí distingue el fallo: la RPC
+  // lanza cuando falla, y una tabla vacía por error se leería como
+  // "nadie tiene clientes", que es una mentira. Por eso lleva su propio
+  // flag y un botón de reintento.
+  const [agentPerformance, setAgentPerformance] = useState<AgentPerformanceRow[] | null>(
+    null,
+  )
+  const [agentPerformanceLoading, setAgentPerformanceLoading] = useState(true)
+  const [agentPerformanceError, setAgentPerformanceError] = useState(false)
+
   /**
    * Recarga las métricas que dependen del período. El bloque comercial
    * reutiliza el mismo selector de rango que la serie de conversaciones
@@ -147,6 +170,36 @@ export default function DashboardPage() {
         .finally(() => setMarginsLoading(false))
     }
   }, [])
+
+  /**
+   * Carga la tabla de rendimiento. Va aparte de `loadAll` porque es la
+   * única sección con botón de reintento: el handler la vuelve a llamar
+   * sin rearrancar el resto del tablero.
+   *
+   * No activa el skeleton acá, por el mismo motivo que `loadRanged`: en
+   * el arranque el flag ya nace en `true`, y en el reintento lo levanta
+   * el handler del evento.
+   */
+  const loadAgents = useCallback(() => {
+    const db = createClient()
+    void loadAgentPerformance(db)
+      .then((rows) => {
+        setAgentPerformance(rows)
+        setAgentPerformanceError(false)
+      })
+      .catch((err) => {
+        console.error('[dashboard] agent performance failed:', err)
+        setAgentPerformance(null)
+        setAgentPerformanceError(true)
+      })
+      .finally(() => setAgentPerformanceLoading(false))
+  }, [])
+
+  const retryAgentPerformance = useCallback(() => {
+    setAgentPerformanceLoading(true)
+    setAgentPerformanceError(false)
+    loadAgents()
+  }, [loadAgents])
 
   const loadAll = useCallback(() => {
     const db = createClient()
@@ -192,8 +245,12 @@ export default function DashboardPage() {
       .catch((err) => console.error('[dashboard] aging failed:', err))
       .finally(() => setAgingLoading(false))
 
+    // Sin permiso no se pide: la RPC devolvería vacío igual, pero una
+    // llamada que nunca se va a mostrar es una ida al servidor de más.
+    if (showAgentPerformance) loadAgents()
+
     loadRanged(30, showMargins)
-  }, [loadRanged, showMargins])
+  }, [loadRanged, showMargins, showAgentPerformance, loadAgents])
 
   useEffect(() => {
     loadAll()
@@ -434,6 +491,18 @@ export default function DashboardPage() {
         />
 
         <ResponseTimeChart data={responseTime} loading={responseTimeLoading} />
+
+        {/* Rendimiento por asesor. Sigue al tiempo de respuesta de la
+            cuenta a propósito: es la misma pregunta, primero en total y
+            después por persona. Solo owner/admin. */}
+        {showAgentPerformance && (
+          <AgentPerformanceTable
+            rows={agentPerformance}
+            loading={agentPerformanceLoading}
+            error={agentPerformanceError}
+            onRetry={retryAgentPerformance}
+          />
+        )}
 
         {/* El pipeline sigue en desarrollo y hoy no se usa: se conserva,
             pero deja de competir por la parte alta del tablero. */}

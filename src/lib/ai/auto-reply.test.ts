@@ -17,7 +17,13 @@ const h = vi.hoisted(() => ({
     claim: true as boolean,
     updatePayload: null as Record<string, unknown> | null,
     rpcCalls: [] as { name: string; args: unknown }[],
-    profiles: [] as { user_id: string; full_name: string }[],
+    profiles: [] as { id?: string; user_id: string; full_name: string }[],
+    /** Historial de asignaciones del hilo, del más viejo al más nuevo. */
+    historial: [] as (string | null)[],
+    /** Argumentos con los que se pidió crear el negocio del traspaso. */
+    dealArgs: null as Record<string, unknown> | null,
+    /** Lo que responde la creación del negocio. */
+    dealOutcome: { status: 'created', dealId: 'deal-1' } as Record<string, unknown>,
     openConversations: [] as (string | null)[],
     inventory: [] as Record<string, unknown>[],
     /** Referral del anuncio de la conversación (migración 526). */
@@ -35,6 +41,15 @@ vi.mock('./reply-window', () => ({
   hasNewerCustomerMessage: h.hasNewerCustomerMessage,
   hasOutboundSince: h.hasOutboundSince,
 }))
+// La creación del negocio del traspaso tiene su propia suite
+// (handoff-deal.test.ts). Acá solo interesa QUE se pida y CON QUÉ.
+vi.mock('./handoff-deal', () => ({
+  createHandoffDeal: (_db: unknown, args: Record<string, unknown>) => {
+    h.state.dealArgs = args
+    return Promise.resolve(h.state.dealOutcome)
+  },
+}))
+
 vi.mock('./admin-client', () => ({
   supabaseAdmin: () => ({
     from: (table: string) => {
@@ -70,6 +85,26 @@ vi.mock('./admin-client', () => ({
           select: () => chain,
           eq: () => chain,
           order: () => Promise.resolve({ data: h.state.inventory, error: null }),
+        }
+        return chain
+      }
+      if (table === 'conversation_assignments') {
+        // Continuidad: la última asignación de este hilo que nombra a
+        // un asesor (`pick-agent.ts`).
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          not: () => chain,
+          order: () => chain,
+          limit: () => chain,
+          maybeSingle: () => {
+            const conAsesor = h.state.historial.filter((a) => a !== null)
+            const ultimo = conAsesor[conAsesor.length - 1] ?? null
+            return Promise.resolve({
+              data: ultimo ? { to_agent_id: ultimo } : null,
+              error: null,
+            })
+          },
         }
         return chain
       }
@@ -181,9 +216,12 @@ beforeEach(() => {
   h.state.updatePayload = null
   h.state.rpcCalls = []
   h.state.profiles = [
-    { user_id: 'u-juan', full_name: 'Juan Marino Arias' },
-    { user_id: 'u-brayan', full_name: 'Brayan Hernández' },
+    { id: 'p-juan', user_id: 'u-juan', full_name: 'Juan Marino Arias' },
+    { id: 'p-brayan', user_id: 'u-brayan', full_name: 'Brayan Hernández' },
   ]
+  h.state.historial = []
+  h.state.dealArgs = null
+  h.state.dealOutcome = { status: 'created', dealId: 'deal-1' }
   h.state.openConversations = ['u-juan', 'u-juan']
   h.state.adReferral = null
   h.state.inventory = [
@@ -874,5 +912,162 @@ describe('dispatchInboundToAiReply — fotos del cliente', () => {
     await dispatchInboundToAiReply(ARGS)
 
     expect(p.loadNewCustomerPhotos).not.toHaveBeenCalled()
+  })
+})
+
+// El traspaso es el momento en que el lead pasa a ser trabajo de una
+// persona; es ahí donde tiene que nacer la tarjeta del embudo. Antes de
+// esto `deals` estaba vacía —0 filas, histórico incluido— porque la
+// automatización de alta llevaba apagada desde el 2026-09-14.
+describe('dispatchInboundToAiReply — el traspaso abre el negocio', () => {
+  beforeEach(() => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
+  })
+
+  // ESCENARIO: Traspaso normal.
+  it('crea el negocio asignado al asesor que recibe la conversación', async () => {
+    h.state.openConversations = ['u-juan', 'u-juan', 'u-brayan']
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
+    expect(h.state.dealArgs).toMatchObject({
+      accountId: 'acct-1',
+      conversationId: 'conv-1',
+      contactId: 'contact-1',
+      // `deals.assigned_to` apunta a `profiles(id)`, NO al user_id que
+      // guarda `conversations.assigned_agent_id`. Confundirlos deja el
+      // negocio sin dueño o revienta la FK.
+      assignedProfileId: 'p-brayan',
+    })
+  })
+
+  // ESCENARIO: El negocio hereda lo que el bot averiguó.
+  it('le pasa al negocio la calificación y la nota del traspaso', async () => {
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.dealArgs?.request).toMatchObject({ motivo: 'visita', nombre: 'Carlos' })
+    expect(String(h.state.dealArgs?.summary)).toContain('El bot traspasó la conversación')
+  })
+
+  // ESCENARIO: El traspaso queda en la cola compartida.
+  it('crea el negocio sin asesor cuando la cuenta no tiene ninguno', async () => {
+    h.state.profiles = []
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+    expect(h.state.dealArgs).toMatchObject({ assignedProfileId: null })
+  })
+
+  it('el asesor fijo de Ajustes también queda como dueño del negocio', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'u-juan' }))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.dealArgs).toMatchObject({ assignedProfileId: 'p-juan' })
+  })
+
+  // DEFECTO DE LA RE-AUDITORÍA: si el hilo ya tenía asesor humano, el
+  // negocio nacía con `assigned_to = NULL` —caía en "Sin asignar"—
+  // mientras la conversación le contaba a ese asesor en la tabla.
+  //
+  // El caso real es una carrera: el dispatch se sale si ya hay asesor al
+  // empezar, así que el dueño aparece DURANTE la generación (Juan toma el
+  // hilo mientras el bot piensa). Se simula mutando la conversación
+  // dentro de `generateReply`.
+  it('si un asesor tomó el hilo mientras tanto, el negocio es suyo y no se le pisa', async () => {
+    h.state.openConversations = ['u-juan', 'u-juan', 'u-brayan']
+    h.generateReply.mockImplementation(async () => {
+      h.state.conv = { ...h.state.conv, assigned_agent_id: 'u-juan' }
+      return { text: '', handoff: handoffRequest() }
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    // La asignación de Juan no se toca: el reparto habría elegido a Brayan.
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+    expect(h.state.dealArgs).toMatchObject({ assignedProfileId: 'p-juan' })
+  })
+
+  it('el dueño que ya tenía el hilo gana también sobre el asesor fijo de Ajustes', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'u-brayan' }))
+    h.generateReply.mockImplementation(async () => {
+      h.state.conv = { ...h.state.conv, assigned_agent_id: 'u-juan' }
+      return { text: '', handoff: handoffRequest() }
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+    expect(h.state.dealArgs).toMatchObject({ assignedProfileId: 'p-juan' })
+  })
+
+  // ESCENARIO: Error al insertar el negocio. Perder una tarjeta del
+  // embudo es preferible a dejar a un cliente esperando.
+  it('completa el traspaso aunque el negocio no se pueda crear', async () => {
+    h.state.dealOutcome = { status: 'failed', reason: 'no se pudo crear el negocio' }
+    h.state.openConversations = ['u-juan', 'u-juan', 'u-brayan']
+
+    await expect(dispatchInboundToAiReply(ARGS)).resolves.toBeUndefined()
+
+    // El asesor queda asignado y el cliente recibe su aviso.
+    expect(h.state.updatePayload).toMatchObject({
+      ai_autoreply_disabled: true,
+      assigned_agent_id: 'u-brayan',
+    })
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toMatch(/agent|asesor|advisor/i)
+  })
+
+  // El traspaso por fallo del proveedor no tiene calificación que
+  // heredar, pero el negocio igual se abre: el cliente está esperando y
+  // alguien tiene que verlo en el tablero.
+  it('abre el negocio también en el traspaso por fallo técnico', async () => {
+    h.generateReply.mockRejectedValue(new Error('Gemini rate limit reached'))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.dealArgs).toMatchObject({ request: null })
+    expect(String(h.state.dealArgs?.summary)).toContain('no pudo responder')
+  })
+})
+
+// La carga reparte bien un lead nuevo, pero no debería mover uno que ya
+// tiene dueño. Caso real: Juan reactiva la IA en un hilo suyo, el hilo
+// deja de contar como su carga y el siguiente traspaso se lo lleva otro.
+describe('dispatchInboundToAiReply — continuidad del asesor', () => {
+  beforeEach(() => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
+  })
+
+  it('devuelve el hilo al asesor que ya lo atendió, aunque tenga más carga', async () => {
+    h.state.historial = ['u-juan', null]
+    h.state.openConversations = ['u-juan', 'u-juan', 'u-juan']
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-juan' })
+  })
+
+  it('reparte por carga cuando el hilo no tiene historial', async () => {
+    h.state.historial = []
+    h.state.openConversations = ['u-juan', 'u-juan']
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
+  })
+
+  // El asesor fijo de Ajustes es una decisión explícita del admin y
+  // manda sobre la continuidad igual que mandaba sobre la carga.
+  it('el asesor fijo tiene precedencia sobre la continuidad', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'u-brayan' }))
+    h.state.historial = ['u-juan']
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
   })
 })
