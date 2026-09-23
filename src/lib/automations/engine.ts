@@ -20,6 +20,7 @@ import type {
   AssignConversationStepConfig,
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
+import { autoAssignContact } from '@/lib/assignment/auto-assign'
 import type { Initiative } from '@/lib/outbound/gate'
 import {
   debeEsperar,
@@ -622,25 +623,27 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
     case 'assign_conversation': {
       const cfg = step.step_config as AssignConversationStepConfig
       if (!args.contactId) throw new Error('assign_conversation needs a contact')
-      let agentId = cfg.agent_id
-      if (cfg.mode === 'round_robin') {
-        // Pick any member of the account. The existing implementation
-        // only ever returned the automation's author; preserving that
-        // shape until a real round-robin algorithm replaces it.
-        const { data: profiles } = await db
-          .from('profiles')
-          .select('user_id')
-          .eq('account_id', args.automation.account_id)
-          .limit(1)
-        agentId = profiles?.[0]?.user_id
-      }
-      if (!agentId) return 'no agent resolved'
-      await db
-        .from('conversations')
-        .update({ assigned_agent_id: agentId })
-        .eq('account_id', args.automation.account_id)
-        .eq('contact_id', args.contactId)
-      return `assigned to ${agentId}`
+      // El asesor lo decide la base (`auto_assign_conversation`, migración
+      // 537), con el orden conservar → continuidad del contacto →
+      // preferido → porcentajes. Dos cosas cambiaron respecto de antes:
+      //   * el modo "reparto" devolvía el PRIMER perfil de la cuenta (un
+      //     stub); ahora reparte por los porcentajes de Ajustes;
+      //   * ningún modo pisa a un asesor vigente: el asesor de un contacto
+      //     solo lo cambia un owner/admin a mano (P2). La base lo sostiene
+      //     además con el trigger `protect_sticky_assignment`.
+      const preferido = cfg.mode === 'round_robin' ? null : (cfg.agent_id ?? null)
+      if (cfg.mode !== 'round_robin' && !preferido) return 'no agent resolved'
+      const resultados = await autoAssignContact(db, {
+        accountId: args.automation.account_id,
+        contactId: args.contactId,
+        origin: 'automation',
+        preferredAgentId: preferido,
+        allowWeighted: true,
+      })
+      if (resultados.length === 0) return 'contact has no conversations'
+      return resultados
+        .map((r) => (r.agent ? `${r.outcome} ${r.agent.userId}` : r.outcome))
+        .join('; ')
     }
 
     case 'update_contact_field': {

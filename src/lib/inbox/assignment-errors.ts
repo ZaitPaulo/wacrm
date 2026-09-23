@@ -23,15 +23,15 @@ export type AssignmentErrorKey =
 /**
  * Elige el mensaje para un intento fallido de reasignación.
  *
- * El 403 tiene dos causas distintas del lado del servidor y el mismo
- * código: reasignar un hilo que no es tuyo, o dejarlo sin asignar siendo
- * `agent`. Se distinguen acá con lo que el cliente ya sabe —si mandó
- * `null` estaba soltando el hilo—, en vez de leer el texto de la
- * respuesta, que es inglés de servidor y puede cambiar sin aviso.
+ * El 403 significa siempre lo mismo desde `sticky-weighted-assignment`:
+ * solo un owner/admin cambia el asesor. Se distingue igual si el intento
+ * era reasignar o soltar —con lo que el cliente ya sabe, si mandó
+ * `null`—, para que el mensaje nombre lo que se intentó, en vez de leer
+ * el texto de la respuesta, que es inglés de servidor.
  *
- * El caso de soltar no debería ser alcanzable desde el desplegable, que
- * ya esconde "Sin asignar" para un `agent`, pero se maneja igual: la
- * frontera real es el endpoint y la interfaz puede cambiar.
+ * No debería ser alcanzable: al `agent` la bandeja ni le muestra el
+ * desplegable. Se maneja igual porque la frontera real es el endpoint y
+ * la interfaz puede cambiar.
  *
  * Cualquier estado no contemplado cae al mensaje genérico. Inventarle un
  * motivo a un fallo desconocido es peor que decir que falló.

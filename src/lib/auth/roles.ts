@@ -133,6 +133,18 @@ export function canViewAllConversations(role: AccountRole): boolean {
   return role !== "agent";
 }
 
+/**
+ * Owner / admin: cambiar a mano el asesor de una conversación (a otro
+ * miembro o a nadie). El asesor de un contacto es pegajoso
+ * (`sticky-weighted-assignment`, P2): el `agent` ya no reasigna ni suelta,
+ * tampoco lo suyo. Cosmético en la interfaz —esconde el desplegable—; la
+ * frontera real es `PATCH /api/conversations/[id]/assignee`, que exige
+ * admin.
+ */
+export function canReassignConversations(role: AccountRole): boolean {
+  return hasMinRole(role, "admin");
+}
+
 /** Owner only: irreversible destructive operations. */
 export function canDeleteAccount(role: AccountRole): boolean {
   return role === "owner";

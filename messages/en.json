@@ -275,8 +275,8 @@
       "unassign": "Unassign",
       "noTeammates": "No teammates available",
       "assignFailed": "Could not change the assigned agent",
-      "assignForbidden": "You can only reassign a conversation that is assigned to you",
-      "assignCannotUnassign": "An agent can pass the conversation to a teammate or hand it back to the bot, but not leave it unassigned",
+      "assignForbidden": "Only an administrator can change the agent of a conversation",
+      "assignCannotUnassign": "Only an administrator can leave a conversation without an agent",
       "assignNotMember": "That person is no longer a member of this account",
       "assignNotFound": "This conversation is no longer available to you",
       "assignRateLimited": "You are changing assignments too often. Wait a moment and try again.",
@@ -288,7 +288,8 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "openContactDetails": "View contact details",
-      "contactDetails": "Contact details"
+      "contactDetails": "Contact details",
+      "unassigned": "Unassigned"
     },
     "sessionTimer": {
       "expired": "Expired",
@@ -1968,7 +1969,8 @@
       "instagram": "Instagram",
       "facebook": "Facebook",
       "showcase": "Public showcase",
-      "business-hours": "Business hours"
+      "business-hours": "Business hours",
+      "assignment": "Agent assignment"
     },
     "groups": {
       "account": "Account",
@@ -2117,9 +2119,6 @@
       "autoReplyDesc": "The bot answers new inbound messages automatically (only when no flow handles them and no agent is assigned). Hands off to a human when it can’t help.",
       "maxAutoReplies": "Max auto-replies per conversation",
       "maxAutoRepliesDesc": "After this many bot replies in one thread, the bot goes quiet.",
-      "handoffTo": "Hand off to",
-      "handoffToDesc": "When the bot can’t help — or hits the reply cap — it pauses and routes the chat here, with a short note on what happened.",
-      "handoffQueue": "Unassigned queue (any agent can pick it up)",
       "remove": "Remove",
       "save": "Save",
       "missingModel": "Enter a model name.",
@@ -2312,6 +2311,80 @@
         "fri": "Friday",
         "sat": "Saturday",
         "sun": "Sunday"
+      }
+    },
+    "assignment": {
+      "errors": {
+        "invalid_body": "The submitted settings could not be read.",
+        "weights_invalid": "The percentage list does not have the expected format.",
+        "weights_empty": "Add at least one agent to the distribution.",
+        "weights_percent_range": "Each percentage must be a whole number between 1 and 100.",
+        "weights_duplicate": "An agent appears more than once in the distribution.",
+        "weights_sum": "Percentages must add up to exactly 100%.",
+        "weights_not_agent": "Only members with the agent role can receive automatic assignments.",
+        "stale_hours_invalid": "Hours without an agent must be a whole number between 1 and 720 (30 days), or empty to turn the rule off.",
+        "reactivate_days_invalid": "Days to reactivate the AI must be a whole number between 1 and 365, or empty to turn it off.",
+        "save_failed": "The assignment settings could not be saved."
+      },
+      "ui": {
+        "title": "Agent assignment",
+        "description": "How leads are split among agents and when the bot takes over again.",
+        "loading": "Loading settings…",
+        "loadFailed": "Could not load the assignment settings.",
+        "retry": "Retry",
+        "adminOnly": "Only the account owner or an admin can configure assignment.",
+        "weights": {
+          "title": "Split by percentage",
+          "explainer": "The next new lead goes to the agent furthest below their share; a lead who already had an agent always goes back to the same one.",
+          "percentLabel": "Percentage for {name}",
+          "sumLabel": "Total",
+          "sumOk": "100%",
+          "sumMissing": "{sum}% · {diff}% missing",
+          "sumOver": "{sum}% · {diff}% over",
+          "evenSplit": "Split evenly",
+          "ineligible": "No longer an agent",
+          "ineligibleHint": "Gets no leads. Remove them from the split to save.",
+          "remove": "Remove",
+          "removeLabel": "Remove {name} from the split",
+          "zeroHint": "At 0% the agent gets no new leads but keeps their existing customers.",
+          "defaultNote": "No percentages saved yet: leads are currently split evenly among all agents.",
+          "resetNote": "Saving new percentages restarts the split count.",
+          "noAgents": "There are no members with the agent role. Invite them or change their role in Team.",
+          "unnamed": "No name"
+        },
+        "stale": {
+          "title": "Assign conversations without an agent",
+          "toggle": "Assign automatically",
+          "hoursLabel": "Hours without an agent",
+          "unit": "hours",
+          "help": "Only applies to conversations left without an agent after the rule is turned on; those already unassigned are not handed out on their own.",
+          "activeSince": "Active since {date}.",
+          "off": "Off: conversations without an agent wait for someone to pick them up."
+        },
+        "reactivate": {
+          "title": "Reactivate the bot when a customer returns",
+          "toggle": "Reactivate the bot",
+          "daysLabel": "Days of silence",
+          "unit": "days",
+          "help": "If a customer with an agent writes again after that silence, the bot answers first and hands them back to the same agent. Does not apply to admins’ conversations.",
+          "off": "Off: the bot never takes back a conversation an agent is handling."
+        },
+        "validation": {
+          "percentInvalid": "Each percentage must be a whole number from 0 to 100.",
+          "weightsSum": "Percentages must add up to exactly 100%.",
+          "weightsEmpty": "At least one agent needs a percentage above 0.",
+          "ineligible": "Remove anyone who is no longer an agent from the split.",
+          "hoursInvalid": "Enter a whole number of hours from 1 to 720.",
+          "daysInvalid": "Enter a whole number of days from 1 to 365."
+        },
+        "save": "Save changes",
+        "saving": "Saving…",
+        "saved": "Assignment settings saved.",
+        "unsaved": "You have unsaved changes.",
+        "noChanges": "No pending changes.",
+        "fixErrors": "Fix the highlighted fields to save.",
+        "aiConfigHint": "Which agent the bot hands each conversation to is set in Settings → Agent assignment.",
+        "aiConfigHintLink": "Go to Agent assignment"
       }
     }
   },
@@ -2614,15 +2687,64 @@
   },
   "Notifications": {
     "title": "Notifications",
-    "description": "Conversations other teammates assign to you show up here.",
+    "description": "Conversations assigned to you and new messages from your customers show up here.",
     "markAllAsRead": "Mark all as read",
     "emptyTitle": "No notifications yet",
-    "emptyHint": "You'll see an alert here when someone assigns you a conversation.",
+    "emptyHint": "You'll see an alert here when a conversation is assigned to you or a customer writes to you.",
     "unread": "Unread",
     "markReadFailed": "Failed to mark notification as read",
     "markAllFailed": "Failed to mark all as read",
     "retry": "Retry",
-    "loadFailed": "Couldn't load notifications."
+    "loadFailed": "Couldn't load notifications.",
+    "push": {
+      "cardTitle": "Alerts on this device",
+      "cardDescription": "A sound alert for every customer assigned to you and every message in your conversations, even with the CRM closed.",
+      "statusEnabled": "On for this device",
+      "statusDisabled": "Off for this device",
+      "statusBlocked": "Blocked by the browser",
+      "statusUnsupported": "This browser can't receive alerts",
+      "statusServerDisabled": "Alerts aren't configured on the server",
+      "statusIosInstall": "On iPhone, add the CRM to your Home Screen first",
+      "statusIosTooOld": "This iPhone needs iOS 16.4 or later",
+      "statusLoading": "Checking this device…",
+      "enable": "Turn on alerts",
+      "enabling": "Turning on…",
+      "disable": "Turn off",
+      "sendTest": "Send test alert",
+      "sendingTest": "Sending…",
+      "testTitle": "Test alert",
+      "testBody": "This is how messages and assignments will reach you.",
+      "testSent": "Alert sent. It should arrive in a few seconds.",
+      "testFailed": "Couldn't send the test alert.",
+      "testExpired": "This device lost its subscription. Turn alerts on again.",
+      "enableFailed": "Couldn't turn on alerts.",
+      "permissionDismissed": "Permission was not granted. Tap “Turn on alerts” again whenever you like.",
+      "disableFailed": "Couldn't turn off alerts.",
+      "disabledToast": "Alerts turned off for this device.",
+      "enabledToast": "Alerts turned on for this device.",
+      "enabledHint": "Each device is turned on separately: do it on your phone and on your computer too.",
+      "unsupportedHint": "Use an up-to-date Chrome, Edge or Firefox. On iPhone, Safari with the CRM added to the Home Screen.",
+      "serverDisabledHint": "Ask your administrator to configure the server VAPID keys.",
+      "iosInstallIntro": "Apple only delivers alerts to sites added to the Home Screen (iOS 16.4 or later). It is a one-time step:",
+      "iosStep1": "Open the CRM in Safari.",
+      "iosStep2": "Tap Share (the square with the up arrow).",
+      "iosStep3": "Choose “Add to Home Screen” and confirm.",
+      "iosStep4": "Open the CRM from the new icon and come back to this page to turn on alerts.",
+      "iosTooOldHint": "Update it in Settings → General → Software Update.",
+      "blockedIntro": "To receive them again you have to allow them manually:",
+      "unblock": {
+        "chromeAndroid": "Tap the icon next to the address → Permissions → Notifications → Allow. If you installed the CRM: long-press its icon → App info → Notifications.",
+        "chromeDesktop": "Click the icon next to the address → Site settings → Notifications → Allow, then reload the page.",
+        "firefox": "Click the permissions icon next to the address, remove the notifications block and reload the page.",
+        "safari": "Safari → Settings → Websites → Notifications, and choose Allow for this site.",
+        "ios": "iPhone Settings → Notifications → find the CRM and turn on Allow Notifications.",
+        "generic": "Allow notifications for this site in your browser settings and reload the page."
+      },
+      "iphoneNote": "On iPhone, alerts only work with the CRM added to the Home Screen (iOS 16.4 or later). On Android, Chrome is enough."
+    },
+    "inApp": {
+      "open": "Open"
+    }
   },
   "SignupPage": {
     "titleInvite": "Create account & join",
@@ -2832,5 +2954,8 @@
   },
   "Brand": {
     "description": "WhatsApp CRM for vehicle dealerships."
+  },
+  "Pwa": {
+    "description": "CRM inbox, deals and alerts."
   }
 }

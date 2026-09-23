@@ -41,6 +41,7 @@ import {
 } from "./meta-send";
 import { decideFallback, resolveFallbackPolicy } from "./fallback";
 import { notifyCustomerOfHandoff } from "@/lib/handoff/notify-customer";
+import { autoAssignConversation } from "@/lib/assignment/auto-assign";
 import { addContactTagAndDispatch } from "@/lib/contacts/tag-events";
 import { removeContactTag } from "@/lib/contacts/tag-write";
 import {
@@ -203,23 +204,6 @@ export function resolveHandoffAgent(
   policy: Pick<FlowFallbackPolicy, "handoff_assign_to">,
 ): string | null {
   return cfg.assign_to?.trim() || policy.handoff_assign_to || null;
-}
-
-/**
- * Which agent the fallback-exhausted route assigns to, given the flow's
- * default and whoever currently owns the conversation.
- *
- * Returns null whenever the thread already has an assignee. That route
- * fires because the customer got stuck, not because anyone routed them
- * there, so it must never take the case away from a human who picked
- * it up mid-run. Mirrors the AI handoff's rule in lib/ai/auto-reply.ts.
- */
-export function resolveFallbackHandoffAgent(
-  policy: Pick<FlowFallbackPolicy, "handoff_assign_to">,
-  currentAssignee: string | null | undefined,
-): string | null {
-  if (currentAssignee) return null;
-  return policy.handoff_assign_to || null;
 }
 
 /**
@@ -550,7 +534,7 @@ async function executeHandoff(
   policy: FlowFallbackPolicy,
 ): Promise<void> {
   const cfg = node.config as unknown as HandoffNodeConfig;
-  const assignTo = resolveHandoffAgent(cfg, policy);
+  const preferido = resolveHandoffAgent(cfg, policy);
   // Resolve `{{vars.*}}` before the note goes anywhere. It used to be
   // persisted raw, which made every templated note dead text: the whole
   // point of a handoff note is to carry what the customer answered, and
@@ -560,15 +544,27 @@ async function executeHandoff(
     status: "pending",
     updated_at: new Date().toISOString(),
   };
-  // Deliberately overwrites an existing assignee — unlike the
-  // fallback-exhausted route below, reaching this node IS the routing
-  // decision the flow's author authored.
-  if (assignTo) convUpdate.assigned_agent_id = assignTo;
+  // A quién queda asignada lo decide la base (`auto_assign_conversation`,
+  // migración 537): conserva al asesor vigente, luego la continuidad del
+  // contacto, y solo después el agente del nodo. Antes el nodo PISABA al
+  // asesor existente ("reaching this node IS the routing decision"); con
+  // el asesor pegajoso (P2) solo un owner/admin lo cambia a mano. Sin
+  // agente configurado no se reparte por porcentajes, como siempre: la
+  // conversación queda en `pending` y el job de conversaciones olvidadas
+  // la recoge si nadie la toma.
+  let assignTo: string | null = null;
   if (run.conversation_id) {
     await db
       .from("conversations")
       .update(convUpdate)
       .eq("id", run.conversation_id);
+    const asignacion = await autoAssignConversation(db, {
+      conversationId: run.conversation_id,
+      origin: "flow",
+      preferredAgentId: preferido,
+      allowWeighted: false,
+    });
+    assignTo = asignacion.agent?.userId ?? null;
   }
   // Put the note where the agent already looks. The run's event log is a
   // diagnostic surface nobody opens mid-conversation; `contact_notes` is
@@ -606,8 +602,9 @@ async function executeHandoff(
     note: note || null,
     // What was actually assigned, not what was configured: a run with
     // no conversation writes nothing, and "handed off to nobody" is
-    // precisely the case worth telling apart in the events viewer.
-    assigned_to: run.conversation_id && assignTo ? assignTo : null,
+    // precisely the case worth telling apart in the events viewer. Si
+    // el asesor ya estaba y se conservó, es él.
+    assigned_to: assignTo,
   });
   await endRun(db, run.id, "handed_off", "handoff_node");
 }
@@ -1287,26 +1284,21 @@ async function handleReplyForActiveRun(
         status: "pending",
         updated_at: new Date().toISOString(),
       };
-      // Read the current owner before deciding — resolveFallbackHandoffAgent
-      // refuses to steal a thread a human already took. Only worth the
-      // round trip when there's a default agent to assign at all.
-      if (policy.handoff_assign_to) {
-        const { data: conv } = await db
-          .from("conversations")
-          .select("assigned_agent_id")
-          .eq("id", run.conversation_id)
-          .maybeSingle();
-        assignedTo = resolveFallbackHandoffAgent(
-          policy,
-          (conv as { assigned_agent_id: string | null } | null)
-            ?.assigned_agent_id,
-        );
-        if (assignedTo) convUpdate.assigned_agent_id = assignedTo;
-      }
       await db
         .from("conversations")
         .update(convUpdate)
         .eq("id", run.conversation_id);
+      // La base conserva a quien ya tenga el hilo (esta ruta se dispara
+      // porque el cliente se atascó, no porque alguien lo enrutara), y
+      // si no hay nadie usa la continuidad del contacto o el agente por
+      // defecto del flujo. Sin reparto por porcentajes.
+      const asignacion = await autoAssignConversation(db, {
+        conversationId: run.conversation_id,
+        origin: "flow",
+        preferredAgentId: policy.handoff_assign_to || null,
+        allowWeighted: false,
+      });
+      assignedTo = asignacion.agent?.userId ?? null;
     }
     await logEvent(db, run.id, "handoff", run.current_node_key, {
       reason: "fallback_exhausted",

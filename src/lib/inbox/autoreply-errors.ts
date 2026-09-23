@@ -22,6 +22,11 @@ export const AUTOREPLY_ERROR_CODES = {
    * eso solo quitaría el asesor, y soltar el hilo no le está permitido.
    * Desde la interfaz pasa con una vista vieja (otra pestaña, otro
    * compañero ya lo reactivó).
+   *
+   * YA NO SE EMITE desde `sticky-weighted-assignment`: reactivar dejó de
+   * quitar al asesor, así que hacerlo con la IA activa es inocuo. Se
+   * conserva la traducción por si un cliente viejo en caché lo recibe de
+   * una versión anterior del servidor durante el despliegue.
    */
   aiAlreadyActive: "ai_already_active",
 } as const;

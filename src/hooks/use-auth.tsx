@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { forgetThisDevice } from "@/lib/push/browser";
 import type { User } from "@supabase/supabase-js";
 import { DEFAULT_CURRENCY } from "@/lib/currency";
 import {
@@ -381,6 +382,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   const signOut = useCallback(async () => {
+    // Antes de cerrar la sesión (el DELETE la necesita): este dispositivo
+    // deja de recibir avisos push. Traen texto de clientes, y en un
+    // navegador compartido le llegarían al siguiente que lo use.
+    await forgetThisDevice();
     const supabase = createClient();
     await supabase.auth.signOut();
     setUser(null);

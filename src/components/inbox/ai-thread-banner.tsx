@@ -49,8 +49,10 @@ interface AiThreadBannerProps {
   disabled: boolean;
   /** `conversations.ai_handoff_summary` — note the bot left on handoff. */
   handoffSummary?: string | null;
-  /** Current assignee; when a human owns the thread the bot won't run,
-   *  so the "AI active" banner is suppressed. */
+  /** Asesor actual. Ya no esconde el banner: desde
+   *  sticky-weighted-assignment el bot atiende aunque haya asesor (lo
+   *  calla solo la pausa), así que "IA activa" + "Tomar" hace falta
+   *  justo en esos hilos. Se conserva la prop por compatibilidad. */
   assignedAgentId?: string | null;
   /** The acting agent — "Take over" assigns the thread to them. */
   currentUserId?: string | null;
@@ -68,15 +70,15 @@ interface AiThreadBannerProps {
  * conversation:
  *   - bot active here → "AI is replying automatically" + [Take over]
  *   - bot paused here → the handoff note (if any) + [Resume AI]
- * Renders nothing when the account has no auto-reply configured, or when
- * the bot is active but a human already owns the thread (nothing to do).
+ * Renders nothing when the account has no auto-reply configured. Con el
+ * asesor pegajoso (P2) un hilo con asesor puede tener la IA activa —el
+ * lead que vuelve—, y el banner se muestra igual para que el asesor pueda
+ * tomarlo.
  */
 export function AiThreadBanner({
   conversationId,
   disabled,
   handoffSummary,
-  assignedAgentId,
-  currentUserId,
   onChange,
 }: AiThreadBannerProps) {
   const t = useTranslations("Inbox.aiBanner");
@@ -109,7 +111,8 @@ export function AiThreadBanner({
         const res = await fetch(`/api/ai/autoreply/${conversationId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // "Take over" also assigns the thread to the acting agent.
+          // "Tomar" pide además quedarse el hilo, pero la ruta solo lo
+          // asigna si no tenía asesor: nunca le quita el cliente a nadie.
           body: JSON.stringify({ paused, assign_to_me: paused }),
         });
         if (!res.ok) {
@@ -119,17 +122,16 @@ export function AiThreadBanner({
           toast.error(t(autoreplyErrorKey(j?.code)));
           return;
         }
+        const j = await res.json().catch(() => ({}));
         setPaused(paused);
         onChange?.({
           ai_autoreply_disabled: paused,
-          // Take over assigns to the acting agent; resume releases only
-          // the caller's own assignment. The realtime UPDATE reconciles
-          // the exact value either way.
-          ...(paused
-            ? currentUserId
-              ? { assigned_agent_id: currentUserId }
-              : {}
-            : { assigned_agent_id: null }),
+          // El asesor que quedó lo dice la ruta: tomar solo asigna un hilo
+          // sin asesor, y reanudar ya no lo suelta. El UPDATE de realtime
+          // lo reconcilia igual.
+          ...(typeof j?.assigned_agent_id === "string" || j?.assigned_agent_id === null
+            ? { assigned_agent_id: j.assigned_agent_id }
+            : {}),
         });
         toast.success(paused ? t("tookOver") : t("resumed"));
       } catch {
@@ -138,7 +140,7 @@ export function AiThreadBanner({
         setBusy(false);
       }
     },
-    [conversationId, currentUserId, onChange, t],
+    [conversationId, onChange, t],
   );
 
   // Account has no auto-reply → nothing to show. (Still loading → nothing.)
@@ -180,9 +182,6 @@ export function AiThreadBanner({
       </Banner>
     );
   }
-
-  // Active, but a human already owns it → the bot won't fire; no banner.
-  if (assignedAgentId) return null;
 
   // Active on this thread.
   return (

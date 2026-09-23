@@ -8,7 +8,6 @@ import {
   isTerminal,
   evaluateConditionPredicate,
   resolveHandoffAgent,
-  resolveFallbackHandoffAgent,
 } from "./engine";
 
 describe("matchReplyId", () => {
@@ -344,33 +343,11 @@ describe("resolveHandoffAgent", () => {
   });
 });
 
-describe("resolveFallbackHandoffAgent", () => {
-  it("assigns the flow default on an unowned conversation", () => {
-    expect(
-      resolveFallbackHandoffAgent({ handoff_assign_to: "agent-default" }, null),
-    ).toBe("agent-default");
-    expect(
-      resolveFallbackHandoffAgent(
-        { handoff_assign_to: "agent-default" },
-        undefined,
-      ),
-    ).toBe("agent-default");
-  });
-
-  it("never steals a conversation a human already took", () => {
-    expect(
-      resolveFallbackHandoffAgent(
-        { handoff_assign_to: "agent-default" },
-        "agent-human",
-      ),
-    ).toBeNull();
-  });
-
-  it("returns null when the flow declares no default", () => {
-    expect(resolveFallbackHandoffAgent({}, null)).toBeNull();
-    expect(resolveFallbackHandoffAgent({ handoff_assign_to: "" }, null)).toBeNull();
-  });
-});
+// resolveFallbackHandoffAgent se retiró: "no robarle el hilo a quien ya
+// lo tomó" ahora lo garantiza la base (auto_assign_conversation conserva
+// al asesor vigente, y el trigger protect_sticky_assignment lo sostiene
+// frente a cualquier escritura sin sesión). Ver
+// supabase/tests/sticky_weighted_assignment.test.sql.
 
 describe("cancelRunsForInactiveFlow", () => {
   /**

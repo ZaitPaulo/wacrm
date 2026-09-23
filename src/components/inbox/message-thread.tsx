@@ -208,11 +208,12 @@ export function MessageThread({
   const tQuote = useTranslations('Inbox.replyQuote');
 
   const { user } = useAuth();
-  // Un asesor puede pasarle la conversación a un compañero, pero no
-  // dejarla sin asignar: eso la mandaría al limbo que solo ve el admin.
-  // El trigger de la migración 520 lo rechaza en la base; acá solo se
-  // esconde la opción para no ofrecer algo que va a fallar.
-  const canUnassign = useCan('view-all-conversations');
+  // El asesor de un contacto es pegajoso (sticky-weighted-assignment, P2):
+  // solo owner/admin lo cambian, a otro miembro o a nadie. Al `agent` no
+  // se le ofrece el desplegable —ve el nombre como texto—: la ruta lo
+  // rechazaría igual con 403, y ofrecer algo que va a fallar es peor que
+  // no ofrecerlo.
+  const canReassign = useCan('reassign-conversations');
   const { getPresence, getRow, now } = usePresence();
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1240,7 +1241,24 @@ export function MessageThread({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Assign dropdown */}
+          {/* Asesor asignado: desplegable para owner/admin, texto para
+              el resto. Mismo aspecto de pastilla para que el header no
+              salte entre roles. */}
+          {!canReassign ? (
+            <span
+              className={cn(
+                'inline-flex h-11 items-center justify-center gap-1 rounded-md px-3 text-xs max-lg:rounded-full max-lg:bg-muted/60 lg:h-7 lg:px-2',
+                assignedAgentId ? 'text-primary' : 'text-muted-foreground'
+              )}
+            >
+              <UserPlus className="h-3 w-3" />
+              <span className="max-lg:max-w-28 max-lg:truncate">
+                {assignedAgentId
+                  ? (currentAssignee?.full_name ?? t('assigned'))
+                  : t('unassigned')}
+              </span>
+            </span>
+          ) : (
           <DropdownMenu>
             <DropdownMenuTrigger
               className={cn(
@@ -1305,7 +1323,7 @@ export function MessageThread({
                   );
                 })
               )}
-              {assignedAgentId && canUnassign && (
+              {assignedAgentId && (
                 <>
                   <DropdownMenuSeparator className="bg-border" />
                   <DropdownMenuItem
@@ -1318,6 +1336,7 @@ export function MessageThread({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
         </div>
       </div>
 

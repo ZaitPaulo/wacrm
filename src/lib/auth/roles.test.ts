@@ -5,6 +5,7 @@ import {
   canDeleteAccount,
   canEditSettings,
   canManageMembers,
+  canReassignConversations,
   canSendMessages,
   canTransferOwnership,
   canViewAllConversations,
@@ -130,6 +131,14 @@ describe("capability predicates", () => {
     // nada— dejaría el rol sin sentido. Por eso no se escribe con
     // hasMinRole, que lo dejaría fuera junto con el agent.
     expect(canViewAllConversations("viewer")).toBe(true);
+  });
+
+  // El asesor de un contacto es pegajoso: solo owner/admin lo cambian.
+  it("canReassignConversations: owner y admin", () => {
+    expect(canReassignConversations("owner")).toBe(true);
+    expect(canReassignConversations("admin")).toBe(true);
+    expect(canReassignConversations("agent")).toBe(false);
+    expect(canReassignConversations("viewer")).toBe(false);
   });
 
   it("canTransferOwnership: owner only", () => {

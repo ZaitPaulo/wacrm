@@ -20,6 +20,7 @@ import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel'
 import { DealsSettings } from '@/components/settings/deals-settings';
 import { ShowcaseSettings } from '@/components/settings/showcase-settings';
 import { BusinessHoursSettings } from '@/components/settings/business-hours-settings';
+import { AssignmentSettings } from '@/components/settings/assignment-settings';
 import { MembersTab } from '@/components/settings/members-tab';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import {
@@ -107,6 +108,7 @@ function SettingsPageInner() {
     deals: <DealsSettings />,
     showcase: <ShowcaseSettings />,
     'business-hours': <BusinessHoursSettings />,
+    assignment: <AssignmentSettings />,
     members: <MembersTab />,
     api: <ApiKeysSettings />,
   };

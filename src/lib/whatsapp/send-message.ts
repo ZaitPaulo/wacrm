@@ -577,6 +577,14 @@ export async function sendMessageToConversation(
       last_message_text: lastMessageText,
       last_message_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      // Una persona escribiendo desde la bandeja pausa la IA en el hilo.
+      // Desde sticky-weighted-assignment tener asesor ya no calla al bot
+      // —el lead con asesor que vuelve lo atiende primero la IA—, así que
+      // la señal de "este hilo ya es de una persona" es su primer
+      // mensaje, la misma que pausa los flujos justo abajo. Solo con
+      // `senderId`: la API v1, las automatizaciones y los flujos no son
+      // una persona tomando el hilo.
+      ...(senderId ? { ai_autoreply_disabled: true } : {}),
     })
     .eq('id', conversationId);
 

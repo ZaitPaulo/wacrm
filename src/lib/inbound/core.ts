@@ -9,6 +9,7 @@ import { reopenClosedConversation } from '@/lib/conversations/reopen';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
 import { dispatchInboundToFlows } from '@/lib/flows/engine';
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply';
+import { reactivateBotForReturningLead } from '@/lib/ai/returning-lead';
 import { aiVisionMaxImages } from '@/lib/ai/defaults';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
 import { recordVehicleInquiry } from '@/lib/inventory/inquiries';
@@ -426,6 +427,12 @@ export async function fanOutInbound(ctx: InboundFanout): Promise<void> {
 
   const { inbound, insertedMessageId, insertedCreatedAt } = ctx.message;
   const { isFirstInboundMessage, contactCreated } = ctx.message;
+
+  // El lead que vuelve tras N días de silencio: la IA pausada se reactiva
+  // para este entrante (migración 538). Va ANTES de flujos, automatizaciones
+  // e IA para que todos vean el mismo estado. No lanza. Ver
+  // `@/lib/ai/returning-lead`. Las reacciones ya salieron arriba.
+  await reactivateBotForReturningLead(db, conversationId, insertedMessageId);
 
   const inboundText = inbound.contentText ?? '';
 

@@ -35,9 +35,15 @@ const h = vi.hoisted(() => ({
   hideVehicles: vi.fn<
     (db: unknown, account: string, ids: string[], reason: string) => Promise<string[]>
   >(async (...[, , ids]) => ids),
+  autoAssignContact: vi.fn(async () => [
+    { outcome: "assigned", source: "weighted", agent: { userId: "u-juan", profileId: "p-juan", fullName: "Juan" }, deal: null },
+  ]),
 }));
 
 vi.mock("@/lib/inventory/auto-delist", () => ({ hideVehicles: h.hideVehicles }));
+// La asignación la decide la base (auto_assign_conversation, migración
+// 537) y tiene su prueba SQL; acá solo importa qué le pide el motor.
+vi.mock("@/lib/assignment/auto-assign", () => ({ autoAssignContact: h.autoAssignContact }));
 
 vi.mock("./admin-client", () => {
   const { state } = h;
@@ -996,5 +1002,57 @@ describe("condición from_ad", () => {
     expect(stepResults()).toContainEqual(
       expect.objectContaining({ step_type: "condition", detail: "branch=no" }),
     );
+  });
+});
+
+// ------------------------------------------------------------
+// assign_conversation (sticky-weighted-assignment): el modo "reparto"
+// ya no devuelve el primer perfil de la cuenta, y ningún modo pisa a un
+// asesor vigente. Las dos cosas las garantiza la base.
+// ------------------------------------------------------------
+function assignStep(step_config: Record<string, unknown>) {
+  return {
+    id: "s-assign",
+    automation_id: "a1",
+    step_type: "assign_conversation",
+    position: 0,
+    parent_step_id: null,
+    step_config,
+  };
+}
+
+describe("assign_conversation", () => {
+  beforeEach(() => {
+    h.state.owned = { id: "c1" };
+    h.state.automations = [dealAutomation()];
+    h.autoAssignContact.mockClear();
+  });
+
+  it("en modo reparto pide porcentajes, sin asesor preferido", async () => {
+    h.state.steps = [assignStep({ mode: "round_robin" })];
+    await run();
+    expect(h.autoAssignContact).toHaveBeenCalledWith(expect.anything(), {
+      accountId: ACCOUNT,
+      contactId: "c1",
+      origin: "automation",
+      preferredAgentId: null,
+      allowWeighted: true,
+    });
+    expect(stepResults()[0]).toMatchObject({ status: "success" });
+  });
+
+  it("con asesor explícito lo pasa como preferido", async () => {
+    h.state.steps = [assignStep({ mode: "specific", agent_id: "u-brayan" })];
+    await run();
+    expect(h.autoAssignContact).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ preferredAgentId: "u-brayan", allowWeighted: true }),
+    );
+  });
+
+  it("modo explícito sin asesor configurado no asigna", async () => {
+    h.state.steps = [assignStep({ mode: "specific" })];
+    await run();
+    expect(h.autoAssignContact).not.toHaveBeenCalled();
   });
 });

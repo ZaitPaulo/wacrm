@@ -5,6 +5,7 @@ import {
   canDeleteAccount,
   canEditSettings,
   canManageMembers,
+  canReassignConversations,
   canSendMessages,
   canTransferOwnership,
   canViewAllConversations,
@@ -26,7 +27,8 @@ export type CanAction =
   | "delete-account"
   | "transfer-ownership"
   | "view-margins"
-  | "view-all-conversations";
+  | "view-all-conversations"
+  | "reassign-conversations";
 
 /**
  * Inline alternative to `<RequireRole>` for places that need a
@@ -62,6 +64,8 @@ export function useCan(action: CanAction): boolean {
       return canViewMargins(accountRole);
     case "view-all-conversations":
       return canViewAllConversations(accountRole);
+    case "reassign-conversations":
+      return canReassignConversations(accountRole);
     default: {
       // Exhaustiveness check — adding a new `CanAction` without a
       // case here fails the typecheck because TS narrows `action`

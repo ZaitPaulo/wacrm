@@ -275,8 +275,8 @@
       "unassign": "담당자 해제",
       "noTeammates": "지정 가능한 팀원이 없습니다",
       "assignFailed": "담당 상담사를 변경하지 못했습니다",
-      "assignForbidden": "본인에게 배정된 대화만 재배정할 수 있습니다",
-      "assignCannotUnassign": "상담사는 대화를 동료에게 넘기거나 봇에게 돌려줄 수 있지만, 미배정 상태로 둘 수는 없습니다",
+      "assignForbidden": "관리자만 대화의 담당 상담사를 변경할 수 있습니다",
+      "assignCannotUnassign": "관리자만 대화를 담당 상담사 없이 둘 수 있습니다",
       "assignNotMember": "해당 사용자는 더 이상 이 계정의 구성원이 아닙니다",
       "assignNotFound": "이 대화는 더 이상 열람할 수 없습니다",
       "assignRateLimited": "배정을 너무 자주 변경하고 있습니다. 잠시 후 다시 시도하세요.",
@@ -288,7 +288,8 @@
       "today": "오늘",
       "yesterday": "어제",
       "openContactDetails": "연락처 정보 보기",
-      "contactDetails": "연락처 정보"
+      "contactDetails": "연락처 정보",
+      "unassigned": "미배정"
     },
     "sessionTimer": {
       "expired": "만료됨",
@@ -1968,7 +1969,8 @@
       "instagram": "Instagram",
       "facebook": "Facebook",
       "showcase": "공개 쇼케이스",
-      "business-hours": "영업 시간"
+      "business-hours": "영업 시간",
+      "assignment": "상담원 배정"
     },
     "groups": {
       "account": "계정",
@@ -2117,9 +2119,6 @@
       "autoReplyDesc": "봇이 새 수신 메시지에 자동으로 응답합니다(플로우가 처리하지 않고 담당 상담원이 없는 경우에만). 도움을 줄 수 없으면 사람에게 인계합니다.",
       "maxAutoReplies": "대화당 최대 자동 응답 횟수",
       "maxAutoRepliesDesc": "한 대화에서 이 횟수만큼 봇이 응답하면 더 이상 응답하지 않습니다.",
-      "handoffTo": "인계 대상",
-      "handoffToDesc": "봇이 도움을 줄 수 없거나 응답 한도에 도달하면 일시 중지하고 무슨 일이 있었는지 짧은 메모와 함께 이 대상에게 대화를 넘깁니다.",
-      "handoffQueue": "미배정 대기열 (모든 상담원이 처리 가능)",
       "remove": "제거",
       "save": "저장",
       "missingModel": "모델 이름을 입력하세요.",
@@ -2312,6 +2311,80 @@
         "fri": "금요일",
         "sat": "토요일",
         "sun": "일요일"
+      }
+    },
+    "assignment": {
+      "errors": {
+        "invalid_body": "전송된 설정을 읽을 수 없습니다.",
+        "weights_invalid": "비율 목록의 형식이 올바르지 않습니다.",
+        "weights_empty": "배분에 상담사를 한 명 이상 추가하세요.",
+        "weights_percent_range": "각 비율은 1에서 100 사이의 정수여야 합니다.",
+        "weights_duplicate": "배분에 같은 상담사가 두 번 이상 있습니다.",
+        "weights_sum": "비율의 합계는 정확히 100%여야 합니다.",
+        "weights_not_agent": "상담사 역할의 멤버만 자동 배정을 받을 수 있습니다.",
+        "stale_hours_invalid": "담당 상담사 없는 시간은 1에서 720(30일) 사이의 정수이거나, 규칙을 끄려면 비워 두어야 합니다.",
+        "reactivate_days_invalid": "AI 재활성화 일수는 1에서 365 사이의 정수이거나, 끄려면 비워 두어야 합니다.",
+        "save_failed": "배정 설정을 저장할 수 없습니다."
+      },
+      "ui": {
+        "title": "상담원 배정",
+        "description": "리드를 상담원에게 나누는 방식과 봇이 다시 응대하는 시점을 설정합니다.",
+        "loading": "설정을 불러오는 중…",
+        "loadFailed": "배정 설정을 불러오지 못했습니다.",
+        "retry": "다시 시도",
+        "adminOnly": "계정 소유자 또는 관리자만 배정을 설정할 수 있습니다.",
+        "weights": {
+          "title": "비율별 배분",
+          "explainer": "다음 신규 리드는 할당 비율에 가장 못 미친 상담원에게 갑니다. 이미 상담원이 있었던 리드는 항상 같은 상담원에게 돌아갑니다.",
+          "percentLabel": "{name}의 비율",
+          "sumLabel": "합계",
+          "sumOk": "100%",
+          "sumMissing": "{sum}% · {diff}% 부족",
+          "sumOver": "{sum}% · {diff}% 초과",
+          "evenSplit": "균등 배분",
+          "ineligible": "더 이상 상담원 아님",
+          "ineligibleHint": "리드를 받지 않습니다. 저장하려면 배분에서 제거하세요.",
+          "remove": "제거",
+          "removeLabel": "{name}을(를) 배분에서 제거",
+          "zeroHint": "0%인 상담원은 신규 리드를 받지 않지만 기존 고객은 유지합니다.",
+          "defaultNote": "저장된 비율이 없습니다. 현재 모든 상담원에게 균등하게 배분됩니다.",
+          "resetNote": "새 비율을 저장하면 배분 집계가 처음부터 다시 시작됩니다.",
+          "noAgents": "상담원 역할의 멤버가 없습니다. 팀에서 초대하거나 역할을 변경하세요.",
+          "unnamed": "이름 없음"
+        },
+        "stale": {
+          "title": "상담원 없는 대화 자동 배정",
+          "toggle": "자동으로 배정",
+          "hoursLabel": "상담원 없이 지난 시간",
+          "unit": "시간",
+          "help": "규칙을 켠 뒤 상담원 없이 남은 대화에만 적용됩니다. 이미 미배정이던 대화는 자동으로 배분되지 않습니다.",
+          "activeSince": "{date}부터 활성화됨.",
+          "off": "꺼짐: 상담원 없는 대화는 누군가 맡을 때까지 기다립니다."
+        },
+        "reactivate": {
+          "title": "고객이 돌아오면 봇 재활성화",
+          "toggle": "봇 재활성화",
+          "daysLabel": "무응답 일수",
+          "unit": "일",
+          "help": "상담원이 있는 고객이 그 기간 이후 다시 메시지를 보내면 봇이 먼저 응대하고, 인계 시 같은 상담원에게 보냅니다. 관리자의 대화에는 적용되지 않습니다.",
+          "off": "꺼짐: 상담원이 응대 중인 대화를 봇이 다시 맡지 않습니다."
+        },
+        "validation": {
+          "percentInvalid": "각 비율은 0에서 100 사이의 정수여야 합니다.",
+          "weightsSum": "비율의 합계는 정확히 100%여야 합니다.",
+          "weightsEmpty": "최소 한 명의 상담원은 0보다 큰 비율이 필요합니다.",
+          "ineligible": "더 이상 상담원이 아닌 사람을 배분에서 제거하세요.",
+          "hoursInvalid": "1에서 720 사이의 정수 시간을 입력하세요.",
+          "daysInvalid": "1에서 365 사이의 정수 일수를 입력하세요."
+        },
+        "save": "변경 사항 저장",
+        "saving": "저장 중…",
+        "saved": "배정 설정을 저장했습니다.",
+        "unsaved": "저장하지 않은 변경 사항이 있습니다.",
+        "noChanges": "대기 중인 변경 사항이 없습니다.",
+        "fixErrors": "저장하려면 표시된 항목을 수정하세요.",
+        "aiConfigHint": "봇이 각 대화를 어느 상담원에게 넘길지는 설정 → 상담원 배정에서 정합니다.",
+        "aiConfigHintLink": "상담원 배정으로 이동"
       }
     }
   },
@@ -2614,15 +2687,64 @@
   },
   "Notifications": {
     "title": "알림",
-    "description": "다른 팀원이 나에게 배정한 대화가 여기에 표시됩니다.",
+    "description": "나에게 배정된 대화와 고객의 새 메시지가 여기에 표시됩니다.",
     "markAllAsRead": "모두 읽음으로 표시",
     "emptyTitle": "아직 알림이 없습니다",
-    "emptyHint": "누군가 대화를 배정하면 여기에 알림이 표시됩니다.",
+    "emptyHint": "대화가 배정되거나 고객이 메시지를 보내면 여기에 알림이 표시됩니다.",
     "unread": "읽지 않음",
     "markReadFailed": "알림을 읽음으로 표시하지 못했습니다",
     "markAllFailed": "모두 읽음으로 표시하지 못했습니다",
     "retry": "다시 시도",
-    "loadFailed": "알림을 불러올 수 없습니다."
+    "loadFailed": "알림을 불러올 수 없습니다.",
+    "push": {
+      "cardTitle": "이 기기의 알림",
+      "cardDescription": "CRM이 닫혀 있어도 배정된 고객과 내 대화의 모든 메시지를 소리 알림으로 받습니다.",
+      "statusEnabled": "이 기기에서 켜짐",
+      "statusDisabled": "이 기기에서 꺼짐",
+      "statusBlocked": "브라우저가 차단함",
+      "statusUnsupported": "이 브라우저는 알림을 받을 수 없습니다",
+      "statusServerDisabled": "서버에 알림이 설정되지 않았습니다",
+      "statusIosInstall": "iPhone에서는 먼저 CRM을 홈 화면에 추가하세요",
+      "statusIosTooOld": "이 iPhone은 iOS 16.4 이상이 필요합니다",
+      "statusLoading": "이 기기를 확인하는 중…",
+      "enable": "알림 켜기",
+      "enabling": "켜는 중…",
+      "disable": "끄기",
+      "sendTest": "테스트 알림 보내기",
+      "sendingTest": "보내는 중…",
+      "testTitle": "테스트 알림",
+      "testBody": "메시지와 배정 알림은 이렇게 도착합니다.",
+      "testSent": "알림을 보냈습니다. 몇 초 안에 도착합니다.",
+      "testFailed": "테스트 알림을 보내지 못했습니다.",
+      "testExpired": "이 기기의 구독이 만료되었습니다. 알림을 다시 켜세요.",
+      "enableFailed": "알림을 켜지 못했습니다.",
+      "permissionDismissed": "권한이 허용되지 않았습니다. 원할 때 “알림 켜기”를 다시 누르세요.",
+      "disableFailed": "알림을 끄지 못했습니다.",
+      "disabledToast": "이 기기의 알림을 껐습니다.",
+      "enabledToast": "이 기기의 알림을 켰습니다.",
+      "enabledHint": "기기마다 따로 켜야 합니다: 휴대폰과 컴퓨터 모두에서 켜세요.",
+      "unsupportedHint": "최신 Chrome, Edge 또는 Firefox를 사용하세요. iPhone에서는 CRM을 홈 화면에 추가한 Safari를 사용하세요.",
+      "serverDisabledHint": "관리자에게 서버 VAPID 키 설정을 요청하세요.",
+      "iosInstallIntro": "Apple은 홈 화면에 추가된 사이트에만 알림을 보냅니다(iOS 16.4 이상). 한 번만 하면 됩니다:",
+      "iosStep1": "Safari에서 CRM을 엽니다.",
+      "iosStep2": "공유(위쪽 화살표가 있는 사각형)를 누릅니다.",
+      "iosStep3": "“홈 화면에 추가”를 선택하고 확인합니다.",
+      "iosStep4": "새 아이콘으로 CRM을 열고 이 페이지로 돌아와 알림을 켭니다.",
+      "iosTooOldHint": "설정 → 일반 → 소프트웨어 업데이트에서 업데이트하세요.",
+      "blockedIntro": "다시 받으려면 직접 허용해야 합니다:",
+      "unblock": {
+        "chromeAndroid": "주소 옆 아이콘 → 권한 → 알림 → 허용을 누르세요. CRM을 설치했다면 아이콘을 길게 눌러 → 앱 정보 → 알림.",
+        "chromeDesktop": "주소 옆 아이콘 → 사이트 설정 → 알림 → 허용을 클릭한 뒤 페이지를 새로고침하세요.",
+        "firefox": "주소 옆 권한 아이콘을 클릭해 알림 차단을 해제하고 페이지를 새로고침하세요.",
+        "safari": "Safari → 설정 → 웹사이트 → 알림에서 이 사이트를 허용으로 선택하세요.",
+        "ios": "iPhone 설정 → 알림 → CRM을 찾아 알림 허용을 켜세요.",
+        "generic": "브라우저 설정에서 이 사이트의 알림을 허용하고 페이지를 새로고침하세요."
+      },
+      "iphoneNote": "iPhone에서는 CRM을 홈 화면에 추가해야만 알림이 작동합니다(iOS 16.4 이상). Android에서는 Chrome이면 충분합니다."
+    },
+    "inApp": {
+      "open": "열기"
+    }
   },
   "SignupPage": {
     "titleInvite": "계정 만들고 참여하기",
@@ -2832,5 +2954,8 @@
   },
   "Brand": {
     "description": "자동차 매매를 위한 WhatsApp CRM."
+  },
+  "Pwa": {
+    "description": "CRM 받은편지함, 거래 및 알림."
   }
 }

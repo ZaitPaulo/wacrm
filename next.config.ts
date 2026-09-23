@@ -201,6 +201,18 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // El service worker de los avisos push. Va DESPUÉS de la regla
+        // general para pisar su `s-maxage=300`: con ella, una versión
+        // nueva de `sw.js` tardaría hasta 5 min en llegar a los
+        // navegadores. El navegador ya revalida el service worker por su
+        // cuenta; esto evita que un caché intermedio se interponga.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
+      {
         // Security headers on every response, including /_next/static
         // assets (nosniff matters there) and /api/* (HSTS + referrer-
         // policy don't hurt).

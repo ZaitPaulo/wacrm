@@ -49,6 +49,18 @@ describe('canAccessSection', () => {
     expect(canAccessSection('api', 'agent')).toBe(false);
   });
 
+  it('reserva la asignación de asesores a admin y owner', () => {
+    // Porcentajes del reparto y reglas del bot: configuración de la
+    // cuenta, y la API (`/api/assignment/settings`) ya exige admin.
+    expect(SECTION_META.assignment.group).toBe('workspace');
+    expect(canAccessSection('assignment', 'owner')).toBe(true);
+    expect(canAccessSection('assignment', 'admin')).toBe(true);
+    expect(canAccessSection('assignment', 'agent')).toBe(false);
+    expect(canAccessSection('assignment', 'viewer')).toBe(false);
+    expect(resolveSection('assignment', 'admin')).toBe('assignment');
+    expect(resolveSection('assignment', 'agent')).toBe('profile');
+  });
+
   it('falla cerrado sin rol resuelto', () => {
     expect(canAccessSection('whatsapp', null)).toBe(false);
     expect(canAccessSection('profile', null)).toBe(true);

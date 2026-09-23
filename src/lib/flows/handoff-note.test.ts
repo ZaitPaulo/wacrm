@@ -66,6 +66,22 @@ vi.mock("./admin-client", () => {
   };
 });
 
+// Quién queda asignado lo decide la base (`auto_assign_conversation`,
+// migración 537): conserva al asesor vigente, luego la continuidad del
+// contacto, luego el agente del nodo. Acá solo importa qué le pide el
+// motor y qué registra.
+const autoAssign = vi.hoisted(() =>
+  vi.fn(async () => ({
+    outcome: "assigned",
+    source: "preferred",
+    agent: { userId: "agent-9", profileId: "p-9", fullName: "Agente Nueve" },
+    deal: null,
+  })),
+);
+vi.mock("@/lib/assignment/auto-assign", () => ({
+  autoAssignConversation: autoAssign,
+}));
+
 vi.mock("./meta-send", () => ({
   engineSendText: vi.fn(async () => ({ whatsapp_message_id: "wamid.1" })),
   engineSendMedia: vi.fn(async () => ({ whatsapp_message_id: "wamid.2" })),
@@ -289,5 +305,41 @@ describe("the handoff note reaches the agent", () => {
         assigned_to: "agent-9",
       },
     });
+  });
+});
+
+describe("el nodo de derivación no pisa al asesor del contacto", () => {
+  it("pide la asignación a la base con el agente del nodo como preferido y sin reparto", async () => {
+    autoAssign.mockClear();
+    h.state.activeRuns = [runRow({})];
+    h.state.nodes = nodes("");
+
+    await tapFinanciado();
+
+    expect(autoAssign).toHaveBeenCalledWith(expect.anything(), {
+      conversationId: "cv-1",
+      origin: "flow",
+      preferredAgentId: "agent-9",
+      allowWeighted: false,
+    });
+    // El UPDATE directo ya no escribe el asesor: solo el estado.
+    const convUpdates = h.state.updated.filter((u) => u.table === "conversations");
+    expect(convUpdates.length).toBeGreaterThan(0);
+    for (const u of convUpdates) expect(u.row).not.toHaveProperty("assigned_agent_id");
+  });
+
+  it("registra el asesor que de verdad quedó, aunque sea el que ya estaba", async () => {
+    autoAssign.mockResolvedValueOnce({
+      outcome: "kept",
+      source: "kept",
+      agent: { userId: "agent-juan", profileId: "p-juan", fullName: "Juan" },
+      deal: null,
+    });
+    h.state.activeRuns = [runRow({})];
+    h.state.nodes = nodes("");
+
+    await tapFinanciado();
+
+    expect(handoffEvents()[0].row.payload).toMatchObject({ assigned_to: "agent-juan" });
   });
 });

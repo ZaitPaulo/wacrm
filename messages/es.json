@@ -268,8 +268,8 @@
       "unassign": "Quitar asignación",
       "noTeammates": "No hay compañeros disponibles",
       "assignFailed": "No se pudo cambiar el asesor asignado",
-      "assignForbidden": "Solo puedes reasignar una conversación que tengas asignada",
-      "assignCannotUnassign": "Un asesor puede pasarle la conversación a un compañero o devolverla al bot, pero no dejarla sin asignar",
+      "assignForbidden": "Solo un administrador puede cambiar el asesor de una conversación",
+      "assignCannotUnassign": "Solo un administrador puede dejar una conversación sin asesor",
       "assignNotMember": "Esa persona ya no es miembro de esta cuenta",
       "assignNotFound": "Esta conversación ya no está disponible para ti",
       "assignRateLimited": "Estás cambiando asignaciones muy seguido. Espera un momento y vuelve a intentarlo.",
@@ -281,7 +281,8 @@
       "today": "Hoy",
       "yesterday": "Ayer",
       "openContactDetails": "Ver la ficha del contacto",
-      "contactDetails": "Ficha del contacto"
+      "contactDetails": "Ficha del contacto",
+      "unassigned": "Sin asignar"
     },
     "sessionTimer": {
       "expired": "Vencida",
@@ -1961,7 +1962,8 @@
       "instagram": "Instagram",
       "facebook": "Facebook",
       "showcase": "Vitrina pública",
-      "business-hours": "Horario de atención"
+      "business-hours": "Horario de atención",
+      "assignment": "Asignación de asesores"
     },
     "groups": {
       "account": "Cuenta",
@@ -2110,9 +2112,6 @@
       "autoReplyDesc": "El bot contesta solo los mensajes nuevos (únicamente cuando ningún flujo los atiende y no hay un agente asignado). Deriva a una persona cuando no puede ayudar.",
       "maxAutoReplies": "Máximo de respuestas automáticas por conversación",
       "maxAutoRepliesDesc": "Después de esa cantidad de respuestas del bot en un mismo hilo, el bot se calla.",
-      "handoffTo": "Derivar a",
-      "handoffToDesc": "Cuando el bot no puede ayudar —o llega al límite de respuestas— se pausa y manda el chat acá, con una nota corta de lo que pasó.",
-      "handoffQueue": "Cola sin asignar (cualquier agente puede tomarlo)",
       "remove": "Quitar",
       "save": "Guardar",
       "missingModel": "Escribe el nombre de un modelo.",
@@ -2305,6 +2304,80 @@
         "fri": "Viernes",
         "sat": "Sábado",
         "sun": "Domingo"
+      }
+    },
+    "assignment": {
+      "errors": {
+        "invalid_body": "No se pudo leer la configuración enviada.",
+        "weights_invalid": "La lista de porcentajes no tiene el formato esperado.",
+        "weights_empty": "Agrega al menos un asesor al reparto.",
+        "weights_percent_range": "Cada porcentaje debe ser un número entero entre 1 y 100.",
+        "weights_duplicate": "Un asesor aparece más de una vez en el reparto.",
+        "weights_sum": "Los porcentajes deben sumar exactamente 100 %.",
+        "weights_not_agent": "Solo los miembros con rol de asesor pueden recibir asignaciones automáticas.",
+        "stale_hours_invalid": "Las horas sin asesor deben ser un número entero entre 1 y 720 (30 días), o quedar vacías para desactivar la regla.",
+        "reactivate_days_invalid": "Los días para reactivar la IA deben ser un número entero entre 1 y 365, o quedar vacíos para desactivarla.",
+        "save_failed": "No se pudo guardar la configuración de asignación."
+      },
+      "ui": {
+        "title": "Asignación de asesores",
+        "description": "Cómo se reparten los leads entre los asesores y cuándo vuelve a atender el bot.",
+        "loading": "Cargando la configuración…",
+        "loadFailed": "No se pudo cargar la configuración de asignación.",
+        "retry": "Reintentar",
+        "adminOnly": "Solo el dueño o un administrador de la cuenta puede configurar la asignación.",
+        "weights": {
+          "title": "Reparto por porcentajes",
+          "explainer": "El siguiente lead nuevo va al asesor más por debajo de su cuota; un lead que ya tuvo asesor vuelve siempre al mismo.",
+          "percentLabel": "Porcentaje de {name}",
+          "sumLabel": "Suma",
+          "sumOk": "100 %",
+          "sumMissing": "{sum} % · faltan {diff} %",
+          "sumOver": "{sum} % · sobran {diff} %",
+          "evenSplit": "Repartir parejo",
+          "ineligible": "Ya no es asesor",
+          "ineligibleHint": "No recibe leads. Quítalo del reparto para poder guardar.",
+          "remove": "Quitar",
+          "removeLabel": "Quitar a {name} del reparto",
+          "zeroHint": "Con 0 % el asesor no recibe leads nuevos, pero conserva los clientes que ya tiene.",
+          "defaultNote": "Todavía no hay porcentajes guardados: hoy se reparte parejo entre todos los asesores.",
+          "resetNote": "Al guardar porcentajes nuevos, la cuenta del reparto empieza de cero.",
+          "noAgents": "No hay miembros con rol de asesor. Invítalos o cambia su rol en Equipo.",
+          "unnamed": "Sin nombre"
+        },
+        "stale": {
+          "title": "Asignar conversaciones sin asesor",
+          "toggle": "Asignar automáticamente",
+          "hoursLabel": "Horas sin asesor",
+          "unit": "horas",
+          "help": "Solo aplica a conversaciones que quedan sin asesor después de activar la regla; las que ya estaban sin asignar no se reparten solas.",
+          "activeSince": "Activa desde el {date}.",
+          "off": "Desactivada: las conversaciones sin asesor esperan a que alguien las tome."
+        },
+        "reactivate": {
+          "title": "Reactivar el bot cuando el cliente vuelve",
+          "toggle": "Reactivar el bot",
+          "daysLabel": "Días de silencio",
+          "unit": "días",
+          "help": "Si un cliente con asesor vuelve a escribir tras ese silencio, el bot lo atiende primero y al traspasar lo manda a su mismo asesor. No aplica a conversaciones de administradores.",
+          "off": "Desactivada: el bot nunca retoma una conversación que atiende un asesor."
+        },
+        "validation": {
+          "percentInvalid": "Cada porcentaje debe ser un número entero entre 0 y 100.",
+          "weightsSum": "Los porcentajes deben sumar exactamente 100 %.",
+          "weightsEmpty": "Al menos un asesor debe tener un porcentaje mayor que 0.",
+          "ineligible": "Quita del reparto a quien ya no es asesor.",
+          "hoursInvalid": "Escribe un número entero de horas entre 1 y 720.",
+          "daysInvalid": "Escribe un número entero de días entre 1 y 365."
+        },
+        "save": "Guardar cambios",
+        "saving": "Guardando…",
+        "saved": "Configuración de asignación guardada.",
+        "unsaved": "Tienes cambios sin guardar.",
+        "noChanges": "Sin cambios pendientes.",
+        "fixErrors": "Corrige los campos marcados para guardar.",
+        "aiConfigHint": "A qué asesor pasa el bot cada conversación se configura en Ajustes → Asignación de asesores.",
+        "aiConfigHintLink": "Ir a Asignación de asesores"
       }
     }
   },
@@ -2607,15 +2680,64 @@
   },
   "Notifications": {
     "title": "Notificaciones",
-    "description": "Acá aparecen las conversaciones que otros compañeros te asignan.",
+    "description": "Acá aparecen las conversaciones que te asignan y los mensajes nuevos de tus clientes.",
     "markAllAsRead": "Marcar todas como leídas",
     "emptyTitle": "Todavía no hay notificaciones",
-    "emptyHint": "Vas a ver un aviso acá cuando alguien te asigne una conversación.",
+    "emptyHint": "Vas a ver un aviso acá cuando te asignen una conversación o te escriba un cliente.",
     "unread": "Sin leer",
     "markReadFailed": "No se pudo marcar la notificación como leída",
     "markAllFailed": "No se pudieron marcar todas como leídas",
     "retry": "Reintentar",
-    "loadFailed": "No se pudieron cargar las notificaciones."
+    "loadFailed": "No se pudieron cargar las notificaciones.",
+    "push": {
+      "cardTitle": "Avisos en este dispositivo",
+      "cardDescription": "Un aviso con sonido por cada cliente que te asignen y por cada mensaje de tus conversaciones, aunque el CRM esté cerrado.",
+      "statusEnabled": "Activados en este dispositivo",
+      "statusDisabled": "Desactivados en este dispositivo",
+      "statusBlocked": "Bloqueados por el navegador",
+      "statusUnsupported": "Este navegador no puede recibir avisos",
+      "statusServerDisabled": "Los avisos no están configurados en el servidor",
+      "statusIosInstall": "En iPhone, primero agrega el CRM a la pantalla de inicio",
+      "statusIosTooOld": "Este iPhone necesita iOS 16.4 o posterior",
+      "statusLoading": "Revisando este dispositivo…",
+      "enable": "Activar avisos",
+      "enabling": "Activando…",
+      "disable": "Desactivar",
+      "sendTest": "Enviar aviso de prueba",
+      "sendingTest": "Enviando…",
+      "testTitle": "Aviso de prueba",
+      "testBody": "Así te llegarán los mensajes y las asignaciones.",
+      "testSent": "Aviso enviado. Debería llegarte en unos segundos.",
+      "testFailed": "No se pudo enviar el aviso de prueba.",
+      "testExpired": "Este dispositivo perdió la suscripción. Vuelve a activar los avisos.",
+      "enableFailed": "No se pudieron activar los avisos.",
+      "permissionDismissed": "No se dio el permiso. Pulsa “Activar avisos” otra vez cuando quieras.",
+      "disableFailed": "No se pudieron desactivar los avisos.",
+      "disabledToast": "Avisos desactivados en este dispositivo.",
+      "enabledToast": "Avisos activados en este dispositivo.",
+      "enabledHint": "Cada aparato se activa por separado: hazlo en tu celular y también en tu computador.",
+      "unsupportedHint": "Usa Chrome, Edge o Firefox actualizados. En iPhone, Safari con el CRM agregado a la pantalla de inicio.",
+      "serverDisabledHint": "Pídele al administrador que configure las claves VAPID del servidor.",
+      "iosInstallIntro": "Apple solo entrega avisos a los sitios agregados a la pantalla de inicio (iOS 16.4 o posterior). Es un paso único:",
+      "iosStep1": "Abre el CRM en Safari.",
+      "iosStep2": "Toca Compartir (el cuadrado con la flecha hacia arriba).",
+      "iosStep3": "Elige “Agregar a inicio” y confirma.",
+      "iosStep4": "Abre el CRM desde el ícono nuevo y vuelve a esta página para activar los avisos.",
+      "iosTooOldHint": "Actualízalo en Ajustes → General → Actualización de software.",
+      "blockedIntro": "Para volver a recibirlos tienes que permitirlos a mano:",
+      "unblock": {
+        "chromeAndroid": "Toca el ícono junto a la dirección → Permisos → Notificaciones → Permitir. Si instalaste el CRM: mantén presionado su ícono → Información de la app → Notificaciones.",
+        "chromeDesktop": "Haz clic en el ícono junto a la dirección → Configuración del sitio → Notificaciones → Permitir, y recarga la página.",
+        "firefox": "Haz clic en el ícono de permisos junto a la dirección, quita el bloqueo de notificaciones y recarga la página.",
+        "safari": "Safari → Ajustes → Sitios web → Notificaciones, y elige Permitir para este sitio.",
+        "ios": "Ajustes del iPhone → Notificaciones → busca el CRM y activa Permitir notificaciones.",
+        "generic": "Permite las notificaciones de este sitio en los ajustes del navegador y recarga la página."
+      },
+      "iphoneNote": "En iPhone los avisos solo funcionan con el CRM agregado a la pantalla de inicio (iOS 16.4 o posterior). En Android basta con Chrome."
+    },
+    "inApp": {
+      "open": "Abrir"
+    }
   },
   "SignupPage": {
     "titleInvite": "Crear cuenta y unirse",
@@ -2832,5 +2954,8 @@
   },
   "Brand": {
     "description": "CRM de WhatsApp para la compraventa de vehículos."
+  },
+  "Pwa": {
+    "description": "Bandeja de clientes, negocios y avisos del CRM."
   }
 }

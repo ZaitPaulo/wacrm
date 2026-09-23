@@ -93,65 +93,37 @@ beforeEach(() => {
   mocks.miembros = [{ user_id: 'u-juan' }, { user_id: 'u-brayan' }, { user_id: 'u-ange' }]
   mocks.conversacionVisible = true
   mocks.requireRole.mockReset()
-  comoRol('agent')
+  comoRol('admin', 'u-ange')
 })
 
 describe('PATCH /api/conversations/[id]/assignee', () => {
-  // EL DEFECTO QUE ESTO ARREGLA, preexistente desde la 520: la bandeja
-  // hacía el UPDATE desde el navegador y la RLS lo rechazaba siempre que
-  // la conversación dejaba de ser del asesor — o sea en el único caso en
-  // que el desplegable sirve. El asesor veía "Failed to update
-  // assignment" y no había forma de reasignar.
-  it('el asesor le pasa su conversación a un compañero', async () => {
+  // P2 (sticky-weighted-assignment): el asesor de un contacto solo lo
+  // cambia un owner/admin a mano. La ruta pide 'admin' y un agent recibe
+  // 403 de requireRole.
+  it('exige rol admin', async () => {
+    await PATCH(request({ assigned_agent_id: 'u-brayan' }), params)
+    expect(mocks.requireRole).toHaveBeenCalledWith('admin')
+  })
+
+  it('un agent no reasigna, ni siquiera su propia conversación', async () => {
+    mocks.requireRole.mockReset().mockRejectedValue(new Error('forbidden'))
+
     const res = await PATCH(request({ assigned_agent_id: 'u-brayan' }), params)
 
-    expect(res.status).toBe(200)
-    expect(mocks.updatePayload).toEqual({ assigned_agent_id: 'u-brayan' })
-    // Con service-role: es lo que la RLS no deja pasar.
-    expect(mocks.escritoPor).toBe('admin')
-  })
-
-  // Service-role apaga la RLS y el trigger, así que la regla de la 520 se
-  // comprueba en código antes de escribir.
-  it('el asesor no puede reasignar la conversación de otro', async () => {
-    mocks.asignadoActual = 'u-brayan'
-
-    const res = await PATCH(request({ assigned_agent_id: 'u-juan' }), params)
-
     expect(res.status).toBe(403)
     expect(mocks.updatePayload).toBeNull()
   })
 
-  it('el asesor no puede tomar una conversación sin asignar', async () => {
-    mocks.asignadoActual = null
+  it('un agent tampoco la suelta', async () => {
+    mocks.requireRole.mockReset().mockRejectedValue(new Error('forbidden'))
 
-    const res = await PATCH(request({ assigned_agent_id: 'u-juan' }), params)
-
-    expect(res.status).toBe(403)
-    expect(mocks.updatePayload).toBeNull()
-  })
-
-  // "Un asesor puede pasar la conversación a otro miembro, pero no
-  // dejarla sin asignar": la regla del trigger de la 520, que con
-  // service-role ya no se aplica sola.
-  it('el asesor no puede soltar la conversación', async () => {
     const res = await PATCH(request({ assigned_agent_id: null }), params)
 
     expect(res.status).toBe(403)
     expect(mocks.updatePayload).toBeNull()
-  })
-
-  it('el admin sí puede soltarla', async () => {
-    comoRol('admin', 'u-ange')
-
-    const res = await PATCH(request({ assigned_agent_id: null }), params)
-
-    expect(res.status).toBe(200)
-    expect(mocks.updatePayload).toEqual({ assigned_agent_id: null })
   })
 
   it('el admin reasigna cualquier conversación de su cuenta', async () => {
-    comoRol('admin', 'u-ange')
     mocks.asignadoActual = 'u-brayan'
 
     const res = await PATCH(request({ assigned_agent_id: 'u-juan' }), params)
@@ -160,19 +132,18 @@ describe('PATCH /api/conversations/[id]/assignee', () => {
     expect(mocks.updatePayload).toEqual({ assigned_agent_id: 'u-juan' })
   })
 
-  // LAS DOS MITADES DE LA BIFURCACIÓN.
-  //
-  // El admin escribe con SU SESIÓN, y eso no es un detalle de
-  // implementación: `notify_conversation_assigned` nombra a quien
-  // reasignó leyendo `auth.uid()`, que con service-role es NULL. Con
-  // sesión el aviso dice "Angélica te asignó una conversación con Juan";
-  // por service-role diría "Se te asignó…", perdiendo información que
-  // los admin tienen hoy.
-  //
-  // Si alguien unifica esto a una sola rama, esta prueba es la que lo
-  // atrapa.
-  it('el admin escribe con su sesión, para que el aviso conserve su nombre', async () => {
-    comoRol('admin', 'u-ange')
+  it('el admin sí puede soltarla', async () => {
+    const res = await PATCH(request({ assigned_agent_id: null }), params)
+
+    expect(res.status).toBe(200)
+    expect(mocks.updatePayload).toEqual({ assigned_agent_id: null })
+  })
+
+  // Escribe con SU SESIÓN: `notify_conversation_assigned` nombra a quien
+  // reasignó con `auth.uid()`, que con service-role es NULL ("Angélica te
+  // asignó…" frente a "Se te asignó…"). Y con sesión siguen mandando la
+  // RLS y el trigger de la 520. Ya no hay rama de service-role.
+  it('escribe con la sesión, nunca con service-role', async () => {
     mocks.asignadoActual = 'u-brayan'
 
     await PATCH(request({ assigned_agent_id: 'u-juan' }), params)
@@ -180,34 +151,15 @@ describe('PATCH /api/conversations/[id]/assignee', () => {
     expect(mocks.escritoPor).toBe('sesion')
   })
 
-  // El asesor no cabe en el camino normal: al pasar el hilo deja de
-  // verlo y la RLS rechaza la fila resultante. Su aviso sale impersonal,
-  // y no pierde nada — hasta ahora no podía reasignar en absoluto.
-  it('el asesor escribe con service-role, que es lo único que le funciona', async () => {
-    await PATCH(request({ assigned_agent_id: 'u-brayan' }), params)
-
-    expect(mocks.escritoPor).toBe('admin')
-  })
-
-  // `conversations.assigned_agent_id` no tiene clave ajena, y con la RLS
-  // apagada nada impediría escribir un UUID cualquiera. La conversación
-  // quedaría a nombre de nadie: invisible para todos los asesores y fuera
-  // de la fila "Sin asignar" del tablero.
+  // `conversations.assigned_agent_id` no tiene clave ajena.
   it('rechaza un destinatario que no es miembro de la cuenta', async () => {
-    const res = await PATCH(
-      request({ assigned_agent_id: 'u-de-otra-cuenta' }),
-      params,
-    )
+    const res = await PATCH(request({ assigned_agent_id: 'u-de-otra-cuenta' }), params)
 
     expect(res.status).toBe(400)
     expect(mocks.updatePayload).toBeNull()
   })
 
-  // La lectura previa va con el cliente de SESIÓN a propósito: es lo que
-  // conserva la comprobación de visibilidad de la 520. Si se hiciera con
-  // el cliente admin, un asesor podría reasignar la cartera de sus
-  // compañeros sabiendo el id de la conversación.
-  it('404 cuando la conversación no es visible para quien llama', async () => {
+  it('404 cuando la conversación no es de la cuenta', async () => {
     mocks.conversacionVisible = false
 
     const res = await PATCH(request({ assigned_agent_id: 'u-brayan' }), params)

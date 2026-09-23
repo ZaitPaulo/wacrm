@@ -97,60 +97,52 @@ beforeEach(() => {
 })
 
 describe('POST /api/ai/autoreply/[conversationId] — reanudar', () => {
-  // Reactivar tiene que dejar el hilo como nuevo también para el gate de
-  // datos: si el contador quedara en 1, la próxima urgencia transferiría
-  // de inmediato por el escape del segundo intento, sin darle al bot su
-  // turno de recolectar el nombre.
-  it('resetea el contador de transferencias rechazadas', async () => {
+  // Reactivar deja el hilo como nuevo para el gate de datos y le da cupo
+  // nuevo al bot.
+  it('reactiva la IA y resetea los contadores', async () => {
     const res = await POST(request({ paused: false }), params)
 
     expect(res.status).toBe(200)
-    expect(mocks.updatePayload).toMatchObject({
+    expect(mocks.updatePayload).toEqual({
       ai_autoreply_disabled: false,
       ai_reply_count: 0,
       ai_handoff_attempts: 0,
-      assigned_agent_id: null,
     })
   })
 
-  // ESCENARIO: Reactivar conserva el contexto.
-  //
-  // La nota del traspaso lleva el motivo y los datos de calificación que
-  // el bot recogió. Borrarla dejaba al siguiente que tomara el hilo
-  // empezando de cero, justo cuando el hilo se queda sin dueño.
-  it('conserva la nota del traspaso', async () => {
-    const res = await POST(request({ paused: false }), params)
+  // P2 (sticky-weighted-assignment): el asesor de un contacto es
+  // pegajoso. Antes reactivar ponía `assigned_agent_id = null`; ahora el
+  // bot atiende y, cuando traspase, va a este mismo asesor.
+  it('NO toca al asesor', async () => {
+    await POST(request({ paused: false }), params)
 
-    expect(res.status).toBe(200)
+    expect(mocks.updatePayload).not.toHaveProperty('assigned_agent_id')
+  })
+
+  it('conserva la nota del traspaso', async () => {
+    await POST(request({ paused: false }), params)
+
     expect(mocks.updatePayload).not.toHaveProperty('ai_handoff_summary')
   })
 
-  // EL DEFECTO QUE ESTO ARREGLA. Con el cliente de sesión la RLS rechaza
-  // la fila resultante —el asesor se deja el hilo invisible a sí mismo en
-  // la misma sentencia— y el asesor recibía un 500. Los tres miembros que
-  // atienden en producción tienen rol `agent`, o sea que NINGUNO podía
-  // reactivar el bot.
-  it('escribe con el cliente de service-role, no con el de sesión', async () => {
-    const res = await POST(request({ paused: false }), params)
+  // La fila sigue siendo del agent: la RLS la deja pasar con su sesión.
+  it('escribe con la sesión, sin service-role', async () => {
+    await POST(request({ paused: false }), params)
 
-    expect(res.status).toBe(200)
-    expect(mocks.escritoPor).toBe('admin')
+    expect(mocks.escritoPor).toBe('sesion')
   })
 
-  // Service-role apaga la RLS Y el trigger de la 520, así que la regla
-  // pasa a comprobarse acá: un asesor solo suelta lo que es suyo.
-  it('un agent no puede devolver al bot un hilo de otro asesor', async () => {
+  it('un agent no controla la IA en el hilo de otro asesor', async () => {
     mocks.asignadoActual = 'user-brayan'
 
     const res = await POST(request({ paused: false }), params)
 
     expect(res.status).toBe(403)
-    // Y no se escribió nada: la guarda va antes del UPDATE.
+    expect(await res.json()).toMatchObject({ code: 'not_assignee' })
     expect(mocks.updatePayload).toBeNull()
-    expect(mocks.escritoPor).toBeNull()
   })
 
-  it('un agent tampoco puede devolver al bot un hilo sin asignar', async () => {
+  it('un agent no controla la IA en un hilo sin asesor', async () => {
     mocks.asignadoActual = null
 
     const res = await POST(request({ paused: false }), params)
@@ -159,97 +151,67 @@ describe('POST /api/ai/autoreply/[conversationId] — reanudar', () => {
     expect(mocks.updatePayload).toBeNull()
   })
 
-  // LA TRANSICIÓN. Service-role salta el trigger de la 520, así que si
-  // la ruta no mirara que la IA estaba pausada, `paused: false` serviría
-  // para soltar cualquier hilo propio con la IA ya activa.
-  it('un agent no puede soltar un hilo suyo cuya IA ya estaba activa', async () => {
-    mocks.iaPausada = false
-
-    const res = await POST(request({ paused: false }), params)
-
-    expect(res.status).toBe(403)
-    expect(await res.json()).toMatchObject({ code: 'ai_already_active' })
-    expect(mocks.updatePayload).toBeNull()
-    expect(mocks.escritoPor).toBeNull()
-  })
-
-  it('un estado de IA desconocido se trata como activo, y se rechaza', async () => {
-    mocks.iaPausada = null
-
-    const res = await POST(request({ paused: false }), params)
-
-    expect(res.status).toBe(403)
-    expect(mocks.updatePayload).toBeNull()
-  })
-
-  it('el rechazo por hilo ajeno trae su propio código', async () => {
-    mocks.asignadoActual = 'user-brayan'
-
-    const res = await POST(request({ paused: false }), params)
-
-    expect(await res.json()).toMatchObject({ code: 'not_assignee' })
-  })
-
-  // El admin puede dejar sin asignar sin excepción que invocar: la
-  // condición de transición es solo para el `agent`.
-  it('un admin sí puede reactivar aunque la IA ya estuviera activa', async () => {
-    comoRol('admin')
+  // Reactivar ya no suelta el hilo, así que hacerlo con la IA activa es
+  // inocuo (como pulsar dos veces) y deja de rechazarse.
+  it('reactivar con la IA ya activa se acepta', async () => {
     mocks.iaPausada = false
 
     const res = await POST(request({ paused: false }), params)
 
     expect(res.status).toBe(200)
-    expect(mocks.updatePayload).toMatchObject({ assigned_agent_id: null })
   })
 
-  // El admin administra la cuenta entera: puede devolver al bot
-  // cualquier hilo, también uno que lleva otro. Y lo hace con SU SESIÓN:
-  // la RLS le deja porque la fila le sigue siendo visible, así que no
-  // hay motivo para apagarla. Solo se sale del camino normal quien no
-  // cabe en él.
-  it('un admin devuelve al bot el hilo de otro, y con su propia sesión', async () => {
+  it('un admin reactiva el hilo de otro asesor, sin quitárselo', async () => {
     comoRol('admin')
     mocks.asignadoActual = 'user-brayan'
 
     const res = await POST(request({ paused: false }), params)
 
     expect(res.status).toBe(200)
+    expect(mocks.updatePayload).not.toHaveProperty('assigned_agent_id')
     expect(mocks.escritoPor).toBe('sesion')
   })
 })
 
-describe('POST /api/ai/autoreply/[conversationId] — pausar', () => {
-  it('no toca el contador al pausar', async () => {
+describe('POST /api/ai/autoreply/[conversationId] — tomar el control', () => {
+  it('pausa la IA sin tocar el contador', async () => {
     const res = await POST(request({ paused: true, assign_to_me: true }), params)
 
     expect(res.status).toBe(200)
-    expect(mocks.updatePayload).toMatchObject({
-      ai_autoreply_disabled: true,
-      assigned_agent_id: 'user-1',
-    })
+    expect(mocks.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
     expect(mocks.updatePayload).not.toHaveProperty('ai_handoff_attempts')
-  })
-
-  // Pausar NO necesita service-role: la fila resultante sigue siendo
-  // visible para quien la escribe, así que la RLS la deja pasar y se
-  // conserva como segunda barrera. Solo se sale del camino normal lo que
-  // de verdad no cabe en él.
-  it('pausar sigue escribiendo con el cliente de sesión', async () => {
-    const res = await POST(request({ paused: true, assign_to_me: true }), params)
-
-    expect(res.status).toBe(200)
     expect(mocks.escritoPor).toBe('sesion')
   })
 
-  // Tomar un hilo no es soltarlo: acá no aplica la guarda de asignación,
-  // y un asesor puede tomar uno que estaba sin asignar si la RLS se lo
-  // deja ver (un admin se lo pasó, por ejemplo).
-  it('pausar no exige ser el asignado actual', async () => {
+  // El hilo ya es de quien lo toma: no hay nada que reasignar.
+  it('el agent que toma su propio hilo no reescribe el asesor', async () => {
+    await POST(request({ paused: true, assign_to_me: true }), params)
+
+    expect(mocks.updatePayload).not.toHaveProperty('assigned_agent_id')
+  })
+
+  // Tomar el control no le quita el cliente a nadie.
+  it('un admin que toma el hilo de Brayan no se lo quita', async () => {
+    comoRol('admin', 'user-admin')
+    mocks.asignadoActual = 'user-brayan'
+
+    const res = await POST(request({ paused: true, assign_to_me: true }), params)
+
+    expect(res.status).toBe(200)
+    expect(mocks.updatePayload).toEqual({ ai_autoreply_disabled: true })
+  })
+
+  it('un admin que toma un hilo sin asesor se lo asigna', async () => {
+    comoRol('admin', 'user-admin')
     mocks.asignadoActual = null
 
     const res = await POST(request({ paused: true, assign_to_me: true }), params)
 
     expect(res.status).toBe(200)
-    expect(mocks.escritoPor).toBe('sesion')
+    expect(mocks.updatePayload).toEqual({
+      ai_autoreply_disabled: true,
+      assigned_agent_id: 'user-admin',
+    })
+    expect(await res.json()).toMatchObject({ assigned_agent_id: 'user-admin' })
   })
 })

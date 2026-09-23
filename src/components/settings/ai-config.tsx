@@ -28,15 +28,10 @@ import { SettingsPanelHead } from './settings-panel-head';
 import { AiKnowledgeCard } from './ai-knowledge';
 import { AI_PROVIDER_DEFAULT_MODEL } from '@/lib/ai/defaults';
 import { AI_PROVIDERS, type AiProvider } from '@/lib/ai/types';
-import type { AccountMember } from '@/types';
-import { fetchAccountMembers, memberLabel } from '@/lib/account/members';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
 const MASKED_KEY = '••••••••••••••••';
-
-// Radix Select can't use an empty-string item value, so the "leave
-// unassigned" choice gets a sentinel that maps to null in the payload.
-const HANDOFF_QUEUE = '__queue__';
 
 // Per-provider presentation. Typed as `Record<AiProvider, …>` on purpose:
 // adding a provider to the union breaks the build here until its label,
@@ -72,6 +67,7 @@ export function AiConfig() {
   const { accountId, accountRole, profileLoading } = useAuth();
   const canEdit = accountRole ? canEditSettings(accountRole) : false;
   const t = useTranslations('Settings.aiConfig');
+  const tAssignment = useTranslations('Settings.assignment.ui');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,9 +88,6 @@ export function AiConfig() {
   const [isActive, setIsActive] = useState(false);
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
   const [maxPerConversation, setMaxPerConversation] = useState(3);
-  // Empty string = leave unassigned (shared queue).
-  const [handoffAgentId, setHandoffAgentId] = useState('');
-  const [members, setMembers] = useState<AccountMember[]>([]);
 
   // Guard keyed on the account (not a bare boolean) so an in-place
   // account switch — ownership transfer, multi-account membership —
@@ -119,7 +112,6 @@ export function AiConfig() {
         setIsActive(data.is_active);
         setAutoReplyEnabled(data.auto_reply_enabled);
         setMaxPerConversation(data.auto_reply_max_per_conversation ?? 3);
-        setHandoffAgentId(data.handoff_agent_id ?? '');
         setHasStoredKey(Boolean(data.has_key));
         setApiKey(data.has_key ? MASKED_KEY : '');
         setKeyEdited(false);
@@ -138,10 +130,6 @@ export function AiConfig() {
     if (!accountId || loadedAccountIdRef.current === accountId) return;
     loadedAccountIdRef.current = accountId;
     void fetchConfig();
-    // Members populate the handoff-target picker. Best-effort — on an
-    // older deployment without the endpoint the picker just shows the
-    // queue option.
-    void fetchAccountMembers().then(setMembers);
   }, [accountId, fetchConfig]);
 
   // Swap the model default when the provider changes, unless the user
@@ -170,7 +158,10 @@ export function AiConfig() {
     is_active: isActive,
     auto_reply_enabled: autoReplyEnabled,
     auto_reply_max_per_conversation: maxPerConversation,
-    handoff_agent_id: handoffAgentId || null,
+    // `handoff_agent_id` ya no se manda: el "asesor fijo" quedó sin
+    // efecto con el reparto por porcentajes (Ajustes → Asignación de
+    // asesores; un asesor fijo es 100 % a una persona). Omitirlo deja la
+    // columna como está —`/api/ai/config` solo la escribe si viene—.
   });
 
   const handleTest = async () => {
@@ -238,7 +229,6 @@ export function AiConfig() {
         setIsActive(false);
         setAutoReplyEnabled(false);
         setSystemPrompt('');
-        setHandoffAgentId('');
       } else {
         const data = await res.json();
         toast.error(data.error ?? t('removeFailed'));
@@ -487,33 +477,18 @@ export function AiConfig() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="ai-handoff">{t('handoffTo')}</Label>
-              <p className="text-xs text-muted-foreground">
-                {t('handoffToDesc')}
-              </p>
-              <Select
-                value={handoffAgentId || HANDOFF_QUEUE}
-                onValueChange={(v) =>
-                  setHandoffAgentId(!v || v === HANDOFF_QUEUE ? '' : v)
-                }
-                disabled={disabled || !autoReplyEnabled}
+            {/* El selector "Derivar a" (asesor fijo) se retiró: a quién
+                pasa el bot cada conversación lo deciden ahora los
+                porcentajes de Ajustes → Asignación de asesores. */}
+            <p className="text-xs text-muted-foreground">
+              {tAssignment('aiConfigHint')}{' '}
+              <Link
+                href="/settings?tab=assignment"
+                className="font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <SelectTrigger id="ai-handoff">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={HANDOFF_QUEUE}>
-                    {t('handoffQueue')}
-                  </SelectItem>
-                  {members.map((m) => (
-                    <SelectItem key={m.user_id} value={m.user_id}>
-                      {memberLabel(m)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                {tAssignment('aiConfigHintLink')}
+              </Link>
+            </p>
           </CardContent>
         </Card>
 

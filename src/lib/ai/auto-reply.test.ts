@@ -18,13 +18,10 @@ const h = vi.hoisted(() => ({
     updatePayload: null as Record<string, unknown> | null,
     rpcCalls: [] as { name: string; args: unknown }[],
     profiles: [] as { id?: string; user_id: string; full_name: string }[],
-    /** Historial de asignaciones del hilo, del más viejo al más nuevo. */
-    historial: [] as (string | null)[],
-    /** Argumentos con los que se pidió crear el negocio del traspaso. */
-    dealArgs: null as Record<string, unknown> | null,
-    /** Lo que responde la creación del negocio. */
-    dealOutcome: { status: 'created', dealId: 'deal-1' } as Record<string, unknown>,
-    openConversations: [] as (string | null)[],
+    /** Argumentos con los que se pidió el traspaso a la base. */
+    handoffArgs: null as Record<string, unknown> | null,
+    /** Lo que responde `ai_handoff_assign` (ya traducido). */
+    handoffResult: null as Record<string, unknown> | null,
     inventory: [] as Record<string, unknown>[],
     /** Referral del anuncio de la conversación (migración 526). */
     adReferral: null as Record<string, unknown> | null,
@@ -41,12 +38,24 @@ vi.mock('./reply-window', () => ({
   hasNewerCustomerMessage: h.hasNewerCustomerMessage,
   hasOutboundSince: h.hasOutboundSince,
 }))
-// La creación del negocio del traspaso tiene su propia suite
-// (handoff-deal.test.ts). Acá solo interesa QUE se pida y CON QUÉ.
-vi.mock('./handoff-deal', () => ({
-  createHandoffDeal: (_db: unknown, args: Record<string, unknown>) => {
-    h.state.dealArgs = args
-    return Promise.resolve(h.state.dealOutcome)
+// La elección del asesor, el negocio y la pausa viven en la base
+// (`ai_handoff_assign`, migración 537) y tienen su propia prueba SQL
+// (supabase/tests/sticky_weighted_assignment.test.sql). Acá solo interesa
+// QUE se pidan, CON QUÉ, y qué hace el bot con la respuesta. El doble
+// deja en `updatePayload` lo que la RPC escribe en la conversación, para
+// que las pruebas de la nota no dependan de por dónde se escribe.
+vi.mock('@/lib/assignment/auto-assign', () => ({
+  aiHandoffAssign: (_db: unknown, args: Record<string, unknown>) => {
+    h.state.handoffArgs = args
+    const r = h.state.handoffResult as { outcome: string; agent: { userId: string } | null }
+    if (r.outcome !== 'failed') {
+      h.state.updatePayload = {
+        ai_autoreply_disabled: true,
+        ai_handoff_summary: args.summary,
+        ...(r.outcome === 'assigned' && r.agent ? { assigned_agent_id: r.agent.userId } : {}),
+      }
+    }
+    return Promise.resolve(r)
   },
 }))
 
@@ -88,26 +97,6 @@ vi.mock('./admin-client', () => ({
         }
         return chain
       }
-      if (table === 'conversation_assignments') {
-        // Continuidad: la última asignación de este hilo que nombra a
-        // un asesor (`pick-agent.ts`).
-        const chain = {
-          select: () => chain,
-          eq: () => chain,
-          not: () => chain,
-          order: () => chain,
-          limit: () => chain,
-          maybeSingle: () => {
-            const conAsesor = h.state.historial.filter((a) => a !== null)
-            const ultimo = conAsesor[conAsesor.length - 1] ?? null
-            return Promise.resolve({
-              data: ultimo ? { to_agent_id: ultimo } : null,
-              error: null,
-            })
-          },
-        }
-        return chain
-      }
       if (table === 'profiles') {
         // Dos formas: .select().eq().in().order() lista los asesores de
         // la cuenta, y .select().eq().maybeSingle() lee el nombre de uno.
@@ -129,22 +118,11 @@ vi.mock('./admin-client', () => ({
         return chain
       }
 
-      // conversations. El estado del hilo sale de .maybeSingle(); la
-      // carga por asesor se pide con .select().eq().eq() y se espera
-      // directamente, sin metodo terminal — de ahi el `then`.
+      // conversations: el estado del hilo sale de .maybeSingle().
       const conversations = {
         select: () => conversations,
         eq: () => conversations,
         maybeSingle: () => Promise.resolve({ data: h.state.conv, error: null }),
-        then: (
-          resolve: (v: { data: unknown; error: null }) => unknown,
-        ) =>
-          resolve({
-            data: h.state.openConversations.map((assigned_agent_id) => ({
-              assigned_agent_id,
-            })),
-            error: null,
-          }),
         update: (payload: Record<string, unknown>) => {
           h.state.updatePayload = payload
           return { eq: () => Promise.resolve({ error: null }) }
@@ -219,10 +197,13 @@ beforeEach(() => {
     { id: 'p-juan', user_id: 'u-juan', full_name: 'Juan Marino Arias' },
     { id: 'p-brayan', user_id: 'u-brayan', full_name: 'Brayan Hernández' },
   ]
-  h.state.historial = []
-  h.state.dealArgs = null
-  h.state.dealOutcome = { status: 'created', dealId: 'deal-1' }
-  h.state.openConversations = ['u-juan', 'u-juan']
+  h.state.handoffArgs = null
+  h.state.handoffResult = {
+    outcome: 'assigned',
+    source: 'weighted',
+    agent: { userId: 'u-juan', profileId: 'p-juan', fullName: 'Juan Marino Arias' },
+    deal: 'created',
+  }
   h.state.adReferral = null
   h.state.inventory = [
     {
@@ -310,14 +291,17 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     expect(h.engineSendText).not.toHaveBeenCalled()
   })
 
-  it('skips when a human agent is assigned', async () => {
+  // P2: el asesor es pegajoso, y el lead con asesor que vuelve lo
+  // atiende primero el bot. Lo que calla a la IA es la pausa, no el
+  // asesor.
+  it('responde aunque la conversación tenga asesor, si la IA no está pausada', async () => {
     h.state.conv = {
       assigned_agent_id: 'agent-9',
       ai_autoreply_disabled: false,
       ai_reply_count: 0,
     }
     await dispatchInboundToAiReply(ARGS)
-    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
   })
 
   it('skips when auto-reply was disabled on this conversation', async () => {
@@ -369,10 +353,8 @@ describe('dispatchInboundToAiReply — handoff', () => {
     expect(h.state.updatePayload?.ai_handoff_summary).toContain(
       'El bot traspasó la conversación',
     )
-    // Sin asesor configurado ya NO se queda sin dueño: se reparte al de
-    // menos carga. Antes caía en la cola compartida, que en la práctica
-    // era nadie.
-    expect(h.state.updatePayload).toHaveProperty('assigned_agent_id')
+    // El asesor lo elige la base (continuidad → porcentajes).
+    expect(h.state.updatePayload).toHaveProperty('assigned_agent_id', 'u-juan')
   })
 
   // Pasó en producción el 2026-08-26: la cuota gratuita de Gemini se agotó
@@ -394,13 +376,15 @@ describe('dispatchInboundToAiReply — handoff', () => {
     expect(h.state.updatePayload?.ai_handoff_summary).toContain('no pudo responder')
   })
 
-  it('el traspaso de emergencia también respeta al asesor configurado', async () => {
-    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
+  it('el traspaso de emergencia también pasa por la base, con el título genérico', async () => {
     h.generateReply.mockRejectedValue(new Error('boom'))
 
     await dispatchInboundToAiReply(ARGS)
 
-    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'agent-7' })
+    expect(h.state.handoffArgs).toMatchObject({
+      conversationId: 'conv-1',
+      dealTitle: 'Traspaso del asistente',
+    })
   })
 
   // El contrato de esta funcion es no lanzar nunca: el webhook tiene que
@@ -412,13 +396,15 @@ describe('dispatchInboundToAiReply — handoff', () => {
     await expect(dispatchInboundToAiReply(ARGS)).resolves.toBeUndefined()
   })
 
-  it('routes to the configured handoff agent on handoff', async () => {
+  // El asesor fijo de Ajustes quedó subsumido por los porcentajes (100 %
+  // a una persona): el bot ya no lo lee.
+  it('no usa el asesor fijo de la configuración de IA', async () => {
     h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
     h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
     await dispatchInboundToAiReply(ARGS)
     expect(h.state.updatePayload).toMatchObject({
       ai_autoreply_disabled: true,
-      assigned_agent_id: 'agent-7',
+      assigned_agent_id: 'u-juan',
     })
   })
 
@@ -427,12 +413,11 @@ describe('dispatchInboundToAiReply — handoff', () => {
     // parked and routed even if the send fails, or a Meta hiccup would
     // strand the customer with nobody assigned.
     h.engineSendText.mockRejectedValue(new Error('meta down'))
-    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
     h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
     await dispatchInboundToAiReply(ARGS)
     expect(h.state.updatePayload).toMatchObject({
       ai_autoreply_disabled: true,
-      assigned_agent_id: 'agent-7',
+      assigned_agent_id: 'u-juan',
     })
   })
 })
@@ -509,8 +494,8 @@ describe('dispatchInboundToAiReply — reply window', () => {
 
   it('skips the wait entirely when the gates already rule the reply out', async () => {
     h.state.conv = {
-      assigned_agent_id: 'agent-1',
-      ai_autoreply_disabled: false,
+      assigned_agent_id: null,
+      ai_autoreply_disabled: true,
       ai_reply_count: 0,
     }
 
@@ -654,25 +639,24 @@ describe('dispatchInboundToAiReply — gate de datos del handoff', () => {
   })
 })
 
-// Antes de esto la transferencia iba siempre al único asesor configurado
-// a mano: en producción, una sola admin con todas las conversaciones
-// asignadas mientras los tres agentes estaban en cero.
+// A quién se asigna lo decide la base (`ai_handoff_assign`); acá se
+// prueba qué le pide el bot y qué hace con la respuesta.
 describe('dispatchInboundToAiReply — a quién se asigna', () => {
   beforeEach(() => {
     h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
   })
 
-  it('reparte al asesor con menos conversaciones abiertas', async () => {
-    h.state.openConversations = ['u-juan', 'u-juan', 'u-brayan']
-
+  it('le pide a la base el traspaso con la nota y el título rico del negocio', async () => {
     await dispatchInboundToAiReply(ARGS)
 
-    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
+    expect(h.state.handoffArgs).toMatchObject({
+      conversationId: 'conv-1',
+      dealTitle: 'Carlos — Kia Sportage 2019',
+    })
+    expect(String(h.state.handoffArgs?.summary)).toContain('Nombre: Carlos')
   })
 
   it('le dice al cliente el primer nombre de quien lo va a atender', async () => {
-    h.state.openConversations = ['u-brayan', 'u-brayan']
-
     await dispatchInboundToAiReply(ARGS)
 
     // Juan Marino Arias → "Juan": así se presenta un vendedor, no con el
@@ -682,26 +666,48 @@ describe('dispatchInboundToAiReply — a quién se asigna', () => {
     expect(aviso).not.toContain('Marino')
   })
 
-  // Configurar un asesor fijo es una decisión explícita del admin y el
-  // reparto no la pisa.
-  it('respeta el asesor configurado por encima del reparto', async () => {
-    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'u-brayan' }))
-    h.state.openConversations = ['u-brayan', 'u-brayan', 'u-brayan']
+  // El lead que vuelve: su asesor se conserva, y el cliente sabe que es él.
+  it('nombra al asesor de siempre cuando la base lo conserva', async () => {
+    h.state.conv = {
+      assigned_agent_id: 'u-brayan',
+      ai_autoreply_disabled: false,
+      ai_reply_count: 0,
+      ai_handoff_attempts: 0,
+    }
+    h.state.handoffResult = {
+      outcome: 'kept',
+      source: 'kept',
+      agent: { userId: 'u-brayan', profileId: 'p-brayan', fullName: 'Brayan Hernández' },
+      deal: 'created',
+    }
 
     await dispatchInboundToAiReply(ARGS)
 
-    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
+    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
     expect(h.engineSendText.mock.calls[0][0].text).toContain('Brayan')
   })
 
   it('deja el hilo en la cola compartida cuando no hay asesores', async () => {
-    h.state.profiles = []
+    h.state.handoffResult = { outcome: 'no_agent', source: 'none', agent: null, deal: 'created' }
 
     await dispatchInboundToAiReply(ARGS)
 
     expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
     // Y no se le promete al cliente un nombre que no existe.
     expect(h.engineSendText.mock.calls[0][0].text).not.toContain('Su nombre es')
+  })
+
+  // Un cliente que pidió un humano no puede quedarse hablando con el bot
+  // porque la base no respondió.
+  it('si la base falla, pausa el bot y guarda la nota igual', async () => {
+    h.state.handoffResult = { outcome: 'failed', source: null, agent: null, deal: null }
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(String(h.state.updatePayload?.ai_handoff_summary)).toContain('Nombre: Carlos')
+    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -915,159 +921,7 @@ describe('dispatchInboundToAiReply — fotos del cliente', () => {
   })
 })
 
-// El traspaso es el momento en que el lead pasa a ser trabajo de una
-// persona; es ahí donde tiene que nacer la tarjeta del embudo. Antes de
-// esto `deals` estaba vacía —0 filas, histórico incluido— porque la
-// automatización de alta llevaba apagada desde el 2026-09-14.
-describe('dispatchInboundToAiReply — el traspaso abre el negocio', () => {
-  beforeEach(() => {
-    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
-  })
-
-  // ESCENARIO: Traspaso normal.
-  it('crea el negocio asignado al asesor que recibe la conversación', async () => {
-    h.state.openConversations = ['u-juan', 'u-juan', 'u-brayan']
-
-    await dispatchInboundToAiReply(ARGS)
-
-    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
-    expect(h.state.dealArgs).toMatchObject({
-      accountId: 'acct-1',
-      conversationId: 'conv-1',
-      contactId: 'contact-1',
-      // `deals.assigned_to` apunta a `profiles(id)`, NO al user_id que
-      // guarda `conversations.assigned_agent_id`. Confundirlos deja el
-      // negocio sin dueño o revienta la FK.
-      assignedProfileId: 'p-brayan',
-    })
-  })
-
-  // ESCENARIO: El negocio hereda lo que el bot averiguó.
-  it('le pasa al negocio la calificación y la nota del traspaso', async () => {
-    await dispatchInboundToAiReply(ARGS)
-
-    expect(h.state.dealArgs?.request).toMatchObject({ motivo: 'visita', nombre: 'Carlos' })
-    expect(String(h.state.dealArgs?.summary)).toContain('El bot traspasó la conversación')
-  })
-
-  // ESCENARIO: El traspaso queda en la cola compartida.
-  it('crea el negocio sin asesor cuando la cuenta no tiene ninguno', async () => {
-    h.state.profiles = []
-
-    await dispatchInboundToAiReply(ARGS)
-
-    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
-    expect(h.state.dealArgs).toMatchObject({ assignedProfileId: null })
-  })
-
-  it('el asesor fijo de Ajustes también queda como dueño del negocio', async () => {
-    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'u-juan' }))
-
-    await dispatchInboundToAiReply(ARGS)
-
-    expect(h.state.dealArgs).toMatchObject({ assignedProfileId: 'p-juan' })
-  })
-
-  // DEFECTO DE LA RE-AUDITORÍA: si el hilo ya tenía asesor humano, el
-  // negocio nacía con `assigned_to = NULL` —caía en "Sin asignar"—
-  // mientras la conversación le contaba a ese asesor en la tabla.
-  //
-  // El caso real es una carrera: el dispatch se sale si ya hay asesor al
-  // empezar, así que el dueño aparece DURANTE la generación (Juan toma el
-  // hilo mientras el bot piensa). Se simula mutando la conversación
-  // dentro de `generateReply`.
-  it('si un asesor tomó el hilo mientras tanto, el negocio es suyo y no se le pisa', async () => {
-    h.state.openConversations = ['u-juan', 'u-juan', 'u-brayan']
-    h.generateReply.mockImplementation(async () => {
-      h.state.conv = { ...h.state.conv, assigned_agent_id: 'u-juan' }
-      return { text: '', handoff: handoffRequest() }
-    })
-
-    await dispatchInboundToAiReply(ARGS)
-
-    // La asignación de Juan no se toca: el reparto habría elegido a Brayan.
-    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
-    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
-    expect(h.state.dealArgs).toMatchObject({ assignedProfileId: 'p-juan' })
-  })
-
-  it('el dueño que ya tenía el hilo gana también sobre el asesor fijo de Ajustes', async () => {
-    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'u-brayan' }))
-    h.generateReply.mockImplementation(async () => {
-      h.state.conv = { ...h.state.conv, assigned_agent_id: 'u-juan' }
-      return { text: '', handoff: handoffRequest() }
-    })
-
-    await dispatchInboundToAiReply(ARGS)
-
-    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
-    expect(h.state.dealArgs).toMatchObject({ assignedProfileId: 'p-juan' })
-  })
-
-  // ESCENARIO: Error al insertar el negocio. Perder una tarjeta del
-  // embudo es preferible a dejar a un cliente esperando.
-  it('completa el traspaso aunque el negocio no se pueda crear', async () => {
-    h.state.dealOutcome = { status: 'failed', reason: 'no se pudo crear el negocio' }
-    h.state.openConversations = ['u-juan', 'u-juan', 'u-brayan']
-
-    await expect(dispatchInboundToAiReply(ARGS)).resolves.toBeUndefined()
-
-    // El asesor queda asignado y el cliente recibe su aviso.
-    expect(h.state.updatePayload).toMatchObject({
-      ai_autoreply_disabled: true,
-      assigned_agent_id: 'u-brayan',
-    })
-    expect(h.engineSendText).toHaveBeenCalledTimes(1)
-    expect(h.engineSendText.mock.calls[0][0].text).toMatch(/agent|asesor|advisor/i)
-  })
-
-  // El traspaso por fallo del proveedor no tiene calificación que
-  // heredar, pero el negocio igual se abre: el cliente está esperando y
-  // alguien tiene que verlo en el tablero.
-  it('abre el negocio también en el traspaso por fallo técnico', async () => {
-    h.generateReply.mockRejectedValue(new Error('Gemini rate limit reached'))
-
-    await dispatchInboundToAiReply(ARGS)
-
-    expect(h.state.dealArgs).toMatchObject({ request: null })
-    expect(String(h.state.dealArgs?.summary)).toContain('no pudo responder')
-  })
-})
-
-// La carga reparte bien un lead nuevo, pero no debería mover uno que ya
-// tiene dueño. Caso real: Juan reactiva la IA en un hilo suyo, el hilo
-// deja de contar como su carga y el siguiente traspaso se lo lleva otro.
-describe('dispatchInboundToAiReply — continuidad del asesor', () => {
-  beforeEach(() => {
-    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
-  })
-
-  it('devuelve el hilo al asesor que ya lo atendió, aunque tenga más carga', async () => {
-    h.state.historial = ['u-juan', null]
-    h.state.openConversations = ['u-juan', 'u-juan', 'u-juan']
-
-    await dispatchInboundToAiReply(ARGS)
-
-    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-juan' })
-  })
-
-  it('reparte por carga cuando el hilo no tiene historial', async () => {
-    h.state.historial = []
-    h.state.openConversations = ['u-juan', 'u-juan']
-
-    await dispatchInboundToAiReply(ARGS)
-
-    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
-  })
-
-  // El asesor fijo de Ajustes es una decisión explícita del admin y
-  // manda sobre la continuidad igual que mandaba sobre la carga.
-  it('el asesor fijo tiene precedencia sobre la continuidad', async () => {
-    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'u-brayan' }))
-    h.state.historial = ['u-juan']
-
-    await dispatchInboundToAiReply(ARGS)
-
-    expect(h.state.updatePayload).toMatchObject({ assigned_agent_id: 'u-brayan' })
-  })
-})
+// El negocio del traspaso (título rico antes que el genérico, uno por
+// contacto, el del lead que vuelve) y la continuidad por contacto se
+// prueban donde viven: en la base, con
+// supabase/tests/sticky_weighted_assignment.test.sql.

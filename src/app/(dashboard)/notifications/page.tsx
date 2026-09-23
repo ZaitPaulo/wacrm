@@ -5,18 +5,19 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import type { Notification } from "@/types";
-import { Bell, CheckCheck, Loader2, UserPlus } from "lucide-react";
+import { Bell, CheckCheck, Loader2, MessageCircle, UserPlus } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { dateLocale } from "@/lib/date-locale";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { PushNotificationsCard } from "@/components/notifications/push-notifications-card";
 
-// Icon per notification type. Only one type exists today
-// (conversation_assigned) but this keeps future types a one-line add.
+// Icono por tipo de aviso: asignación o mensaje nuevo de un cliente.
 const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
   conversation_assigned: UserPlus,
+  new_message: MessageCircle,
 };
 
 export default function NotificationsPage() {
@@ -72,10 +73,13 @@ export default function NotificationsPage() {
             });
           } else if (payload.eventType === "UPDATE") {
             const row = payload.new as Notification;
-            setNotifications((prev) =>
-              prev?.map((n) => (n.id === row.id ? { ...n, ...row } : n)) ??
-              prev,
-            );
+            // Un aviso de mensaje se refresca con cada mensaje nuevo del
+            // cliente (mueve `created_at`): sube al principio de la lista.
+            setNotifications((prev) => {
+              if (!prev) return prev;
+              const merged = prev.map((n) => (n.id === row.id ? { ...n, ...row } : n));
+              return merged.sort((a, b) => b.created_at.localeCompare(a.created_at));
+            });
           } else if (payload.eventType === "DELETE") {
             const oldRow = payload.old as Partial<Notification>;
             setNotifications(
@@ -190,6 +194,11 @@ export default function NotificationsPage() {
           {t('markAllAsRead')}
         </Button>
       </div>
+
+      {/* Activar los avisos push de este dispositivo. Va arriba de la
+          lista: es lo primero que un asesor nuevo tiene que hacer, y en
+          el celular la lista puede ser larga. */}
+      <PushNotificationsCard />
 
       {notifications.length === 0 ? (
         <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/40">

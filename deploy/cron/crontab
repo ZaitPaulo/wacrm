@@ -20,6 +20,12 @@
 #
 # Al cambiar este archivo hay que REINICIAR el contenedor del cron: lo copia
 # al arrancar (ver deploy/docker-compose.app.yml), y sin eso sigue con el viejo.
+# --- Avisos push: cada minuto ------------------------------------------------
+# Red de seguridad del envío inmediato (pg_net → /api/push/dispatch): manda los
+# avisos de los últimos 15 min que no salieron, p. ej. porque la app se estaba
+# reiniciando en un despliegue. Ver src/app/api/push/cron/route.ts.
+* * * * * /tick.sh /api/push/cron
+
 */5 * * * * /tick.sh /api/broadcasts/cron
 
 # --- Flows: cada 5 minutos --------------------------------------------------
@@ -32,3 +38,13 @@
 # disparo nuevo mientras no se barra. Sin este sweep, un contacto puede
 # quedar mudo para siempre sin que nadie entienda por qué.
 */5 * * * * /tick.sh /api/flows/cron
+
+# --- Conversaciones olvidadas: cada 5 minutos -------------------------------
+# Asigna con continuidad o porcentajes las conversaciones que llevan X HORAS
+# sin asesor (P4, migración 537). En producción X nace en 3 horas (539); solo
+# cuentan las que quedaron sin asesor después de activar la regla. Con un
+# plazo de 3 horas, cinco minutos de precisión es lo razonable (con 15 un
+# lead podía esperar hasta 3 h 15). Cada pasada procesa hasta 50.
+#
+# Al agregar esta línea hay que REINICIAR el contenedor del cron (ver arriba).
+*/5 * * * * /tick.sh /api/assignment/cron

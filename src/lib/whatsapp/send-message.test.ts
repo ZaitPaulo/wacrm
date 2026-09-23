@@ -415,3 +415,33 @@ describe('sendMessageToConversation — autoría del saliente (sender_id)', () =
     expect(captured.message?.sender_id).toBe('u-brayan');
   });
 });
+
+describe('sendMessageToConversation — el asesor que escribe pausa al bot', () => {
+  // Desde sticky-weighted-assignment tener asesor ya no calla a la IA:
+  // la calla `ai_autoreply_disabled`. Cuando un asesor asignado por el
+  // job, una automatización o un admin empieza a atender, su primer
+  // mensaje es la señal de que el hilo es suyo —la misma que ya pausaba
+  // los flujos—.
+  it('un mensaje con persona detrás deja la IA pausada', async () => {
+    const captured: CapturedWrites = {};
+    await sendMessageToConversation(sendPathDb([], captured), 'acct-1', {
+      conversationId: 'cv-1',
+      messageType: 'text',
+      contentText: 'hola, soy Juan',
+      senderId: 'u-juan',
+    });
+    expect(captured.conversation?.ai_autoreply_disabled).toBe(true);
+  });
+
+  // La API v1, las automatizaciones y los flujos no son una persona
+  // tomando el hilo.
+  it('un envío sin persona detrás no toca la IA', async () => {
+    const captured: CapturedWrites = {};
+    await sendMessageToConversation(sendPathDb([], captured), 'acct-1', {
+      conversationId: 'cv-1',
+      messageType: 'text',
+      contentText: 'enviado por la API',
+    });
+    expect(captured.conversation).not.toHaveProperty('ai_autoreply_disabled');
+  });
+});
