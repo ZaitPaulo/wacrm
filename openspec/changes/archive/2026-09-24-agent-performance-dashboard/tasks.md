@@ -143,7 +143,7 @@ Veredicto de QA: apto con reservas. Correcciones aplicadas el 2026-09-23:
 
 ## 6. Despliegue (`/backend`)
 
-- [ ] 6.1 `./scripts/backup.sh` y `./scripts/apply-migrations.sh --dry-run`, confirmando que aparecen como pendientes **exactamente 531, 532 y 533** (tres; el 530 queda vacío a propósito y NO debe aparecer)
-- [ ] 6.2 Desplegar las tres migraciones juntas con el código del lote
+- [x] 6.1 `./scripts/backup.sh` y `./scripts/apply-migrations.sh --dry-run`, confirmando que aparecen como pendientes **exactamente 531, 532 y 533** (tres; el 530 queda vacío a propósito y NO debe aparecer)
+- [x] 6.2 Desplegar las tres migraciones juntas con el código del lote
 - [ ] 6.3 Verificar en producción: una reactivación real registra su fila en el historial y el `sender_id` se está escribiendo en los salientes nuevos
-- [ ] 6.4 Confirmar con el Director de TI antes de tocar producción
+- [x] 6.4 Confirmar con el Director de TI antes de tocar producción

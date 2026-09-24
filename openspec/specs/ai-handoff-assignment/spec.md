@@ -3,62 +3,19 @@
 ## Purpose
 A qué asesor va a parar una conversación cuando la IA la transfiere: reparto por carga, aviso al cliente con nombre y notificación al asesor con el contexto.
 ## Requirements
-
-### Requirement: La transferencia elige al asesor con menos carga
-
-Cuando la IA transfiere una conversación y la cuenta no tiene un asesor de derivación configurado, el sistema SHALL asignarla al miembro con menos conversaciones abiertas asignadas en ese momento.
-
-Son candidatos únicamente los miembros de la cuenta con rol `agent`. Ni el `admin` ni el `owner` SHALL ser candidatos: administrar el CRM no es atender clientes.
-
-Los empates SHALL resolverse por antigüedad en la cuenta, de modo que la elección sea determinista y reproducible.
-
-#### Scenario: Reparto con cargas distintas
-
-- **WHEN** la IA transfiere y un asesor tiene 3 conversaciones abiertas y otro tiene 1
-- **THEN** la conversación se asigna al que tiene 1
-
-#### Scenario: Empate entre asesores
-
-- **WHEN** dos asesores tienen la misma cantidad de conversaciones abiertas
-- **THEN** se asigna al que lleva más tiempo en la cuenta
-
-#### Scenario: Ni el owner ni el admin atienden
-
-- **WHEN** el owner y un admin tienen 0 conversaciones abiertas y todos los `agent` tienen 2
-- **THEN** la conversación se asigna a un `agent`, no al owner ni al admin
-
-#### Scenario: La cuenta no tiene ningún agent
-
-- **WHEN** la cuenta solo tiene miembros con rol `admin` y `owner`
-- **THEN** la conversación queda en la cola compartida
-
-#### Scenario: Solo se cuentan las conversaciones abiertas
-
-- **WHEN** un asesor tiene 10 conversaciones cerradas y 0 abiertas, y otro tiene 2 abiertas
-- **THEN** la conversación se asigna al primero
-
-### Requirement: El asesor configurado tiene precedencia
-
-Cuando la cuenta tiene `handoff_agent_id` configurado, el sistema SHALL asignar la conversación a ese asesor sin consultar la carga. Una elección explícita del administrador no se sustituye por el reparto automático.
-
-#### Scenario: Asesor fijo configurado
-
-- **WHEN** la cuenta tiene un asesor de derivación configurado y la IA transfiere
-- **THEN** la conversación se asigna a ese asesor, aunque sea el más cargado
-
-#### Scenario: Sin asesor configurado
-
-- **WHEN** la cuenta no tiene asesor de derivación configurado
-- **THEN** el sistema elige por carga
-
 ### Requirement: Una asignación humana existente no se pisa
 
-Cuando la conversación ya tiene un asesor asignado, el sistema NO SHALL reasignarla, ni por reparto ni por asesor configurado.
+Cuando la conversación ya tiene un asesor vigente (miembro de la cuenta), el traspaso NO SHALL reasignarla. La conversación conserva su asesor, la IA se pausa, la nota del traspaso se guarda y el asesor SHALL recibir un aviso con la nota ("Tu cliente pidió un asesor"), porque sin cambio de asignación el aviso habitual no se dispara.
 
 #### Scenario: Hilo ya tomado
 
 - **WHEN** la IA transfiere una conversación que ya tiene asesor asignado
 - **THEN** la conversación conserva su asesor actual
+
+#### Scenario: El lead que vuelve pide asesor
+
+- **WHEN** la IA, reactivada para un lead que volvió, transfiere su conversación asignada a Juan
+- **THEN** la conversación sigue con Juan, Juan recibe un aviso con la nota del traspaso y el cliente recibe el mensaje de que Juan lo va a atender
 
 ### Requirement: El cliente sabe quién lo va a atender
 
@@ -108,3 +65,46 @@ El resumen que el bot deja en la conversación SHALL estar redactado íntegramen
 
 - **WHEN** el bot transfiere una conversación después de 2 respuestas
 - **THEN** el resumen no contiene texto en inglés
+
+### Requirement: La nota del traspaso sobrevive a la reactivación
+
+Cuando un miembro devuelve una conversación al bot, el sistema SHALL conservar la nota del traspaso anterior (`ai_handoff_summary`). Esa nota lleva el motivo y los datos de calificación, y es lo que permite que quien retome el hilo más adelante no empiece de cero.
+
+Un traspaso posterior SHALL reemplazar la nota por la suya, de modo que siempre refleje el último traspaso y no se acumule.
+
+#### Scenario: Reactivar conserva el contexto
+
+- **WHEN** un asesor reactiva la IA en una conversación que traía nota de traspaso
+- **THEN** la nota sigue disponible en la conversación
+
+#### Scenario: Un traspaso nuevo reemplaza la nota
+
+- **WHEN** el bot vuelve a transferir una conversación que ya tenía nota
+- **THEN** la nota pasa a ser la del traspaso nuevo
+
+### Requirement: La transferencia elige asesor por continuidad del contacto y luego por porcentajes
+
+Cuando la IA transfiere una conversación sin asesor vigente, el sistema SHALL usar la asignación automática unificada (`weighted-auto-assignment`) con origen `ai_handoff`: primero el asesor de continuidad **del contacto** (el último asesor nombrado en el historial de cualquiera de sus conversaciones, si sigue siendo `agent`), y si no hay, el reparto por porcentajes.
+
+La asignación, la pausa de la IA, la nota del traspaso y el negocio SHALL escribirse en una sola transacción.
+
+#### Scenario: La conversación vuelve a quien ya la atendió
+
+- **WHEN** una conversación que tuvo asignada a Juan se devuelve al bot y este la vuelve a transferir
+- **THEN** se asigna a Juan
+
+#### Scenario: El contacto ya lo atendió otro asesor por otro canal
+
+- **WHEN** la IA transfiere la conversación de Instagram de un contacto cuya conversación de WhatsApp atendió Brayan
+- **THEN** se asigna a Brayan
+
+#### Scenario: Lead nuevo
+
+- **WHEN** la IA transfiere una conversación de un contacto sin historial
+- **THEN** se asigna por porcentajes
+
+#### Scenario: La cuenta no tiene ningún agent
+
+- **WHEN** la cuenta solo tiene miembros con rol `admin` y `owner`
+- **THEN** la conversación queda en la cola compartida con la IA pausada
+
