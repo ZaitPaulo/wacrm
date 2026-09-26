@@ -42,8 +42,8 @@ export interface AssignmentSettingsInput {
   /** P4 en HORAS (1 a 720), decisión del Director del 2026-09-23. */
   stale_assign_after_hours?: number | null
   bot_reactivate_after_days?: number | null
-  /** El asesor que recibe siempre los traspasos por venta o permuta
-   *  (migración 543). `null` = desactivado. */
+  /** El asesor que recibe los traspasos por venta o permuta de clientes
+   *  que aún no tienen asesor (migraciones 543-544). `null` = desactivado. */
   trade_in_agent_id?: string | null
 }
 

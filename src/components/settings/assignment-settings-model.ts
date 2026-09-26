@@ -28,7 +28,7 @@ export interface AssignmentSettingsResponse {
   weights_updated_at: string | null
   weights: { user_id: string; full_name: string; percent: number; eligible: boolean }[]
   agents: { user_id: string; full_name: string }[]
-  /** Quien recibe siempre las ventas y permutas (migración 543), o null. */
+  /** Quien recibe las ventas y permutas de clientes sin asesor, o null. */
   trade_in_agent_id: string | null
   /** Miembros vigentes (owner, admin, agent): candidatos para ese ajuste. */
   members: { user_id: string; full_name: string; role: string }[]

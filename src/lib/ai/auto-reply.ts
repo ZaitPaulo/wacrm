@@ -447,7 +447,8 @@ async function handOffToHuman(args: {
     conversationId: args.conversationId,
     summary: args.summary,
     dealTitle: buildHandoffDealTitle(args.request ?? null),
-    // Venta o permuta van al asesor de ventas y permutas (migración 543).
+    // Venta o permuta de un cliente sin asesor: va al asesor de ventas y
+    // permutas (migración 544). Con asesor, se queda con el suyo.
     reason: args.request?.motivo ?? null,
   })
 

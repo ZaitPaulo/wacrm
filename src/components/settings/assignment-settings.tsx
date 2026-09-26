@@ -44,8 +44,8 @@ import {
  * Cuatro ajustes de la cuenta sobre `GET/PUT /api/assignment/settings`:
  * el reparto por porcentajes de los leads nuevos, la asignación de
  * conversaciones que se quedan sin asesor (en horas), la reactivación
- * del bot para el cliente que vuelve (en días) y quién recibe siempre las
- * ventas y permutas (cambio `asesor-ventas-y-permutas`).
+ * del bot para el cliente que vuelve (en días) y quién recibe las ventas
+ * y permutas de clientes sin asesor (migraciones 543-544).
  *
  * Contenedor (`AssignmentSettings`: red y estado) separado de la vista
  * (`AssignmentSettingsView`: pura, probada con el catálogo real). Las
@@ -513,7 +513,7 @@ export function AssignmentSettingsView(props: AssignmentSettingsViewProps) {
           />
         </SectionCard>
 
-        {/* 4. Ventas y permutas: siempre a una persona */}
+        {/* 4. Ventas y permutas: clientes sin asesor, a una persona */}
         <SectionCard icon={<ArrowLeftRight />} title={t('tradeIn.title')} titleId="assignment-trade-in-title">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <label htmlFor={IDS.tradeIn} className="text-sm font-medium text-foreground">

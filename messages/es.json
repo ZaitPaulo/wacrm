@@ -2368,7 +2368,7 @@
           "label": "Asesor para ventas y permutas",
           "none": "Nadie (orden normal)",
           "notMember": "Ya no es miembro de la cuenta",
-          "help": "Los clientes que quieren vender su carro o entregarlo en permuta van siempre a esta persona, aunque ya tengan asesor. Quien lo tenía recibe un aviso."
+          "help": "Los clientes que quieren vender su carro o entregarlo en permuta y todavía no tienen asesor van a esta persona. Si ya tienen asesor, se quedan con él; pasarlos a otro lo hace un administrador a mano."
         },
         "validation": {
           "percentInvalid": "Cada porcentaje debe ser un número entero entre 0 y 100.",

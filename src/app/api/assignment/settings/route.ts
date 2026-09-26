@@ -23,8 +23,9 @@ import {
  *   - `bot_reactivate_after_days`: N días de silencio tras los que un
  *     mensaje del cliente reactiva la IA pausada (el lead que vuelve).
  *     7 por defecto, `null` = desactivado.
- *   - `trade_in_agent_id`: quien recibe SIEMPRE los traspasos de la IA por
- *     venta o permuta (cambio `asesor-ventas-y-permutas`, migración 543).
+ *   - `trade_in_agent_id`: quien recibe los traspasos de la IA por venta
+ *     o permuta de clientes que aún no tienen asesor (migraciones 543-544;
+ *     a uno con asesor no se lo reasigna nunca de forma automática).
  *     Cualquier miembro vigente —owner, admin o agent—, por eso GET
  *     devuelve también `members`. `null` = desactivado.
  *

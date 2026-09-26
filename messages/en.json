@@ -2375,7 +2375,7 @@
           "label": "Agent for sales and trade-ins",
           "none": "Nobody (normal order)",
           "notMember": "No longer a member of the account",
-          "help": "Customers who want to sell their car or trade it in always go to this person, even if they already have an agent. Whoever had them gets a notice."
+          "help": "Customers who want to sell their car or trade it in and do not have an agent yet go to this person. If they already have an agent, they stay with them; moving them is done manually by an administrator."
         },
         "validation": {
           "percentInvalid": "Each percentage must be a whole number from 0 to 100.",

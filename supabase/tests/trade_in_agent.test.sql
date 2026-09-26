@@ -1,5 +1,8 @@
 -- ============================================================
--- Prueba de la migración 543 (cambio asesor-ventas-y-permutas).
+-- Prueba de las migraciones 543 y 544: el asesor de ventas y permutas
+-- (cambios asesor-ventas-y-permutas y ventas-permutas-sin-reasignar).
+-- Solo recibe clientes SIN asesor: nunca reemplaza a uno vigente ni a la
+-- continuidad del contacto.
 --
 -- Corre entera dentro de una transacción que termina en ROLLBACK: no
 -- deja nada. Cada bloque falla con una excepción que nombra el escenario.
@@ -93,8 +96,8 @@ BEGIN
 END $$;
 
 -- ============================================================
--- Permuta de un cliente de Juan → pasa a Angélica, su negocio también,
--- el de Brayan no, y Juan recibe el aviso
+-- Permuta de un cliente de Juan → se queda con Juan (kept): ni
+-- reasignación, ni negocio movido, ni aviso de "pasó a"
 -- ============================================================
 DO $$
 DECLARE r jsonb;
@@ -103,47 +106,47 @@ BEGIN
   PERFORM pg_temp.new_conv(2, '00000000-0000-4000-9000-000000000021');
   SET LOCAL crm.assignment_override = '';
 
-  -- El trigger de la 536 le abrió el negocio a Juan. Uno de Brayan aparte.
-  INSERT INTO deals (account_id, user_id, pipeline_id, stage_id, contact_id, title, value, currency, status, assigned_to)
-  VALUES ('00000000-0000-4000-9000-0000000000a1', '00000000-0000-4000-9000-000000000010',
-          '00000000-0000-4000-9000-0000000000b1', '00000000-0000-4000-9000-0000000000c1',
-          pg_temp.contact(2), 'de Brayan', 0, 'COP', 'open', '00000000-0000-4000-9000-0000000000f3');
-
   r := ai_handoff_assign(pg_temp.conv(2), 'nota', NULL, 'permuta');
-  IF r->>'source' <> 'reason' OR pg_temp.agent_of(2) <> '00000000-0000-4000-9000-000000000011' THEN
+  IF r->>'outcome' <> 'kept' OR pg_temp.agent_of(2) <> '00000000-0000-4000-9000-000000000021' THEN
     PERFORM pg_temp.fail('permuta con asesor', r::text);
   END IF;
-  IF EXISTS (SELECT 1 FROM deals WHERE contact_id = pg_temp.contact(2) AND status = 'open'
-             AND assigned_to = '00000000-0000-4000-9000-0000000000f2') THEN
-    PERFORM pg_temp.fail('permuta con asesor', 'el negocio de Juan no pasó a Angélica');
+  IF EXISTS (SELECT 1 FROM deals WHERE contact_id = pg_temp.contact(2)
+             AND assigned_to = '00000000-0000-4000-9000-0000000000f1') THEN
+    PERFORM pg_temp.fail('permuta con asesor', 'le pasó un negocio a Angélica');
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM deals WHERE contact_id = pg_temp.contact(2)
-                 AND title = 'de Brayan' AND assigned_to = '00000000-0000-4000-9000-0000000000f3') THEN
-    PERFORM pg_temp.fail('permuta con asesor', 'movió el negocio de Brayan');
+  IF EXISTS (SELECT 1 FROM notifications WHERE conversation_id = pg_temp.conv(2)
+             AND title LIKE 'Tu cliente pasó a%') THEN
+    PERFORM pg_temp.fail('permuta con asesor', 'avisó una reasignación que no hubo');
   END IF;
   IF NOT EXISTS (SELECT 1 FROM notifications
                  WHERE user_id = '00000000-0000-4000-9000-000000000021'
                    AND conversation_id = pg_temp.conv(2)
-                   AND title = 'Tu cliente pasó a Angélica'
-                   AND body LIKE '%Motivo: permuta') THEN
-    PERFORM pg_temp.fail('permuta con asesor', 'Juan no recibió el aviso');
+                   AND title = 'Tu cliente pidió un asesor') THEN
+    PERFORM pg_temp.fail('permuta con asesor', 'Juan no recibió el aviso de su cliente');
   END IF;
-  IF COALESCE(current_setting('crm.assignment_override', true), '') <> '' THEN
-    PERFORM pg_temp.fail('permuta con asesor', 'el override quedó encendido');
-  END IF;
-  RAISE NOTICE 'ok  permuta de un cliente de Juan: pasa a Angélica, con negocio y aviso';
+  RAISE NOTICE 'ok  permuta de un cliente de Juan: se queda con Juan y él se entera';
 END $$;
 
--- La guarda sigue viva después: otra escritura sin sesión no le quita
--- la conversación a Angélica.
+-- ============================================================
+-- El contacto ya tiene asesor por otro canal → gana la continuidad
+-- ============================================================
 DO $$
+DECLARE r jsonb; v_ig uuid;
 BEGIN
-  UPDATE conversations SET assigned_agent_id = '00000000-0000-4000-9000-000000000022'
-  WHERE id = pg_temp.conv(2);
-  IF pg_temp.agent_of(2) <> '00000000-0000-4000-9000-000000000011' THEN
-    PERFORM pg_temp.fail('guarda intacta', 'una escritura sin sesión reasignó');
+  SET LOCAL crm.assignment_override = 'on';
+  PERFORM pg_temp.new_conv(10, '00000000-0000-4000-9000-000000000022');
+  SET LOCAL crm.assignment_override = '';
+
+  INSERT INTO conversations (user_id, contact_id, account_id, channel)
+  VALUES ('00000000-0000-4000-9000-000000000010', pg_temp.contact(10),
+          '00000000-0000-4000-9000-0000000000a1', 'instagram')
+  RETURNING id INTO v_ig;
+
+  r := ai_handoff_assign(v_ig, 'nota', NULL, 'vende_su_carro');
+  IF (SELECT assigned_agent_id FROM conversations WHERE id = v_ig) <> '00000000-0000-4000-9000-000000000022' THEN
+    PERFORM pg_temp.fail('continuidad', r::text);
   END IF;
-  RAISE NOTICE 'ok  la guarda de la 535 sigue activa tras el traspaso';
+  RAISE NOTICE 'ok  el contacto de Brayan por otro canal sigue con Brayan';
 END $$;
 
 -- ============================================================

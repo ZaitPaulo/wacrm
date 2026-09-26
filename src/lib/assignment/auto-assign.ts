@@ -24,8 +24,8 @@ import type { HandoffAgent } from '@/lib/ai/pick-agent'
 export type AssignmentOrigin = 'automation' | 'flow' | 'stale_job'
 
 /** Cómo se eligió al asesor. `kept` = ya tenía uno vigente; `reason` =
- *  el motivo del traspaso lo mandó al asesor de ventas y permutas
- *  (migración 543). */
+ *  un cliente sin asesor que vende o permuta fue al asesor de ventas y
+ *  permutas (migraciones 543-544). */
 export type AssignmentSource =
   | 'kept'
   | 'continuity'
@@ -141,9 +141,9 @@ export function autoAssignConversation(
  * base le manda un aviso propio.
  *
  * @param reason El motivo que declaró el modelo. Con `vende_su_carro` o
- *   `permuta` la base manda la conversación al asesor de ventas y
- *   permutas de la cuenta, aunque ya tenga otro (migración 543). `null`
- *   en el traspaso por fallo del proveedor.
+ *   `permuta`, un cliente SIN asesor (ni vigente ni de continuidad) va al
+ *   asesor de ventas y permutas de la cuenta; uno con asesor se queda con
+ *   él (migración 544). `null` en el traspaso por fallo del proveedor.
  */
 export function aiHandoffAssign(
   db: SupabaseClient,
