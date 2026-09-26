@@ -47,3 +47,9 @@ next-env.d.ts
 # Llegan por correo, se regeneran cada mes y no son documentacion del producto:
 # versionarlos engorda el historial para siempre sin aportar nada al repo.
 docs/*.xlsx
+
+# Skill cuenta-de-cobro: datos personales (cédula, cuenta bancaria) e historial
+.claude/skills/cuenta-de-cobro/*.local.*
+
+# Propuesta comercial al cliente (precios y condiciones): el repo es público.
+docs/Propuesta-CRM-LoraMotors.pdf
