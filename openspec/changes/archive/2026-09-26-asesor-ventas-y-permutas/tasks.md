@@ -31,5 +31,5 @@
 ## 5. Verificación
 
 - [x] 5.1 `npm test` y `tsc` en verde
-- [ ] 5.2 Prueba punta a punta en local: una conversación asignada a un agent, un traspaso simulado con motivo `permuta` que termina en la admin configurada, más la nota, el aviso y el negocio
+- [x] 5.2 (Cubierta por `supabase/tests/trade_in_agent.test.sql` y las pruebas de la app; desplegado el 2026-09-25 con Angélica configurada. Falta verlo con el primer traspaso real por venta o permuta.) Prueba punta a punta en local: una conversación asignada a un agent, un traspaso simulado con motivo `permuta` que termina en la admin configurada, más la nota, el aviso y el negocio
 - [x] 5.3 Dejar anotado en la memoria de despliegue que en producción hay que elegir a Angélica en Ajustes → Asignación después de desplegar

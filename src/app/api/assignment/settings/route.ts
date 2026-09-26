@@ -142,6 +142,8 @@ export async function PUT(request: Request) {
       return bad(CODES.saveFailed, 'Failed to load agents', 500)
     }
 
+    // Una sola lectura para las dos validaciones: los porcentajes solo
+    // admiten `agent`; el asesor de ventas y permutas, cualquier vigente.
     const vigentes = (miembros ?? []) as { user_id: string; account_role: string }[]
     const parsed = parseAssignmentSettingsInput(body, {
       agentIds: vigentes.filter((m) => m.account_role === 'agent').map((m) => m.user_id),
@@ -150,7 +152,8 @@ export async function PUT(request: Request) {
     if (!parsed.ok) return bad(parsed.code, `Invalid assignment settings: ${parsed.code}`)
     const input = parsed.value
 
-    // Los días primero: son un upsert simple. `stale_assign_enabled_at`
+    // Las columnas de `assignment_settings` primero (plazos y asesor de
+    // ventas y permutas): son un upsert simple. `stale_assign_enabled_at`
     // no se manda nunca; lo fija el trigger de la 534 al activar.
     const dias: Record<string, unknown> = {}
     if ('stale_assign_after_hours' in input) {
