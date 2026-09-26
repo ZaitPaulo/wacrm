@@ -24,6 +24,7 @@ export const ASSIGNMENT_SETTINGS_ERROR_CODES = {
   weightsNotAgent: 'weights_not_agent',
   staleHoursInvalid: 'stale_hours_invalid',
   reactivateDaysInvalid: 'reactivate_days_invalid',
+  tradeInAgentInvalid: 'trade_in_agent_invalid',
   saveFailed: 'save_failed',
 } as const
 
@@ -41,6 +42,9 @@ export interface AssignmentSettingsInput {
   /** P4 en HORAS (1 a 720), decisión del Director del 2026-09-23. */
   stale_assign_after_hours?: number | null
   bot_reactivate_after_days?: number | null
+  /** El asesor que recibe siempre los traspasos por venta o permuta
+   *  (migración 543). `null` = desactivado. */
+  trade_in_agent_id?: string | null
 }
 
 export type ParseResult =
@@ -62,10 +66,13 @@ function enteroEnRango(v: unknown, max: number): v is number | null {
  *
  * @param agentIds Los `user_id` de los miembros de la cuenta con rol
  *   `agent`: solo ellos pueden recibir asignaciones automáticas.
+ * @param memberIds Los `user_id` de los miembros vigentes (owner, admin
+ *   y agent): los que pueden ser asesor de ventas y permutas. Angélica,
+ *   que lo es en producción, es `admin`.
  */
 export function parseAssignmentSettingsInput(
   body: unknown,
-  opts: { agentIds: readonly string[] },
+  opts: { agentIds: readonly string[]; memberIds: readonly string[] },
 ): ParseResult {
   const C = ASSIGNMENT_SETTINGS_ERROR_CODES
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -114,6 +121,14 @@ export function parseAssignmentSettingsInput(
       return { ok: false, code: C.reactivateDaysInvalid }
     }
     value.bot_reactivate_after_days = b.bot_reactivate_after_days
+  }
+
+  if ('trade_in_agent_id' in b) {
+    const v = b.trade_in_agent_id
+    if (v !== null && (typeof v !== 'string' || !opts.memberIds.includes(v))) {
+      return { ok: false, code: C.tradeInAgentInvalid }
+    }
+    value.trade_in_agent_id = v
   }
 
   // `stale_assign_enabled_at` no se acepta: lo fija la base al activar.

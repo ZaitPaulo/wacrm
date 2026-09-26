@@ -656,6 +656,24 @@ describe('dispatchInboundToAiReply — a quién se asigna', () => {
     expect(String(h.state.handoffArgs?.summary)).toContain('Nombre: Carlos')
   })
 
+  // Venta o permuta: la base decide mandarla al asesor de ventas y
+  // permutas (migración 543); el bot solo le tiene que pasar el motivo.
+  it('le pasa a la base el motivo del traspaso', async () => {
+    h.generateReply.mockResolvedValue({
+      text: '',
+      handoff: handoffRequest({
+        motivo: 'vende_su_carro',
+        interes: 'Citroën C3 2024, 50 mil km',
+        presupuesto: null,
+        credito: null,
+      }),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.handoffArgs).toMatchObject({ reason: 'vende_su_carro' })
+  })
+
   it('le dice al cliente el primer nombre de quien lo va a atender', async () => {
     await dispatchInboundToAiReply(ARGS)
 

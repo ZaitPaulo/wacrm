@@ -23,6 +23,10 @@ import {
  *   - `bot_reactivate_after_days`: N días de silencio tras los que un
  *     mensaje del cliente reactiva la IA pausada (el lead que vuelve).
  *     7 por defecto, `null` = desactivado.
+ *   - `trade_in_agent_id`: quien recibe SIEMPRE los traspasos de la IA por
+ *     venta o permuta (cambio `asesor-ventas-y-permutas`, migración 543).
+ *     Cualquier miembro vigente —owner, admin o agent—, por eso GET
+ *     devuelve también `members`. `null` = desactivado.
  *
  * Contrato completo —formas, validaciones y códigos de error con su clave
  * i18n— en `openspec/changes/sticky-weighted-assignment/design.md` →
@@ -35,6 +39,9 @@ import {
  */
 
 const DEFAULT_REACTIVATE_DAYS = 7
+
+/** Los roles que `is_active_member` (535) considera vigentes. */
+const MIEMBROS_VIGENTES = ['owner', 'admin', 'agent']
 
 interface ProfileRow {
   user_id: string
@@ -51,7 +58,9 @@ async function loadSettings(supabase: SupabaseClient, accountId: string) {
   const [settingsRes, weightsRes, profilesRes] = await Promise.all([
     supabase
       .from('assignment_settings')
-      .select('stale_assign_after_hours, stale_assign_enabled_at, bot_reactivate_after_days, weights_updated_at')
+      .select(
+        'stale_assign_after_hours, stale_assign_enabled_at, bot_reactivate_after_days, weights_updated_at, trade_in_agent_id',
+      )
       .eq('account_id', accountId)
       .maybeSingle(),
     supabase.from('assignment_weights').select('user_id, percent').eq('account_id', accountId),
@@ -71,6 +80,7 @@ async function loadSettings(supabase: SupabaseClient, accountId: string) {
     stale_assign_enabled_at: string | null
     bot_reactivate_after_days: number | null
     weights_updated_at: string | null
+    trade_in_agent_id: string | null
   } | null
 
   return {
@@ -80,6 +90,7 @@ async function loadSettings(supabase: SupabaseClient, accountId: string) {
     // `reactivate_ai_for_returning_lead`.
     bot_reactivate_after_days: s ? s.bot_reactivate_after_days : DEFAULT_REACTIVATE_DAYS,
     weights_updated_at: s?.weights_updated_at ?? null,
+    trade_in_agent_id: s?.trade_in_agent_id ?? null,
     weights: ((weightsRes.data ?? []) as { user_id: string; percent: number }[])
       .map((w) => {
         const p = porUsuario.get(w.user_id)
@@ -96,6 +107,10 @@ async function loadSettings(supabase: SupabaseClient, accountId: string) {
     agents: perfiles
       .filter((p) => p.account_role === 'agent')
       .map((p) => ({ user_id: p.user_id, full_name: p.full_name ?? '' })),
+    // Los que pueden ser asesor de ventas y permutas: no solo los agent.
+    members: perfiles
+      .filter((p) => MIEMBROS_VIGENTES.includes(p.account_role))
+      .map((p) => ({ user_id: p.user_id, full_name: p.full_name ?? '', role: p.account_role })),
   }
 }
 
@@ -117,18 +132,20 @@ export async function PUT(request: Request) {
 
     const body = await request.json().catch(() => null)
 
-    const { data: agentes, error: agentesErr } = await supabase
+    const { data: miembros, error: agentesErr } = await supabase
       .from('profiles')
-      .select('user_id')
+      .select('user_id, account_role')
       .eq('account_id', accountId)
-      .eq('account_role', 'agent')
+      .in('account_role', MIEMBROS_VIGENTES)
     if (agentesErr) {
       console.error('[assignment/settings] no se pudieron leer los asesores:', agentesErr)
       return bad(CODES.saveFailed, 'Failed to load agents', 500)
     }
 
+    const vigentes = (miembros ?? []) as { user_id: string; account_role: string }[]
     const parsed = parseAssignmentSettingsInput(body, {
-      agentIds: ((agentes ?? []) as { user_id: string }[]).map((a) => a.user_id),
+      agentIds: vigentes.filter((m) => m.account_role === 'agent').map((m) => m.user_id),
+      memberIds: vigentes.map((m) => m.user_id),
     })
     if (!parsed.ok) return bad(parsed.code, `Invalid assignment settings: ${parsed.code}`)
     const input = parsed.value
@@ -141,6 +158,9 @@ export async function PUT(request: Request) {
     }
     if ('bot_reactivate_after_days' in input) {
       dias.bot_reactivate_after_days = input.bot_reactivate_after_days
+    }
+    if ('trade_in_agent_id' in input) {
+      dias.trade_in_agent_id = input.trade_in_agent_id
     }
     if (Object.keys(dias).length > 0) {
       const { error } = await supabase

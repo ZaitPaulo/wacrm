@@ -47,6 +47,12 @@ const RESPUESTA: AssignmentSettingsResponse = {
     { user_id: 'u-ana', full_name: 'Ana Ruiz' },
     { user_id: 'u-beto', full_name: 'Beto Gil' },
   ],
+  trade_in_agent_id: null,
+  members: [
+    { user_id: 'u-ange', full_name: 'Angélica Molero', role: 'admin' },
+    { user_id: 'u-ana', full_name: 'Ana Ruiz', role: 'agent' },
+    { user_id: 'u-beto', full_name: 'Beto Gil', role: 'agent' },
+  ],
 }
 
 const noop = () => {}
@@ -62,6 +68,7 @@ function render(over: Partial<AssignmentSettingsViewProps> = {}, form?: Assignme
     dirty: false,
     saving: false,
     staleActiveSince: null,
+    members: RESPUESTA.members,
     onRetry: noop,
     onPercentChange: noop,
     onEvenSplit: noop,
@@ -70,6 +77,7 @@ function render(over: Partial<AssignmentSettingsViewProps> = {}, form?: Assignme
     onStaleHoursChange: noop,
     onReactivateToggle: noop,
     onReactivateDaysChange: noop,
+    onTradeInChange: noop,
     onSave: noop,
     ...over,
   }
@@ -206,6 +214,35 @@ describe('AssignmentSettingsView — reglas', () => {
     const html = render({ dirty: true }, form)
     expect(html).toContain(UI.validation.hoursInvalid)
     expect(html).toMatch(/id="assignment-stale-hours"[^>]*aria-describedby="[^"]*assignment-stale-error/)
+  })
+})
+
+describe('AssignmentSettingsView — ventas y permutas', () => {
+  it('selector etiquetado, con su ayuda, y "nadie" cuando no hay nadie', () => {
+    const html = render()
+    expect(html).toContain(UI.tradeIn.title)
+    expect(html).toMatch(/<label[^>]*for="assignment-trade-in"/)
+    expect(html).toMatch(/id="assignment-trade-in"[^>]*aria-describedby="assignment-trade-in-help"|aria-describedby="assignment-trade-in-help"[^>]*id="assignment-trade-in"/)
+    expect(texto(html)).toContain(UI.tradeIn.help)
+    expect(texto(html)).toContain(UI.tradeIn.none)
+  })
+
+  it('muestra el nombre de quien está elegido', () => {
+    const form = formFromResponse({ ...RESPUESTA, trade_in_agent_id: 'u-ange' })
+    expect(texto(render({}, form))).toContain('Angélica Molero')
+  })
+
+  it('si lo guardado ya no es miembro, lo dice', () => {
+    const form = formFromResponse({ ...RESPUESTA, trade_in_agent_id: 'u-se-fue' })
+    expect(texto(render({}, form))).toContain(UI.tradeIn.notMember)
+  })
+
+  it('el error del servidor sale junto al selector y se anuncia', () => {
+    const html = render({
+      dirty: true,
+      serverError: { field: 'tradeIn', message: 'Ya no es miembro.' },
+    })
+    expect(html).toMatch(/id="assignment-trade-in-error"[^>]*role="alert"|role="alert"[^>]*id="assignment-trade-in-error"/)
   })
 })
 

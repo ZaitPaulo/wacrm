@@ -2324,7 +2324,8 @@
         "weights_not_agent": "Only members with the agent role can receive automatic assignments.",
         "stale_hours_invalid": "Hours without an agent must be a whole number between 1 and 720 (30 days), or empty to turn the rule off.",
         "reactivate_days_invalid": "Days to reactivate the AI must be a whole number between 1 and 365, or empty to turn it off.",
-        "save_failed": "The assignment settings could not be saved."
+        "save_failed": "The assignment settings could not be saved.",
+        "trade_in_agent_invalid": "The person chosen for sales and trade-ins is no longer a member of the account."
       },
       "ui": {
         "title": "Agent assignment",
@@ -2368,6 +2369,13 @@
           "unit": "days",
           "help": "If a customer with an agent writes again after that silence, the bot answers first and hands them back to the same agent. Does not apply to admins’ conversations.",
           "off": "Off: the bot never takes back a conversation an agent is handling."
+        },
+        "tradeIn": {
+          "title": "Sales and trade-ins",
+          "label": "Agent for sales and trade-ins",
+          "none": "Nobody (normal order)",
+          "notMember": "No longer a member of the account",
+          "help": "Customers who want to sell their car or trade it in always go to this person, even if they already have an agent. Whoever had them gets a notice."
         },
         "validation": {
           "percentInvalid": "Each percentage must be a whole number from 0 to 100.",

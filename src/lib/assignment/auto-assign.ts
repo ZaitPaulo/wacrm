@@ -23,8 +23,16 @@ import type { HandoffAgent } from '@/lib/ai/pick-agent'
 /** Qué camino pide la asignación (columna `origin` del historial). */
 export type AssignmentOrigin = 'automation' | 'flow' | 'stale_job'
 
-/** Cómo se eligió al asesor. `kept` = ya tenía uno vigente. */
-export type AssignmentSource = 'kept' | 'continuity' | 'preferred' | 'weighted' | 'none'
+/** Cómo se eligió al asesor. `kept` = ya tenía uno vigente; `reason` =
+ *  el motivo del traspaso lo mandó al asesor de ventas y permutas
+ *  (migración 543). */
+export type AssignmentSource =
+  | 'kept'
+  | 'continuity'
+  | 'preferred'
+  | 'weighted'
+  | 'reason'
+  | 'none'
 
 export interface AutoAssignResult {
   /**
@@ -43,7 +51,7 @@ export interface AutoAssignResult {
 }
 
 const OUTCOMES = new Set(['assigned', 'kept', 'no_agent', 'not_found'])
-const SOURCES = new Set(['kept', 'continuity', 'preferred', 'weighted', 'none'])
+const SOURCES = new Set(['kept', 'continuity', 'preferred', 'weighted', 'reason', 'none'])
 
 const FALLO: AutoAssignResult = { outcome: 'failed', source: null, agent: null, deal: null }
 
@@ -131,15 +139,26 @@ export function autoAssignConversation(
  * genérico del trigger no le gane), y pausa la IA con la nota en el mismo
  * UPDATE que el asesor. Si el asesor se conserva —el lead que vuelve—, la
  * base le manda un aviso propio.
+ *
+ * @param reason El motivo que declaró el modelo. Con `vende_su_carro` o
+ *   `permuta` la base manda la conversación al asesor de ventas y
+ *   permutas de la cuenta, aunque ya tenga otro (migración 543). `null`
+ *   en el traspaso por fallo del proveedor.
  */
 export function aiHandoffAssign(
   db: SupabaseClient,
-  args: { conversationId: string; summary: string; dealTitle: string | null },
+  args: {
+    conversationId: string
+    summary: string
+    dealTitle: string | null
+    reason?: string | null
+  },
 ): Promise<AutoAssignResult> {
   return llamar(db, 'ai_handoff_assign', {
     p_conversation_id: args.conversationId,
     p_summary: args.summary,
     p_deal_title: args.dealTitle,
+    p_reason: args.reason ?? null,
   })
 }
 

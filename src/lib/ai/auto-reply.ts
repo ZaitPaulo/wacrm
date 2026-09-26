@@ -447,6 +447,8 @@ async function handOffToHuman(args: {
     conversationId: args.conversationId,
     summary: args.summary,
     dealTitle: buildHandoffDealTitle(args.request ?? null),
+    // Venta o permuta van al asesor de ventas y permutas (migración 543).
+    reason: args.request?.motivo ?? null,
   })
 
   if (resultado.outcome === 'failed') {

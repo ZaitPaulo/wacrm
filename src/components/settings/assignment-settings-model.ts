@@ -28,6 +28,10 @@ export interface AssignmentSettingsResponse {
   weights_updated_at: string | null
   weights: { user_id: string; full_name: string; percent: number; eligible: boolean }[]
   agents: { user_id: string; full_name: string }[]
+  /** Quien recibe siempre las ventas y permutas (migración 543), o null. */
+  trade_in_agent_id: string | null
+  /** Miembros vigentes (owner, admin, agent): candidatos para ese ajuste. */
+  members: { user_id: string; full_name: string; role: string }[]
 }
 
 /** Una fila del reparto. `percent` es el texto crudo del campo: validar
@@ -49,6 +53,8 @@ export interface AssignmentForm {
   staleHours: string
   reactivateEnabled: boolean
   reactivateDays: string
+  /** `user_id` del asesor de ventas y permutas; '' = nadie. */
+  tradeInAgentId: string
 }
 
 /** Claves de `Settings.assignment.ui.validation`. */
@@ -63,9 +69,10 @@ export interface AssignmentPayload {
   weights?: { user_id: string; percent: number }[]
   stale_assign_after_hours?: number | null
   bot_reactivate_after_days?: number | null
+  trade_in_agent_id?: string | null
 }
 
-export type ErrorField = 'weights' | 'stale' | 'reactivate' | 'general'
+export type ErrorField = 'weights' | 'stale' | 'reactivate' | 'tradeIn' | 'general'
 
 /** Enteros que suman 100; el sobrante va a los primeros (3 → 34/33/33). */
 export function evenSplit(n: number): number[] {
@@ -112,6 +119,7 @@ export function formFromResponse(res: AssignmentSettingsResponse): AssignmentFor
     staleHours: String(res.stale_assign_after_hours ?? DEFAULT_STALE_HOURS),
     reactivateEnabled: res.bot_reactivate_after_days !== null,
     reactivateDays: String(res.bot_reactivate_after_days ?? DEFAULT_REACTIVATE_DAYS),
+    tradeInAgentId: res.trade_in_agent_id ?? '',
   }
 }
 
@@ -194,6 +202,10 @@ export function buildAssignmentPayload(
   const diasAntes = initial.reactivateEnabled ? entero(initial.reactivateDays) : null
   if (dias !== diasAntes) body.bot_reactivate_after_days = dias
 
+  if (form.tradeInAgentId !== initial.tradeInAgentId) {
+    body.trade_in_agent_id = form.tradeInAgentId || null
+  }
+
   return body
 }
 
@@ -205,5 +217,6 @@ export function serverErrorField(code: unknown): ErrorField {
   if (code.startsWith('weights_')) return 'weights'
   if (code.startsWith('stale_')) return 'stale'
   if (code.startsWith('reactivate_')) return 'reactivate'
+  if (code.startsWith('trade_in_')) return 'tradeIn'
   return 'general'
 }

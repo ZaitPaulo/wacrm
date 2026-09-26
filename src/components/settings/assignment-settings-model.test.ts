@@ -30,6 +30,11 @@ function respuesta(over: Partial<AssignmentSettingsResponse> = {}): AssignmentSe
       { user_id: BETO, full_name: 'Beto' },
       { user_id: CATA, full_name: 'Cata' },
     ],
+    trade_in_agent_id: null,
+    members: [
+      { user_id: 'u-ange', full_name: 'Angélica', role: 'admin' },
+      { user_id: ANA, full_name: 'Ana', role: 'agent' },
+    ],
     ...over,
   }
 }
@@ -229,6 +234,29 @@ describe('buildAssignmentPayload', () => {
   })
 })
 
+describe('asesor de ventas y permutas', () => {
+  it('lo carga como id, y vacío cuando no hay', () => {
+    expect(formFromResponse(respuesta()).tradeInAgentId).toBe('')
+    expect(formFromResponse(respuesta({ trade_in_agent_id: 'u-ange' })).tradeInAgentId).toBe('u-ange')
+  })
+
+  it('manda solo el ajuste cuando es lo único que cambió', () => {
+    const inicial = formFromResponse(
+      respuesta({ weights: [{ user_id: ANA, full_name: 'Ana', percent: 100, eligible: true }] }),
+    )
+    const f = structuredClone(inicial)
+    f.tradeInAgentId = 'u-ange'
+    expect(buildAssignmentPayload(f, inicial)).toEqual({ trade_in_agent_id: 'u-ange' })
+  })
+
+  it('elegir "nadie" manda null', () => {
+    const inicial = formFromResponse(respuesta({ trade_in_agent_id: 'u-ange' }))
+    const f = structuredClone(inicial)
+    f.tradeInAgentId = ''
+    expect(buildAssignmentPayload(f, inicial)).toEqual({ trade_in_agent_id: null })
+  })
+})
+
 describe('serverErrorField', () => {
   it('ubica cada código junto a su campo', () => {
     expect(serverErrorField('weights_sum')).toBe('weights')
@@ -236,6 +264,7 @@ describe('serverErrorField', () => {
     expect(serverErrorField('stale_days_invalid')).toBe('stale')
     expect(serverErrorField('stale_hours_invalid')).toBe('stale')
     expect(serverErrorField('reactivate_days_invalid')).toBe('reactivate')
+    expect(serverErrorField('trade_in_agent_invalid')).toBe('tradeIn')
     expect(serverErrorField('save_failed')).toBe('general')
     expect(serverErrorField(undefined)).toBe('general')
   })

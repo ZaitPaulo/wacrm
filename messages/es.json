@@ -2317,7 +2317,8 @@
         "weights_not_agent": "Solo los miembros con rol de asesor pueden recibir asignaciones automáticas.",
         "stale_hours_invalid": "Las horas sin asesor deben ser un número entero entre 1 y 720 (30 días), o quedar vacías para desactivar la regla.",
         "reactivate_days_invalid": "Los días para reactivar la IA deben ser un número entero entre 1 y 365, o quedar vacíos para desactivarla.",
-        "save_failed": "No se pudo guardar la configuración de asignación."
+        "save_failed": "No se pudo guardar la configuración de asignación.",
+        "trade_in_agent_invalid": "La persona elegida para ventas y permutas ya no es miembro de la cuenta."
       },
       "ui": {
         "title": "Asignación de asesores",
@@ -2361,6 +2362,13 @@
           "unit": "días",
           "help": "Si un cliente con asesor vuelve a escribir tras ese silencio, el bot lo atiende primero y al traspasar lo manda a su mismo asesor. No aplica a conversaciones de administradores.",
           "off": "Desactivada: el bot nunca retoma una conversación que atiende un asesor."
+        },
+        "tradeIn": {
+          "title": "Ventas y permutas",
+          "label": "Asesor para ventas y permutas",
+          "none": "Nadie (orden normal)",
+          "notMember": "Ya no es miembro de la cuenta",
+          "help": "Los clientes que quieren vender su carro o entregarlo en permuta van siempre a esta persona, aunque ya tengan asesor. Quien lo tenía recibe un aviso."
         },
         "validation": {
           "percentInvalid": "Cada porcentaje debe ser un número entero entre 0 y 100.",

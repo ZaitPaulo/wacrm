@@ -7,9 +7,11 @@ import {
 } from './settings'
 
 const AGENTES = ['u-juan', 'u-brayan', 'u-robinson']
+/** Miembros vigentes: los agent más la dueña y Angélica, que es admin. */
+const MIEMBROS = [...AGENTES, 'u-owner', 'u-angelica']
 
 function parse(body: unknown) {
-  return parseAssignmentSettingsInput(body, { agentIds: AGENTES })
+  return parseAssignmentSettingsInput(body, { agentIds: AGENTES, memberIds: MIEMBROS })
 }
 
 describe('parseAssignmentSettingsInput — porcentajes', () => {
@@ -142,6 +144,38 @@ describe('parseAssignmentSettingsInput — cuerpo', () => {
       ok: true,
       value: { bot_reactivate_after_days: 10 },
     })
+  })
+})
+
+describe('parseAssignmentSettingsInput — asesor de ventas y permutas', () => {
+  it('acepta a una admin: Angélica no es agent', () => {
+    expect(parse({ trade_in_agent_id: 'u-angelica' })).toEqual({
+      ok: true,
+      value: { trade_in_agent_id: 'u-angelica' },
+    })
+  })
+
+  it('null lo desactiva', () => {
+    expect(parse({ trade_in_agent_id: null })).toEqual({
+      ok: true,
+      value: { trade_in_agent_id: null },
+    })
+  })
+
+  it('rechaza a quien no es miembro vigente de la cuenta', () => {
+    expect(parse({ trade_in_agent_id: 'u-otra-cuenta' })).toEqual({
+      ok: false,
+      code: ASSIGNMENT_SETTINGS_ERROR_CODES.tradeInAgentInvalid,
+    })
+  })
+
+  it('rechaza lo que no es texto ni null', () => {
+    for (const v of [42, '', true, {}, []]) {
+      expect(parse({ trade_in_agent_id: v })).toMatchObject({
+        ok: false,
+        code: ASSIGNMENT_SETTINGS_ERROR_CODES.tradeInAgentInvalid,
+      })
+    }
   })
 })
 

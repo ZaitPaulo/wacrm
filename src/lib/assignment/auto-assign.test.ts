@@ -132,8 +132,29 @@ describe('aiHandoffAssign', () => {
       p_conversation_id: 'c-1',
       p_summary: 'nota',
       p_deal_title: 'Carlos — Mazda 3',
+      p_reason: null,
     })
     expect(r.deal).toBe('created')
+  })
+
+  it('le pasa el motivo y entiende la asignación por motivo', async () => {
+    const { client, rpc } = db({
+      data: { outcome: 'assigned', source: 'reason', agent: AGENTE, deal: 'already_open' },
+    })
+    const r = await aiHandoffAssign(client, {
+      conversationId: 'c-1',
+      summary: 'nota',
+      dealTitle: 'Luis — Citroën C3',
+      reason: 'vende_su_carro',
+    })
+    expect(rpc).toHaveBeenCalledWith('ai_handoff_assign', {
+      p_conversation_id: 'c-1',
+      p_summary: 'nota',
+      p_deal_title: 'Luis — Citroën C3',
+      p_reason: 'vende_su_carro',
+    })
+    expect(r.outcome).toBe('assigned')
+    expect(r.source).toBe('reason')
   })
 
   it('un fallo de la RPC no lanza', async () => {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useFormatter, useTranslations } from 'next-intl';
-import { AlertCircle, Bot, Loader2, PieChart, Scale, Timer, X } from 'lucide-react';
+import { AlertCircle, ArrowLeftRight, Bot, Loader2, PieChart, Scale, Timer, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useCan } from '@/hooks/use-can';
@@ -13,6 +13,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { SettingsPanelHead } from './settings-panel-head';
 import { SettingsChip } from './settings-chip';
 import {
@@ -34,10 +41,11 @@ import {
 /**
  * Ajustes → Asignación de asesores (cambio `sticky-weighted-assignment`).
  *
- * Tres ajustes de la cuenta sobre `GET/PUT /api/assignment/settings`:
+ * Cuatro ajustes de la cuenta sobre `GET/PUT /api/assignment/settings`:
  * el reparto por porcentajes de los leads nuevos, la asignación de
- * conversaciones que se quedan sin asesor (en horas) y la reactivación
- * del bot para el cliente que vuelve (en días).
+ * conversaciones que se quedan sin asesor (en horas), la reactivación
+ * del bot para el cliente que vuelve (en días) y quién recibe siempre las
+ * ventas y permutas (cambio `asesor-ventas-y-permutas`).
  *
  * Contenedor (`AssignmentSettings`: red y estado) separado de la vista
  * (`AssignmentSettingsView`: pura, probada con el catálogo real). Las
@@ -57,6 +65,8 @@ export interface AssignmentSettingsViewProps {
   saving: boolean;
   /** Fecha ya formateada en que se activó la regla de horas. */
   staleActiveSince: string | null;
+  /** Candidatos a asesor de ventas y permutas: owner, admin y agent. */
+  members: { user_id: string; full_name: string; role: string }[];
   onRetry: () => void;
   onPercentChange: (userId: string, value: string) => void;
   onEvenSplit: () => void;
@@ -65,6 +75,8 @@ export interface AssignmentSettingsViewProps {
   onStaleHoursChange: (value: string) => void;
   onReactivateToggle: (on: boolean) => void;
   onReactivateDaysChange: (value: string) => void;
+  /** '' = nadie (orden normal). */
+  onTradeInChange: (userId: string) => void;
   onSave: () => void;
 }
 
@@ -77,8 +89,14 @@ const IDS = {
   reactivateDays: 'assignment-reactivate-days',
   reactivateHelp: 'assignment-reactivate-help',
   reactivateError: 'assignment-reactivate-error',
+  tradeIn: 'assignment-trade-in',
+  tradeInHelp: 'assignment-trade-in-help',
+  tradeInError: 'assignment-trade-in-error',
   generalError: 'assignment-general-error',
 } as const;
+
+/** Valor del Select para "nadie": Base UI no admite un item con ''. */
+const NADIE = '__none';
 
 /** Mensaje de error bajo un campo. `role="alert"` solo para el del
  *  servidor (llega una vez, tras guardar); el de validación local cambia
@@ -228,6 +246,7 @@ function RuleRow({
 
 export function AssignmentSettingsView(props: AssignmentSettingsViewProps) {
   const t = useTranslations('Settings.assignment.ui');
+  const tRoles = useTranslations('Settings.roles');
   const { status, canEdit, form, errors, serverError, dirty, saving } = props;
 
   const head = <SettingsPanelHead title={t('title')} description={t('description')} />;
@@ -279,6 +298,16 @@ export function AssignmentSettingsView(props: AssignmentSettingsViewProps) {
   const staleError = serverMsg('stale') ?? (errors.stale ? t(`validation.${errors.stale}`) : null);
   const reactivateError =
     serverMsg('reactivate') ?? (errors.reactivate ? t(`validation.${errors.reactivate}`) : null);
+  const tradeInError = serverMsg('tradeIn');
+
+  // Lo guardado puede ser alguien que ya dejó la cuenta: se muestra así
+  // para que el admin lo cambie, y la base ya lo ignora.
+  const tradeInMember = props.members.find((m) => m.user_id === form.tradeInAgentId);
+  const tradeInLabel = !form.tradeInAgentId
+    ? t('tradeIn.none')
+    : tradeInMember
+      ? tradeInMember.full_name.trim() || t('weights.unnamed')
+      : t('tradeIn.notMember');
 
   const sum = sumPercents(form.weights);
   const sumText =
@@ -483,6 +512,41 @@ export function AssignmentSettingsView(props: AssignmentSettingsViewProps) {
             disabled={saving}
           />
         </SectionCard>
+
+        {/* 4. Ventas y permutas: siempre a una persona */}
+        <SectionCard icon={<ArrowLeftRight />} title={t('tradeIn.title')} titleId="assignment-trade-in-title">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <label htmlFor={IDS.tradeIn} className="text-sm font-medium text-foreground">
+              {t('tradeIn.label')}
+            </label>
+            <Select
+              value={form.tradeInAgentId || NADIE}
+              onValueChange={(v) => props.onTradeInChange(!v || v === NADIE ? '' : String(v))}
+              disabled={saving}
+            >
+              <SelectTrigger
+                id={IDS.tradeIn}
+                className="w-full sm:w-64"
+                aria-describedby={tradeInError ? `${IDS.tradeInHelp} ${IDS.tradeInError}` : IDS.tradeInHelp}
+                aria-invalid={tradeInError ? true : undefined}
+              >
+                <SelectValue>{tradeInLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NADIE}>{t('tradeIn.none')}</SelectItem>
+                {props.members.map((m) => (
+                  <SelectItem key={m.user_id} value={m.user_id}>
+                    {`${m.full_name.trim() || t('weights.unnamed')} · ${tRoles(m.role)}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <p id={IDS.tradeInHelp} className="text-sm text-muted-foreground">
+            {t('tradeIn.help')}
+          </p>
+          <FieldError id={IDS.tradeInError} message={tradeInError} assertive={!!tradeInError} />
+        </SectionCard>
       </div>
 
       {/* Barra de guardado pegada al borde inferior del área que se
@@ -615,6 +679,7 @@ export function AssignmentSettings() {
       dirty={dirty}
       saving={saving}
       staleActiveSince={staleActiveSince}
+      members={saved?.members ?? []}
       onRetry={() => void load()}
       onPercentChange={(userId, value) =>
         edit((f) => ({
@@ -655,6 +720,7 @@ export function AssignmentSettings() {
         }))
       }
       onReactivateDaysChange={(v) => edit((f) => ({ ...f, reactivateDays: v }))}
+      onTradeInChange={(userId) => edit((f) => ({ ...f, tradeInAgentId: userId }))}
       onSave={() => void save()}
     />
   );

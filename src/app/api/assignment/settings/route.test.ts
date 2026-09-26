@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   settings: null as Record<string, unknown> | null,
   weights: [] as { user_id: string; percent: number }[],
   profiles: [] as { user_id: string; full_name: string; account_role: string }[],
+  /** Filtros `.in()` que recibió la consulta de perfiles del PUT. */
+  inFilters: [] as { col: string; values: unknown[] }[],
   upserts: [] as Record<string, unknown>[],
   rpcCalls: [] as { fn: string; args: Record<string, unknown> }[],
   rpcError: null as { code?: string; message: string } | null,
@@ -29,8 +31,11 @@ function cliente() {
       const datos = () => {
         if (table === 'assignment_weights') return mocks.weights
         if (table === 'profiles') {
+          const roles = filtros.account_role_in as string[] | undefined
           return mocks.profiles.filter(
-            (p) => !filtros.account_role || p.account_role === filtros.account_role,
+            (p) =>
+              (!filtros.account_role || p.account_role === filtros.account_role) &&
+              (!roles || roles.includes(p.account_role)),
           )
         }
         return []
@@ -39,6 +44,11 @@ function cliente() {
         select: () => chain,
         eq: (col: string, v: unknown) => {
           filtros[col] = v
+          return chain
+        },
+        in: (col: string, values: unknown[]) => {
+          mocks.inFilters.push({ col, values })
+          filtros[`${col}_in`] = values
           return chain
         },
         order: () => chain,
@@ -77,7 +87,9 @@ beforeEach(() => {
     { user_id: 'u-ange', full_name: 'Angélica', account_role: 'admin' },
     { user_id: 'u-juan', full_name: 'Juan', account_role: 'agent' },
     { user_id: 'u-brayan', full_name: 'Brayan', account_role: 'agent' },
+    { user_id: 'u-dani', full_name: 'Dani', account_role: 'viewer' },
   ]
+  mocks.inFilters = []
   mocks.upserts = []
   mocks.rpcCalls = []
   mocks.rpcError = null
@@ -102,11 +114,25 @@ describe('GET /api/assignment/settings', () => {
       stale_assign_enabled_at: null,
       bot_reactivate_after_days: 7,
       weights: [],
+      trade_in_agent_id: null,
       agents: [
         { user_id: 'u-juan', full_name: 'Juan' },
         { user_id: 'u-brayan', full_name: 'Brayan' },
       ],
     })
+  })
+
+  // Angélica es admin: la lista para ventas y permutas no puede ser
+  // la de agents. Un viewer no atiende clientes.
+  it('devuelve el asesor de ventas y permutas y los miembros vigentes', async () => {
+    mocks.settings = { trade_in_agent_id: 'u-ange' }
+    const body = await (await GET()).json()
+    expect(body.trade_in_agent_id).toBe('u-ange')
+    expect(body.members).toEqual([
+      { user_id: 'u-ange', full_name: 'Angélica', role: 'admin' },
+      { user_id: 'u-juan', full_name: 'Juan', role: 'agent' },
+      { user_id: 'u-brayan', full_name: 'Brayan', role: 'agent' },
+    ])
   })
 
   it('marca como no elegible a quien ya no es agent', async () => {
@@ -175,6 +201,27 @@ describe('PUT /api/assignment/settings', () => {
     expect(mocks.upserts).toEqual([
       { account_id: 'acct-1', stale_assign_after_hours: 3, bot_reactivate_after_days: null },
     ])
+  })
+
+  it('guarda a una admin como asesora de ventas y permutas', async () => {
+    const res = await put({ trade_in_agent_id: 'u-ange' })
+    expect(res.status).toBe(200)
+    expect(mocks.upserts).toEqual([{ account_id: 'acct-1', trade_in_agent_id: 'u-ange' }])
+  })
+
+  it('null desactiva el asesor de ventas y permutas', async () => {
+    const res = await put({ trade_in_agent_id: null })
+    expect(res.status).toBe(200)
+    expect(mocks.upserts).toEqual([{ account_id: 'acct-1', trade_in_agent_id: null }])
+  })
+
+  it('un viewer o alguien de otra cuenta es 400 trade_in_agent_invalid', async () => {
+    for (const id of ['u-dani', 'u-ajeno']) {
+      const res = await put({ trade_in_agent_id: id })
+      expect(res.status).toBe(400)
+      expect(await res.json()).toMatchObject({ code: 'trade_in_agent_invalid' })
+    }
+    expect(mocks.upserts).toEqual([])
   })
 
   it('horas inválidas son 400 con su código', async () => {
