@@ -32,6 +32,16 @@ describe('SECTION_META', () => {
 });
 
 describe('canAccessSection', () => {
+  it('reserva la plantilla de publicaciones a admin y owner', () => {
+    // Cambia el texto de todo lo que se publica en las redes del
+    // negocio, y el PATCH de /api/account ya exige admin.
+    expect(SECTION_META['social-posts'].group).toBe('workspace');
+    expect(canAccessSection('social-posts', 'admin')).toBe(true);
+    expect(canAccessSection('social-posts', 'agent')).toBe(false);
+    expect(resolveSection('social-posts', 'admin')).toBe('social-posts');
+    expect(resolveSection('social-posts', 'agent')).toBe('profile');
+  });
+
   it('deja a cada rol entrar a sus propias secciones de cuenta', () => {
     for (const role of ACCOUNT_ROLES) {
       for (const section of ACCOUNT_GROUP_SECTIONS) {

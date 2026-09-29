@@ -160,7 +160,11 @@ beforeEach(() => {
   adminClient.supabaseAdmin.mockImplementation(() => fakeAdmin());
   // El traductor devuelve la clave: acá no se prueba el texto, se
   // prueba a cuántas redes y con qué filtros se encola.
-  intlMod.getTranslations.mockResolvedValue((key: string) => key);
+  intlMod.getTranslations.mockResolvedValue(
+    Object.assign((key: string) => key, {
+      raw: () => '{marca} {modelo}\nPRECIO: {precio}',
+    })
+  );
   networksMod.allNetworks.mockReturnValue([IG, FB]);
   networksMod.networkAdapter.mockImplementation((n: string) =>
     n === 'facebook' ? FB : n === 'instagram' ? IG : undefined

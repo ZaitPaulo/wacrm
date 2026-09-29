@@ -14,6 +14,10 @@
 import { NextResponse } from "next/server";
 
 import { parseHorario } from "@/lib/outbound/business-hours";
+import {
+  MAX_TEMPLATE_LENGTH,
+  unknownTemplateVariables,
+} from "@/lib/social/caption";
 
 import {
   requireRole,
@@ -34,7 +38,7 @@ export async function GET() {
     const { data: extra } = await ctx.supabase
       .from("accounts")
       .select(
-        "showcase_enabled, public_whatsapp, public_brand_color, public_name, public_logo_url, public_address, public_phone, public_email, public_hours, quiet_hours_enabled, business_hours, holiday_calendar",
+        "showcase_enabled, public_whatsapp, public_brand_color, public_name, public_logo_url, public_address, public_phone, public_email, public_hours, quiet_hours_enabled, business_hours, holiday_calendar, social_post_template",
       )
       .eq("id", ctx.accountId)
       .maybeSingle();
@@ -57,6 +61,9 @@ export async function GET() {
         quiet_hours_enabled: extra?.quiet_hours_enabled ?? false,
         business_hours: extra?.business_hours ?? {},
         holiday_calendar: extra?.holiday_calendar ?? null,
+        // Plantilla del texto de las publicaciones (migracion 545).
+        // Null = la de defecto del catalogo.
+        social_post_template: extra?.social_post_template ?? null,
       },
       role: ctx.role,
     });
@@ -232,6 +239,46 @@ export async function PATCH(request: Request) {
         );
       }
       update.holiday_calendar = raw;
+    }
+
+    // ============================================================
+    // Plantilla de las publicaciones en redes.
+    //
+    // Se valida el catalogo de variables ACA, al guardar: una variable
+    // mal escrita que pasara saldria tal cual en el feed del cliente
+    // (`{precio_garantia}`) en cada borrador que se armara despues.
+    // Vacia = volver a la plantilla por defecto.
+    // ============================================================
+    if (body.social_post_template !== undefined) {
+      const raw = body.social_post_template;
+      if (raw !== null && typeof raw !== "string") {
+        return NextResponse.json(
+          { error: "'social_post_template' must be a string or null" },
+          { status: 400 },
+        );
+      }
+      const template = raw?.trim() ? raw.split(/\r?\n/).join("\n") : null;
+      if (template && template.length > MAX_TEMPLATE_LENGTH) {
+        return NextResponse.json(
+          {
+            error: `La plantilla no puede superar los ${MAX_TEMPLATE_LENGTH} caracteres`,
+          },
+          { status: 400 },
+        );
+      }
+      const unknown = template ? unknownTemplateVariables(template) : [];
+      if (unknown.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Variable no válida en la plantilla: ${unknown
+              .map((v) => `{${v}}`)
+              .join(", ")}`,
+            unknown_variables: unknown,
+          },
+          { status: 400 },
+        );
+      }
+      update.social_post_template = template;
     }
 
     if (Object.keys(update).length === 0) {

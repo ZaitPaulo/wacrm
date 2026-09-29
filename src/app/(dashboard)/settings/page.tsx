@@ -14,6 +14,7 @@ import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
 import { InstagramConfig } from '@/components/settings/instagram-config';
 import { FacebookConfig } from '@/components/settings/facebook-config';
+import { SocialPostSettings } from '@/components/settings/social-post-settings';
 import { TemplateManager } from '@/components/settings/template-manager';
 import { QuickRepliesManager } from '@/components/settings/quick-replies-manager';
 import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel';
@@ -102,6 +103,7 @@ function SettingsPageInner() {
     whatsapp: <WhatsAppConfig />,
     instagram: <InstagramConfig />,
     facebook: <FacebookConfig />,
+    'social-posts': <SocialPostSettings />,
     templates: <TemplateManager />,
     'quick-replies': <QuickRepliesManager />,
     fields: <FieldsAndTagsPanel />,

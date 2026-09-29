@@ -10,11 +10,12 @@
 // que pide una persona desde la pantalla de revisión, y una cuenta sin
 // IA configurada tiene la cola igual de funcional.
 //
-// EL FORMATO NO ES NUESTRO. Calca el que el negocio ya venía publicando
-// a mano —mayúsculas, una línea por dato, SOAT y tecnomecánica, los dos
-// precios y el cierre comercial—, porque su feed es suyo y una
-// publicación que se ve distinta a las de al lado se lee como ajena.
-// Cambiarlo "para que quede más prolijo" es romperlo.
+// EL FORMATO NO ES NUESTRO: lo define el negocio en una PLANTILLA que
+// edita desde Ajustes → Publicaciones (`accounts.social_post_template`,
+// migración 545). La de defecto vive en el catálogo
+// (`SocialPost.defaultTemplate`) y calca lo que el negocio publica a
+// mano. Este archivo solo sabe interpretarla: qué vale cada variable y
+// cuándo una línea no tiene nada que decir.
 // ============================================================
 
 import { formatNumber, formatPrice } from '@/lib/showcase/format';
@@ -62,6 +63,12 @@ export interface AccountForCaption {
   public_whatsapp: string | null;
   public_phone: string | null;
   public_email: string | null;
+  /**
+   * Plantilla propia de la cuenta. Nula o vacía = `defaultTemplate`.
+   * Opcional para que un llamador que no la lee (tests, vista previa
+   * sin guardar) no tenga que inventarla.
+   */
+  social_post_template?: string | null;
 }
 
 /** Traductor del namespace de la publicación, ya acotado por el llamador. */
@@ -72,77 +79,138 @@ export interface BuildCaptionArgs {
   account: AccountForCaption;
   /** Namespace de la publicación (`SocialPost`). */
   t: Translator;
+  /**
+   * La plantilla por defecto, CRUDA (`t.raw('defaultTemplate')`).
+   *
+   * No se pide por `t` porque el catálogo de next-intl es ICU: un
+   * `{marca}` en el mensaje se leería como un argumento sin valor y
+   * rompería el formateo. La plantilla se interpreta acá, no allá.
+   */
+  defaultTemplate: string;
 }
 
 /**
- * Arma el texto propuesto.
+ * Las variables que una plantilla puede citar, y ninguna más.
  *
- * Los datos ausentes SE OMITEN, no se rellenan: una línea
- * "Kilometraje: —" en el feed del cliente se lee como descuido, no como
- * información faltante. La ÚNICA excepción son el SOAT y la
- * tecnomecánica, que se escriben "NA" cuando faltan porque así los
- * publica el negocio: ahí el vacío es la respuesta, no un olvido, y
- * omitir la línea haría dudar al comprador en vez de informarlo.
+ * Catálogo CERRADO por la misma razón que `VehicleForCaption` es
+ * explícita: lo que no está acá no puede llegar al feed. Y lo usa el
+ * validador de `/api/account` para rechazar una variable mal escrita al
+ * guardar, en vez de publicarla tal cual como `{precio_garantia}`.
+ */
+export const CAPTION_VARIABLES = [
+  'marca',
+  'modelo',
+  'año',
+  'kilometraje',
+  'transmision',
+  'motor',
+  'ciudad_placa',
+  'soat',
+  'tecno',
+  'precio',
+  'precio_sin_garantia',
+  'direccion',
+  'contacto',
+  'nombre',
+] as const;
+
+export type CaptionVariable = (typeof CAPTION_VARIABLES)[number];
+
+/** Nombres alternativos que se aceptan: la ñ no siempre sale del teclado. */
+const ALIASES: Record<string, CaptionVariable> = { anio: 'año' };
+
+/** Largo máximo de una plantilla propia. Instagram corta en 2200. */
+export const MAX_TEMPLATE_LENGTH = 2000;
+
+const VARIABLE_RE = /\{([^{}\s]+)\}/g;
+
+function canonical(name: string): CaptionVariable | null {
+  if ((CAPTION_VARIABLES as readonly string[]).includes(name)) {
+    return name as CaptionVariable;
+  }
+  return ALIASES[name] ?? null;
+}
+
+/** Las variables de la plantilla que no existen, sin repetir. */
+export function unknownTemplateVariables(template: string): string[] {
+  const unknown = new Set<string>();
+  for (const [, name] of template.matchAll(VARIABLE_RE)) {
+    if (!canonical(name)) unknown.add(name);
+  }
+  return [...unknown];
+}
+
+/**
+ * Arma el texto propuesto a partir de la plantilla de la cuenta.
+ *
+ * La plantilla se lee LÍNEA POR LÍNEA: si alguna variable de una línea
+ * no tiene dato, la línea entera no sale. Así "PLACAS DE {ciudad_placa}"
+ * desaparece cuando no hay ciudad, sin pedirle a quien edita una
+ * sintaxis de condicionales: una línea "Kilometraje: —" en el feed del
+ * cliente se lee como descuido, no como información faltante. Las
+ * líneas sin variables salen siempre, tal cual.
+ *
+ * `{soat}` y `{tecno}` NUNCA quedan vacías: valen "NA" cuando falta la
+ * fecha, porque así lo publica el negocio —ahí el vacío es la
+ * respuesta, no un olvido—. `{contacto}` tampoco: sin canales cae a la
+ * invitación genérica.
  */
 export function buildVehicleCaption(args: BuildCaptionArgs): string {
-  const { vehicle: v, account, t } = args;
+  const { account, defaultTemplate } = args;
+  const values = captionValues(args);
+
+  const template = account.social_post_template?.trim()
+    ? account.social_post_template
+    : defaultTemplate;
 
   const lines: string[] = [];
-
-  // Encabezado: marca y línea, sin el año, que va en su propio renglón
-  // debajo — es como se lee de un vistazo en el feed.
-  lines.push(t('title', { vehicle: `${v.brand} ${v.model}` }));
-  lines.push(t('modelYear', { value: String(v.year) }));
-
-  if (v.mileage != null) {
-    lines.push(t('mileage', { value: formatNumber(v.mileage) }));
+  for (const line of template.split(/\r?\n/)) {
+    let missing = false;
+    const rendered = line.replace(VARIABLE_RE, (whole, name: string) => {
+      const key = canonical(name);
+      // Una variable desconocida se deja tal cual: el validador ya no
+      // deja guardarla, y si llegara igual es mejor verla en la cola
+      // que perder la línea en silencio.
+      if (!key) return whole;
+      const value = values[key];
+      if (!value) missing = true;
+      return value;
+    });
+    if (!missing) lines.push(rendered.trimEnd());
   }
-
-  // `other` no se traduce a nada que informe, así que no ocupa línea.
-  if (v.transmission && v.transmission !== 'other') {
-    lines.push(t(`transmission.${v.transmission}`));
-  }
-
-  if (v.engine_displacement) {
-    lines.push(t('engine', { value: v.engine_displacement }));
-  }
-
-  // De la ciudad de matrícula dependen los impuestos y el costo del
-  // traspaso: es de las primeras preguntas de cualquier comprador.
-  if (v.plate_city) {
-    lines.push(t('plateCity', { value: v.plate_city }));
-  }
-
-  lines.push(t('soat', { value: formatDocDate(v.soat_expires_at, t) }));
-  lines.push(
-    t('tecno', { value: formatDocDate(v.tecnomecanica_expires_at, t) })
-  );
-
-  lines.push(
-    t('salePrice', { value: formatPrice(v.price, account.default_currency) })
-  );
-  if (v.warranty_price != null) {
-    lines.push(
-      t('warrantyPrice', {
-        value: formatPrice(v.warranty_price, account.default_currency),
-      })
-    );
-  }
-
-  // Cierre comercial: lo mismo en toda publicación, y por eso vive en el
-  // catálogo y no acá.
-  lines.push(t('separator'));
-  lines.push(t('financing'));
-  if (account.public_address) {
-    lines.push(account.public_address);
-  }
-  lines.push(t('cta'));
-  lines.push(buildContactLine(account, t));
-
-  const tail = [t('hashtags'), account.public_name].filter(Boolean).join(' ');
-  lines.push(tail);
 
   return lines.join('\n').trim();
+}
+
+/** Lo que vale cada variable para este vehículo. `''` = sin dato. */
+function captionValues(
+  args: BuildCaptionArgs
+): Record<CaptionVariable, string> {
+  const { vehicle: v, account, t } = args;
+  const currency = account.default_currency;
+  return {
+    marca: v.brand,
+    modelo: v.model,
+    año: String(v.year),
+    kilometraje: v.mileage != null ? formatNumber(v.mileage) : '',
+    // `other` no se traduce a nada que informe, así que no ocupa línea.
+    transmision:
+      v.transmission && v.transmission !== 'other'
+        ? t(`transmission.${v.transmission}`)
+        : '',
+    motor: v.engine_displacement ?? '',
+    // Ciudad de matrícula: de ella dependen impuestos y traspaso.
+    ciudad_placa: v.plate_city ?? '',
+    soat: formatDocDate(v.soat_expires_at, t),
+    tecno: formatDocDate(v.tecnomecanica_expires_at, t),
+    // El negocio publica el precio CON garantía. Sin él cargado se cae
+    // al de venta: un vehículo sin precio en el feed no vende.
+    precio: formatPrice(v.warranty_price ?? v.price, currency),
+    precio_sin_garantia: formatPrice(v.price, currency),
+    direccion: account.public_address ?? '',
+    contacto: buildContactLine(account, t),
+    nombre: account.public_name ?? '',
+  };
 }
 
 /**

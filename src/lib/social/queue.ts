@@ -54,7 +54,7 @@ const VEHICLE_COLUMNS =
 
 const ACCOUNT_COLUMNS =
   'default_currency, public_name, public_address, public_whatsapp, ' +
-  'public_phone, public_email';
+  'public_phone, public_email, social_post_template';
 
 interface VehicleRow extends VehicleForCaption {
   id: string;
@@ -120,6 +120,9 @@ export async function syncVehiclePost(
 
   const t = await getTranslations('SocialPost');
   const translate: Translator = (key, values) => t(key, values);
+  // Cruda: la plantilla trae `{marca}` y compañía, que el formateo ICU
+  // de next-intl leería como argumentos. Se interpreta en caption.ts.
+  const defaultTemplate = t.raw('defaultTemplate') as string;
 
   let firstError: unknown = null;
 
@@ -136,6 +139,7 @@ export async function syncVehiclePost(
         network: adapter.network,
         limits: adapter.limits,
         t: translate,
+        defaultTemplate,
       });
     } catch (err) {
       // Se registra y se sigue con la red siguiente. El primero se
@@ -166,9 +170,19 @@ async function syncNetworkPost(args: {
   network: SocialNetwork;
   limits: NetworkLimits;
   t: Translator;
+  defaultTemplate: string;
 }): Promise<void> {
-  const { admin, accountId, vehicleId, vehicle, account, network, limits, t } =
-    args;
+  const {
+    admin,
+    accountId,
+    vehicleId,
+    vehicle,
+    account,
+    network,
+    limits,
+    t,
+    defaultTemplate,
+  } = args;
 
   const composed = composeVehiclePost({
     vehicle,
@@ -176,6 +190,7 @@ async function syncNetworkPost(args: {
     images: vehicle.images,
     limits,
     t,
+    defaultTemplate,
   });
 
   // Sin imágenes no hay nada que publicar. Si además había un pendiente
@@ -341,6 +356,7 @@ export async function refreshPendingCaptions(accountId: string): Promise<void> {
 
   const byId = new Map((vehicles ?? []).map((v) => [v.id, v]));
   const t = await getTranslations('SocialPost');
+  const defaultTemplate = t.raw('defaultTemplate') as string;
 
   // El texto de un vehículo no depende de la red, así que armarlo una
   // vez por vehículo evita repetir el trabajo cuando el mismo auto
@@ -359,6 +375,7 @@ export async function refreshPendingCaptions(accountId: string): Promise<void> {
         vehicle,
         account,
         t: (key, values) => t(key, values),
+        defaultTemplate,
       });
       captions.set(post.vehicle_id, caption);
     }

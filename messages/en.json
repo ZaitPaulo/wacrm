@@ -1970,7 +1970,8 @@
       "facebook": "Facebook",
       "showcase": "Public showcase",
       "business-hours": "Business hours",
-      "assignment": "Agent assignment"
+      "assignment": "Agent assignment",
+      "social-posts": "Social posts"
     },
     "groups": {
       "account": "Account",
@@ -2394,6 +2395,38 @@
         "aiConfigHint": "Which agent the bot hands each conversation to is set in Settings → Agent assignment.",
         "aiConfigHintLink": "Go to Agent assignment"
       }
+    },
+    "socialPosts": {
+      "title": "Social post text",
+      "description": "Template used to propose the text of each vehicle on Facebook and Instagram. A line that uses a value the vehicle does not have is left out.",
+      "template": "Template",
+      "variables": "Available variables",
+      "variablesHint": "Tap a variable to insert it at the cursor.",
+      "preview": "Preview",
+      "previewWith": "With {vehicle}",
+      "previewEmpty": "No available vehicles to preview.",
+      "usingDefault": "You are using the default template.",
+      "restore": "Restore default template",
+      "save": "Save",
+      "saved": "Template saved. Unedited drafts refresh when the queue is opened.",
+      "saveFailed": "Could not save the template",
+      "restored": "Default template restored.",
+      "vars": {
+        "marca": "Make",
+        "modelo": "Model",
+        "año": "Model year",
+        "kilometraje": "Mileage",
+        "transmision": "Transmission",
+        "motor": "Engine",
+        "ciudad_placa": "Registration city",
+        "soat": "Insurance expiry (or NA)",
+        "tecno": "Inspection expiry (or NA)",
+        "precio": "Price with warranty (or sale price)",
+        "precio_sin_garantia": "Sale price without warranty",
+        "direccion": "Business address",
+        "contacto": "Business contact channel",
+        "nombre": "Business name"
+      }
     }
   },
   "Inventory": {
@@ -2557,28 +2590,16 @@
     }
   },
   "SocialPost": {
-    "title": "{vehicle} 🚗",
-    "modelYear": "MODEL {value}",
-    "mileage": "{value} KM",
     "transmission": {
       "manual": "MANUAL",
       "automatic": "AUTOMATIC",
       "cvt": "AUTOMATIC (CVT)"
     },
-    "engine": "ENGINE {value}",
-    "plateCity": "REGISTERED IN {value}",
-    "soat": "🚩 INSURANCE: {value}",
-    "tecno": "🚩 INSPECTION: {value}",
     "notAvailable": "NA",
     "monthsShort": "JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC",
-    "salePrice": "PRICE: {value}",
-    "warrantyPrice": "PRICE WITH WARRANTY: {value}",
-    "separator": "..................................................",
-    "financing": "UP TO 100% ✅FINANCING AVAILABLE!",
-    "cta": "Book your visit today. GET IN TOUCH...",
     "contact": "📞 {channel}",
     "contactGeneric": "Message us for more information",
-    "hashtags": "#CarsForSale #UsedCars #CarDealership"
+    "defaultTemplate": "{marca} {modelo} 🚘\nMODEL {año}\n{kilometraje} KM\n{transmision}\nENGINE {motor}\nREGISTERED IN {ciudad_placa}\n🚩 INSURANCE: {soat}\n🚩 INSPECTION: {tecno}\nPRICE:  {precio}\n12-MONTH WARRANTY INCLUDED\n..................................................\nUP TO 100% ✅FINANCING AVAILABLE!\n{direccion}\nBook your visit today. GET IN TOUCH...\n{contacto}\n#CarsForSale #UsedCars #CarDealership\n{nombre}"
   },
   "Documents": {
     "title": "Documents",
