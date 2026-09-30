@@ -96,7 +96,9 @@ export async function POST(request: Request) {
       textMessages.length > 0
         ? retrieveKnowledge(supabase, accountId, config, latestUserMessage(textMessages))
         : Promise.resolve<string[]>([]),
-      buildInventoryIndex(supabase, accountId),
+      buildInventoryIndex(supabase, accountId, {
+        creditMaxAgeYears: config.creditMaxVehicleAgeYears,
+      }),
     ])
 
     // Photos go on before the emptiness check: a photo sent on its own
@@ -119,6 +121,9 @@ export async function POST(request: Request) {
       mode: 'draft',
       knowledge,
       inventory,
+      creditRule: config.creditMaxVehicleAgeYears
+        ? { maxAgeYears: config.creditMaxVehicleAgeYears }
+        : null,
       hasPhotos: messages.some((m) => m.images?.length),
     })
 

@@ -25,6 +25,9 @@ export const ASSIGNMENT_SETTINGS_ERROR_CODES = {
   staleHoursInvalid: 'stale_hours_invalid',
   reactivateDaysInvalid: 'reactivate_days_invalid',
   tradeInAgentInvalid: 'trade_in_agent_invalid',
+  handoffRemindInvalid: 'handoff_remind_invalid',
+  handoffEscalateInvalid: 'handoff_escalate_invalid',
+  handoffOrderInvalid: 'handoff_order_invalid',
   saveFailed: 'save_failed',
 } as const
 
@@ -45,6 +48,11 @@ export interface AssignmentSettingsInput {
   /** El asesor que recibe los traspasos por venta o permuta de clientes
    *  que aún no tienen asesor (migraciones 543-544). `null` = desactivado. */
   trade_in_agent_id?: string | null
+  /** Minutos de horario hasta recordarle al asesor un traspaso sin
+   *  atender; null apaga (migración 546). */
+  handoff_remind_after_minutes?: number | null
+  /** Minutos de horario hasta avisar a owner/admin; null apaga. */
+  handoff_escalate_after_minutes?: number | null
 }
 
 export type ParseResult =
@@ -56,6 +64,8 @@ export type ParseResult =
 const MAX_HORAS = 720
 /** Reactivación del bot: de 1 a 365 días. */
 const MAX_DIAS = 365
+/** Un día entero de minutos: el mismo tope que el CHECK de la 546. */
+const MAX_MINUTOS = 1440
 
 function enteroEnRango(v: unknown, max: number): v is number | null {
   return v === null || (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= max)
@@ -129,6 +139,28 @@ export function parseAssignmentSettingsInput(
       return { ok: false, code: C.tradeInAgentInvalid }
     }
     value.trade_in_agent_id = v
+  }
+
+  if ('handoff_remind_after_minutes' in b) {
+    if (!enteroEnRango(b.handoff_remind_after_minutes, MAX_MINUTOS)) {
+      return { ok: false, code: C.handoffRemindInvalid }
+    }
+    value.handoff_remind_after_minutes = b.handoff_remind_after_minutes
+  }
+
+  if ('handoff_escalate_after_minutes' in b) {
+    if (!enteroEnRango(b.handoff_escalate_after_minutes, MAX_MINUTOS)) {
+      return { ok: false, code: C.handoffEscalateInvalid }
+    }
+    value.handoff_escalate_after_minutes = b.handoff_escalate_after_minutes
+  }
+
+  // Con los dos en el cuerpo se valida aquí; con uno solo lo ataja el
+  // CHECK de la base (la ruta traduce el 23514 al mismo código).
+  const recordar = value.handoff_remind_after_minutes
+  const escalar = value.handoff_escalate_after_minutes
+  if (recordar != null && escalar != null && escalar <= recordar) {
+    return { ok: false, code: C.handoffOrderInvalid }
   }
 
   // `stale_assign_enabled_at` no se acepta: lo fija la base al activar.

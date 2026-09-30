@@ -40,6 +40,9 @@ import {
  */
 
 const DEFAULT_REACTIVATE_DAYS = 7
+/** Los plazos de traspasos sin atender sin fila de ajustes (546). */
+const DEFAULT_HANDOFF_REMIND_MINUTES = 15
+const DEFAULT_HANDOFF_ESCALATE_MINUTES = 45
 
 /** Los roles que `is_active_member` (535) considera vigentes. */
 const MIEMBROS_VIGENTES = ['owner', 'admin', 'agent']
@@ -60,7 +63,7 @@ async function loadSettings(supabase: SupabaseClient, accountId: string) {
     supabase
       .from('assignment_settings')
       .select(
-        'stale_assign_after_hours, stale_assign_enabled_at, bot_reactivate_after_days, weights_updated_at, trade_in_agent_id',
+        'stale_assign_after_hours, stale_assign_enabled_at, bot_reactivate_after_days, weights_updated_at, trade_in_agent_id, handoff_remind_after_minutes, handoff_escalate_after_minutes',
       )
       .eq('account_id', accountId)
       .maybeSingle(),
@@ -82,6 +85,8 @@ async function loadSettings(supabase: SupabaseClient, accountId: string) {
     bot_reactivate_after_days: number | null
     weights_updated_at: string | null
     trade_in_agent_id: string | null
+    handoff_remind_after_minutes: number | null
+    handoff_escalate_after_minutes: number | null
   } | null
 
   return {
@@ -92,6 +97,13 @@ async function loadSettings(supabase: SupabaseClient, accountId: string) {
     bot_reactivate_after_days: s ? s.bot_reactivate_after_days : DEFAULT_REACTIVATE_DAYS,
     weights_updated_at: s?.weights_updated_at ?? null,
     trade_in_agent_id: s?.trade_in_agent_id ?? null,
+    // Sin fila rigen los valores por defecto de la base (546).
+    handoff_remind_after_minutes: s
+      ? s.handoff_remind_after_minutes
+      : DEFAULT_HANDOFF_REMIND_MINUTES,
+    handoff_escalate_after_minutes: s
+      ? s.handoff_escalate_after_minutes
+      : DEFAULT_HANDOFF_ESCALATE_MINUTES,
     weights: ((weightsRes.data ?? []) as { user_id: string; percent: number }[])
       .map((w) => {
         const p = porUsuario.get(w.user_id)
@@ -166,11 +178,22 @@ export async function PUT(request: Request) {
     if ('trade_in_agent_id' in input) {
       dias.trade_in_agent_id = input.trade_in_agent_id
     }
+    if ('handoff_remind_after_minutes' in input) {
+      dias.handoff_remind_after_minutes = input.handoff_remind_after_minutes
+    }
+    if ('handoff_escalate_after_minutes' in input) {
+      dias.handoff_escalate_after_minutes = input.handoff_escalate_after_minutes
+    }
     if (Object.keys(dias).length > 0) {
       const { error } = await supabase
         .from('assignment_settings')
         .upsert({ account_id: accountId, ...dias }, { onConflict: 'account_id' })
       if (error) {
+        // Solo uno de los plazos en el cuerpo, y quedó antes que el otro:
+        // lo ataja el CHECK de orden de la 546.
+        if (error.code === '23514' && error.message?.includes('handoff_order')) {
+          return bad(CODES.handoffOrderInvalid, 'Escalation must come after the reminder')
+        }
         console.error('[assignment/settings] no se pudo guardar la configuración:', error)
         return bad(CODES.saveFailed, 'Failed to save settings', 500)
       }

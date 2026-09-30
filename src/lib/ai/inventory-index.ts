@@ -75,6 +75,33 @@ interface VehicleRow {
 
 const cache = new Map<string, { at: number; value: InventoryIndex | null }>()
 
+export type CreditEligibility = 'si' | 'confirmar' | 'no'
+
+/**
+ * ¿Aplica este vehículo a crédito vehicular? Lora Motors (2026-09-29):
+ * hasta `maxAgeYears` años desde la matrícula. El inventario no guarda la
+ * matrícula, así que se aproxima con el año del modelo, y el año límite
+ * queda "por confirmar": un carro matriculado a mitad de ese año cruza el
+ * tope durante el año en curso. `null` = regla apagada.
+ */
+export function creditEligibility(
+  year: number,
+  maxAgeYears: number | null | undefined,
+  currentYear: number = new Date().getFullYear(),
+): CreditEligibility | null {
+  if (maxAgeYears == null) return null
+  const limite = currentYear - maxAgeYears
+  if (year > limite) return 'si'
+  if (year === limite) return 'confirmar'
+  return 'no'
+}
+
+const CREDIT_LABEL: Record<CreditEligibility, string> = {
+  si: 'crédito vehicular: sí',
+  confirmar: 'crédito vehicular: por confirmar',
+  no: 'crédito vehicular: no',
+}
+
 /** Para los tests, y por si alguna vez hace falta forzar una relectura. */
 export function clearInventoryIndexCache(): void {
   cache.clear()
@@ -89,7 +116,8 @@ function millones(price: number): string {
   return `$${txt}M`
 }
 
-function linea(v: VehicleRow, url: string | null): string {
+function linea(v: VehicleRow, url: string | null, creditMaxAgeYears: number | null): string {
+  const credito = creditEligibility(v.year, creditMaxAgeYears)
   // Los nulos se omiten en vez de imprimirse: una línea con "null" o con
   // separadores vacíos le enseña ruido al modelo.
   const partes = [
@@ -99,6 +127,7 @@ function linea(v: VehicleRow, url: string | null): string {
     v.mileage != null ? `${Math.round(v.mileage / 1000)}k kms` : null,
     v.transmission ? (KB_TRANSMISSION[v.transmission] ?? v.transmission) : null,
     v.body_type ? (KB_BODY[v.body_type] ?? v.body_type) : null,
+    credito ? CREDIT_LABEL[credito] : null,
     // El enlace de la ficha: sin él, el modelo nombraba carros del
     // índice sin poder mandarlo, porque solo lo traían los extractos.
     url,
@@ -117,8 +146,12 @@ function linea(v: VehicleRow, url: string | null): string {
 export async function buildInventoryIndex(
   db: SupabaseClient,
   accountId: string,
+  opts: { creditMaxAgeYears?: number | null } = {},
 ): Promise<InventoryIndex | null> {
-  const hit = cache.get(accountId)
+  const creditMaxAgeYears = opts.creditMaxAgeYears ?? null
+  // La marca de crédito depende del tope: un tope distinto es otro índice.
+  const key = `${accountId}:${creditMaxAgeYears ?? '-'}`
+  const hit = cache.get(key)
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value
 
   const { data, error } = await db
@@ -145,13 +178,13 @@ export async function buildInventoryIndex(
       url: base ? `${base}/vehiculo/${v.id}` : null,
     }))
     value = {
-      text: mostrados.map((v, i) => linea(v, entries[i].url)).join('\n'),
+      text: mostrados.map((v, i) => linea(v, entries[i].url, creditMaxAgeYears)).join('\n'),
       entries,
       total: rows.length,
       truncated: rows.length > INVENTORY_INDEX_LIMIT,
     }
   }
 
-  cache.set(accountId, { at: Date.now(), value })
+  cache.set(key, { at: Date.now(), value })
   return value
 }

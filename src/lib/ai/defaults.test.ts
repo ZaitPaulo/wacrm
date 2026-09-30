@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import {
+  aiProviderRetryDelayMs,
   aiReplyDebounceMs,
   aiVisionDownloadTimeoutMs,
   aiVisionMaxImages,
@@ -88,6 +89,27 @@ describe('aiReplyDebounceMs', () => {
   it('allows 0 to disable the wait', () => {
     vi.stubEnv('AI_REPLY_DEBOUNCE_MS', '0')
     expect(aiReplyDebounceMs()).toBe(0)
+  })
+})
+
+describe('aiProviderRetryDelayMs', () => {
+  it('espera 3000 ms por defecto', () => {
+    vi.stubEnv('AI_PROVIDER_RETRY_DELAY_MS', '')
+    expect(aiProviderRetryDelayMs()).toBe(3000)
+  })
+
+  it('respeta un valor válido, incluido 0', () => {
+    vi.stubEnv('AI_PROVIDER_RETRY_DELAY_MS', '500')
+    expect(aiProviderRetryDelayMs()).toBe(500)
+    vi.stubEnv('AI_PROVIDER_RETRY_DELAY_MS', '0')
+    expect(aiProviderRetryDelayMs()).toBe(0)
+  })
+
+  it('vuelve al valor por defecto con basura o negativos', () => {
+    vi.stubEnv('AI_PROVIDER_RETRY_DELAY_MS', 'abc')
+    expect(aiProviderRetryDelayMs()).toBe(3000)
+    vi.stubEnv('AI_PROVIDER_RETRY_DELAY_MS', '-1')
+    expect(aiProviderRetryDelayMs()).toBe(3000)
   })
 })
 
@@ -270,9 +292,12 @@ describe('buildSystemPrompt — respeta lo que ya dijo el cliente', () => {
     expect(prompt).toContain('Never ask again for something they already said')
   })
 
-  it('prohíbe prometer seguimientos que nadie hace', () => {
+  it('prohíbe prometer avisos automáticos, pero ofrece un asesor que busque', () => {
     const prompt = buildSystemPrompt({ userPrompt: null, mode: 'draft' })
-    expect(prompt).toContain('Do not promise follow-ups')
+    expect(prompt).toContain('Do not promise automatic follow-ups')
+    expect(prompt).toContain('never say the business does not keep contacts')
+    expect(prompt).toContain('motivo=sin_stock')
+    expect(prompt).not.toContain('keeping their contact on file')
   })
 })
 
@@ -287,5 +312,48 @@ describe('buildSystemPrompt — motivos con requisitos propios', () => {
   it('explica cuándo pasar a un asesor porque no hay lo que busca', () => {
     expect(prompt).toContain('motivo=sin_stock')
     expect(prompt).toContain('offer the closest ones first')
+  })
+})
+
+describe('buildSystemPrompt — espera del asesor', () => {
+  const base = { userPrompt: 'Pide nombre y presupuesto.', mode: 'auto_reply' as const }
+
+  it('sin espera: enseña el traspaso y pide el nombre una sola vez', () => {
+    const p = buildSystemPrompt(base)
+    expect(p).toContain('[[HANDOFF')
+    expect(p).toContain("Ask for the customer's name at most once")
+    expect(p).not.toContain('ALREADY HANDED OFF')
+  })
+
+  it('en espera: no enseña el traspaso, nombra al asesor y dice cuándo', () => {
+    const p = buildSystemPrompt({
+      ...base,
+      waiting: { agentName: 'Juan', when: 'Te escribe mañana desde las 8:00 a. m.' },
+    })
+    expect(p).not.toContain('[[HANDOFF nombre=')
+    expect(p).toContain('ALREADY HANDED OFF to an advisor named Juan')
+    expect(p).toContain('Te escribe mañana desde las 8:00 a. m.')
+    expect(p).toContain('[[NO_REPLY]]')
+  })
+
+  it('la sección de espera va después del prompt de la cuenta', () => {
+    const p = buildSystemPrompt({ ...base, waiting: { agentName: null, when: null } })
+    expect(p.indexOf('ALREADY HANDED OFF')).toBeGreaterThan(p.indexOf('Pide nombre y presupuesto.'))
+    expect(p).toContain('to an advisor, who has not written yet')
+  })
+})
+
+describe('buildSystemPrompt — crédito por antigüedad', () => {
+  const inventory = { text: 'X · CHEVROLET AVEO 2013 · $25M · crédito vehicular: no', total: 1, truncated: false }
+
+  it('con regla, explica la columna y prohíbe ofrecer crédito donde dice no', () => {
+    const p = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', inventory, creditRule: { maxAgeYears: 10 } })
+    expect(p).toContain('up to 10 years old since their registration')
+    expect(p).toContain('For "no", never offer vehicle financing')
+  })
+
+  it('sin regla no la menciona', () => {
+    const p = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', inventory })
+    expect(p).not.toContain('since their registration')
   })
 })

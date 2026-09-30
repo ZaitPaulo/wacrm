@@ -403,6 +403,7 @@
       "preview": "Preview",
       "headerValuePlaceholder": "Value for the header variable",
       "bodyValuePlaceholder": "Value for {val}",
+      "placeholderValueHint": "Type the real value, for example the customer's name.",
       "urlSuffixValuePlaceholder": "URL suffix value",
       "finalUrl": "Final URL: {url}",
       "back": "Back",
@@ -433,6 +434,8 @@
     },
     "aiBanner": {
       "pausedTitle": "AI assistant is paused here",
+      "waitingTitle": "The bot is keeping the customer company until you write",
+      "waitingHint": "It answers simple questions (price, photos, address) and does not ask for data. It goes quiet as soon as you send your first message.",
       "activeText": "AI assistant is replying automatically",
       "takeOver": "Take over",
       "resume": "Resume AI",
@@ -2326,7 +2329,10 @@
         "stale_hours_invalid": "Hours without an agent must be a whole number between 1 and 720 (30 days), or empty to turn the rule off.",
         "reactivate_days_invalid": "Days to reactivate the AI must be a whole number between 1 and 365, or empty to turn it off.",
         "save_failed": "The assignment settings could not be saved.",
-        "trade_in_agent_invalid": "The person chosen for sales and trade-ins is no longer a member of the account."
+        "trade_in_agent_invalid": "The person chosen for sales and trade-ins is no longer a member of the account.",
+        "handoff_remind_invalid": "Reminder minutes must be a whole number between 1 and 1440, or empty to turn it off.",
+        "handoff_escalate_invalid": "Admin alert minutes must be a whole number between 1 and 1440, or empty to turn it off.",
+        "handoff_order_invalid": "The admin alert must come after the reminder to the agent."
       },
       "ui": {
         "title": "Agent assignment",
@@ -2371,6 +2377,17 @@
           "help": "If a customer with an agent writes again after that silence, the bot answers first and hands them back to the same agent. Does not apply to admins’ conversations.",
           "off": "Off: the bot never takes back a conversation an agent is handling."
         },
+        "handoff": {
+          "title": "Unattended handoffs",
+          "remindToggle": "Remind the agent",
+          "remindLabel": "Minutes waiting",
+          "escalateToggle": "Alert the admins",
+          "escalateLabel": "Minutes waiting",
+          "unit": "min",
+          "help": "Counts only time within business hours since the bot handed off, while the agent has not written from the inbox. It does not reassign the conversation.",
+          "remindOff": "Off: the agent is not reminded.",
+          "escalateOff": "Off: admins are not alerted."
+        },
         "tradeIn": {
           "title": "Sales and trade-ins",
           "label": "Agent for sales and trade-ins",
@@ -2384,7 +2401,9 @@
           "weightsEmpty": "At least one agent needs a percentage above 0.",
           "ineligible": "Remove anyone who is no longer an agent from the split.",
           "hoursInvalid": "Enter a whole number of hours from 1 to 720.",
-          "daysInvalid": "Enter a whole number of days from 1 to 365."
+          "daysInvalid": "Enter a whole number of days from 1 to 365.",
+          "minutesInvalid": "Enter a whole number of minutes from 1 to 1440.",
+          "handoffOrder": "The admin alert must come after the reminder."
         },
         "save": "Save changes",
         "saving": "Saving…",
@@ -2922,8 +2941,32 @@
     "ogFooter": "Open the link to create your account and accept"
   },
   "Handoff": {
-    "customerNotice": "We have assigned a sales agent to you. They will be in touch very soon. 🙌",
-    "customerNoticeNamed": "One of our advisors will get in touch with you. Their name is {name}."
+    "customerNotice": "We have assigned a sales agent who will get in touch with you. 🙌",
+    "customerNoticeNamed": "One of our advisors will get in touch with you. Their name is {name}.",
+    "whenSoon": "They will message you within the next few minutes.",
+    "whenToday": "They will message you today from {time}.",
+    "whenTomorrow": "They will message you tomorrow from {time}.",
+    "whenWeekday": "They will message you on {day} from {time}.",
+    "weekdays": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    }
+  },
+  "HandoffSla": {
+    "reminderTitle": "Customer waiting: {client}",
+    "reminderBody": "Waiting {minutes} min for your first message since the bot handed off.",
+    "unattendedTitle": "{agent} has not attended {client}",
+    "unattendedTitleNoAgent": "Handoff with no agent: {client}",
+    "unattendedBody": "Waiting {minutes} min since the bot handed off.",
+    "unknownClient": "a customer"
+  },
+  "AiReply": {
+    "safeFallback": "Sorry, I mixed up a message. Tell me what vehicle you are looking for or your budget and I will show you some options."
   },
   "SocialQueue": {
     "pageTitle": "Publishing queue",

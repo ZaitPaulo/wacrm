@@ -202,6 +202,11 @@ export interface Conversation {
    *    re-enabled on the thread.
    */
   ai_autoreply_disabled?: boolean;
+  /** Desde cuándo el hilo espera el primer mensaje del asesor tras un
+   *  traspaso del bot; mientras tanto el bot acompaña (migración 546). */
+  ai_waiting_agent_since?: string | null;
+  handoff_reminded_at?: string | null;
+  handoff_escalated_at?: string | null;
   ai_reply_count?: number;
   ai_handoff_summary?: string | null;
   ai_handoff_attempts?: number;
@@ -211,7 +216,13 @@ export interface Conversation {
 // Notifications (migration 027)
 // ============================================================
 
-export type NotificationType = 'conversation_assigned' | 'new_message';
+export type NotificationType =
+  | 'conversation_assigned'
+  | 'new_message'
+  // Traspaso del bot sin atender (migración 546): recordatorio al asesor
+  // y aviso a owner/admin.
+  | 'handoff_reminder'
+  | 'handoff_unattended';
 
 export interface Notification {
   id: string;

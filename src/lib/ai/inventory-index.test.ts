@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import {
   buildInventoryIndex,
   clearInventoryIndexCache,
+  creditEligibility,
   INVENTORY_INDEX_LIMIT,
 } from './inventory-index'
 
@@ -186,6 +187,50 @@ describe('buildInventoryIndex — caché', () => {
     await buildInventoryIndex(db([vehiculo()]), 'acct-1')
     vi.advanceTimersByTime(61_000)
     await buildInventoryIndex(db([vehiculo()]), 'acct-1')
+    expect(consultas).toBe(2)
+  })
+})
+
+describe('creditEligibility', () => {
+  it('10 años en 2026: 2017 sí, 2016 por confirmar, 2015 no', () => {
+    expect(creditEligibility(2023, 10, 2026)).toBe('si')
+    expect(creditEligibility(2017, 10, 2026)).toBe('si')
+    expect(creditEligibility(2016, 10, 2026)).toBe('confirmar')
+    expect(creditEligibility(2013, 10, 2026)).toBe('no')
+  })
+
+  it('sin regla no clasifica', () => {
+    expect(creditEligibility(2013, null, 2026)).toBeNull()
+    expect(creditEligibility(2013, undefined, 2026)).toBeNull()
+  })
+})
+
+describe('buildInventoryIndex — crédito vehicular', () => {
+  it('marca cada línea con la aptitud cuando hay regla', async () => {
+    vi.useFakeTimers({ now: new Date('2026-09-29T10:00:00'), toFake: ['Date'] })
+    const idx = await buildInventoryIndex(
+      db([
+        vehiculo({ id: 'a', year: 2013, model: 'AVEO', brand: 'CHEVROLET' }),
+        vehiculo({ id: 'b', year: 2016, model: 'DUSTER', brand: 'RENAULT' }),
+        vehiculo({ id: 'c', year: 2023, model: 'PICANTO', brand: 'KIA' }),
+      ]),
+      'acct-1',
+      { creditMaxAgeYears: 10 },
+    )
+    const lineas = idx?.text.split('\n') ?? []
+    expect(lineas[0]).toContain('crédito vehicular: no')
+    expect(lineas[1]).toContain('crédito vehicular: por confirmar')
+    expect(lineas[2]).toContain('crédito vehicular: sí')
+  })
+
+  it('sin regla la línea queda como antes', async () => {
+    const idx = await buildInventoryIndex(db([vehiculo()]), 'acct-1')
+    expect(idx?.text).not.toContain('crédito')
+  })
+
+  it('un tope distinto no reutiliza el índice cacheado', async () => {
+    await buildInventoryIndex(db([vehiculo()]), 'acct-1', { creditMaxAgeYears: 10 })
+    await buildInventoryIndex(db([vehiculo()]), 'acct-1', { creditMaxAgeYears: 8 })
     expect(consultas).toBe(2)
   })
 })

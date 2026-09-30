@@ -83,7 +83,12 @@ export async function POST(request: Request) {
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
-      inventory: await buildInventoryIndex(supabase, accountId),
+      inventory: await buildInventoryIndex(supabase, accountId, {
+        creditMaxAgeYears: config.creditMaxVehicleAgeYears,
+      }),
+      creditRule: config.creditMaxVehicleAgeYears
+        ? { maxAgeYears: config.creditMaxVehicleAgeYears }
+        : null,
     })
 
     const { text, handoff } = await generateReply({ config, systemPrompt, messages })

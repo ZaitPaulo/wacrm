@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useFormatter, useTranslations } from 'next-intl';
-import { AlertCircle, ArrowLeftRight, Bot, Loader2, PieChart, Scale, Timer, X } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeftRight,
+  Bot,
+  Clock,
+  Loader2,
+  PieChart,
+  Scale,
+  Timer,
+  X,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useCan } from '@/hooks/use-can';
@@ -23,6 +33,8 @@ import {
 import { SettingsPanelHead } from './settings-panel-head';
 import { SettingsChip } from './settings-chip';
 import {
+  DEFAULT_HANDOFF_ESCALATE_MINUTES,
+  DEFAULT_HANDOFF_REMIND_MINUTES,
   DEFAULT_REACTIVATE_DAYS,
   DEFAULT_STALE_HOURS,
   buildAssignmentPayload,
@@ -75,6 +87,10 @@ export interface AssignmentSettingsViewProps {
   onStaleHoursChange: (value: string) => void;
   onReactivateToggle: (on: boolean) => void;
   onReactivateDaysChange: (value: string) => void;
+  onHandoffRemindToggle: (on: boolean) => void;
+  onHandoffRemindChange: (value: string) => void;
+  onHandoffEscalateToggle: (on: boolean) => void;
+  onHandoffEscalateChange: (value: string) => void;
   /** '' = nadie (orden normal). */
   onTradeInChange: (userId: string) => void;
   onSave: () => void;
@@ -89,6 +105,10 @@ const IDS = {
   reactivateDays: 'assignment-reactivate-days',
   reactivateHelp: 'assignment-reactivate-help',
   reactivateError: 'assignment-reactivate-error',
+  handoffRemind: 'assignment-handoff-remind',
+  handoffEscalate: 'assignment-handoff-escalate',
+  handoffHelp: 'assignment-handoff-help',
+  handoffError: 'assignment-handoff-error',
   tradeIn: 'assignment-trade-in',
   tradeInHelp: 'assignment-trade-in-help',
   tradeInError: 'assignment-trade-in-error',
@@ -299,6 +319,8 @@ export function AssignmentSettingsView(props: AssignmentSettingsViewProps) {
   const reactivateError =
     serverMsg('reactivate') ?? (errors.reactivate ? t(`validation.${errors.reactivate}`) : null);
   const tradeInError = serverMsg('tradeIn');
+  const handoffError =
+    serverMsg('handoff') ?? (errors.handoff ? t(`validation.${errors.handoff}`) : null);
 
   // Lo guardado puede ser alguien que ya dejó la cuenta: se muestra así
   // para que el admin lo cambie, y la base ya lo ignora.
@@ -513,6 +535,44 @@ export function AssignmentSettingsView(props: AssignmentSettingsViewProps) {
           />
         </SectionCard>
 
+        {/* Traspasos del bot sin atender: recordatorio y aviso (546) */}
+        <SectionCard icon={<Clock />} title={t('handoff.title')} titleId="assignment-handoff-title">
+          <RuleRow
+            toggleLabel={t('handoff.remindToggle')}
+            enabled={form.handoffRemindEnabled}
+            onToggle={props.onHandoffRemindToggle}
+            inputId={IDS.handoffRemind}
+            inputLabel={t('handoff.remindLabel')}
+            unit={t('handoff.unit')}
+            value={form.handoffRemindMinutes}
+            onChange={props.onHandoffRemindChange}
+            helpId={IDS.handoffHelp}
+            help={t('handoff.help')}
+            offText={t('handoff.remindOff')}
+            errorId={IDS.handoffError}
+            error={null}
+            errorAssertive={false}
+            disabled={saving}
+          />
+          <RuleRow
+            toggleLabel={t('handoff.escalateToggle')}
+            enabled={form.handoffEscalateEnabled}
+            onToggle={props.onHandoffEscalateToggle}
+            inputId={IDS.handoffEscalate}
+            inputLabel={t('handoff.escalateLabel')}
+            unit={t('handoff.unit')}
+            value={form.handoffEscalateMinutes}
+            onChange={props.onHandoffEscalateChange}
+            helpId={IDS.handoffHelp}
+            help={t('handoff.help')}
+            offText={t('handoff.escalateOff')}
+            errorId={IDS.handoffError}
+            error={handoffError}
+            errorAssertive={!!serverMsg('handoff')}
+            disabled={saving}
+          />
+        </SectionCard>
+
         {/* 4. Ventas y permutas: clientes sin asesor, a una persona */}
         <SectionCard icon={<ArrowLeftRight />} title={t('tradeIn.title')} titleId="assignment-trade-in-title">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -720,6 +780,28 @@ export function AssignmentSettings() {
         }))
       }
       onReactivateDaysChange={(v) => edit((f) => ({ ...f, reactivateDays: v }))}
+      onHandoffRemindToggle={(on) =>
+        edit((f) => ({
+          ...f,
+          handoffRemindEnabled: on,
+          handoffRemindMinutes:
+            on && !f.handoffRemindMinutes.trim()
+              ? String(DEFAULT_HANDOFF_REMIND_MINUTES)
+              : f.handoffRemindMinutes,
+        }))
+      }
+      onHandoffRemindChange={(v) => edit((f) => ({ ...f, handoffRemindMinutes: v }))}
+      onHandoffEscalateToggle={(on) =>
+        edit((f) => ({
+          ...f,
+          handoffEscalateEnabled: on,
+          handoffEscalateMinutes:
+            on && !f.handoffEscalateMinutes.trim()
+              ? String(DEFAULT_HANDOFF_ESCALATE_MINUTES)
+              : f.handoffEscalateMinutes,
+        }))
+      }
+      onHandoffEscalateChange={(v) => edit((f) => ({ ...f, handoffEscalateMinutes: v }))}
       onTradeInChange={(userId) => edit((f) => ({ ...f, tradeInAgentId: userId }))}
       onSave={() => void save()}
     />

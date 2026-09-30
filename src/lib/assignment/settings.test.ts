@@ -191,3 +191,42 @@ describe('assignmentSettingsErrorKey', () => {
     expect(assignmentSettingsErrorKey(undefined)).toBe('save_failed')
   })
 })
+
+describe('parseAssignmentSettingsInput — plazos de traspasos sin atender', () => {
+  const OPTS = { agentIds: [], memberIds: [] }
+
+  it('acepta minutos válidos y null para apagar', () => {
+    expect(
+      parseAssignmentSettingsInput(
+        { handoff_remind_after_minutes: 15, handoff_escalate_after_minutes: 45 },
+        OPTS,
+      ),
+    ).toEqual({
+      ok: true,
+      value: { handoff_remind_after_minutes: 15, handoff_escalate_after_minutes: 45 },
+    })
+    expect(parseAssignmentSettingsInput({ handoff_remind_after_minutes: null }, OPTS)).toMatchObject({
+      ok: true,
+    })
+  })
+
+  it('rechaza fuera de rango', () => {
+    expect(parseAssignmentSettingsInput({ handoff_remind_after_minutes: 0 }, OPTS)).toEqual({
+      ok: false,
+      code: 'handoff_remind_invalid',
+    })
+    expect(parseAssignmentSettingsInput({ handoff_escalate_after_minutes: 1441 }, OPTS)).toEqual({
+      ok: false,
+      code: 'handoff_escalate_invalid',
+    })
+  })
+
+  it('rechaza escalar antes de recordar', () => {
+    expect(
+      parseAssignmentSettingsInput(
+        { handoff_remind_after_minutes: 45, handoff_escalate_after_minutes: 15 },
+        OPTS,
+      ),
+    ).toEqual({ ok: false, code: 'handoff_order_invalid' })
+  })
+})

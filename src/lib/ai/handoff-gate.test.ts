@@ -198,3 +198,42 @@ describe('evaluateHandoffGate — no hay lo que busca', () => {
     expect(res.missing).toEqual(['presupuesto'])
   })
 })
+
+describe('evaluateHandoffGate — el nombre del perfil de WhatsApp', () => {
+  const sinNombre = () => request({ nombre: null, motivo: 'credito' })
+
+  it('al primer intento, sin nombre, no pasa aunque haya perfil', () => {
+    expect(
+      evaluateHandoffGate({ request: sinNombre(), attempts: 0, profileName: 'Rodrigo Movil' }),
+    ).toEqual({ transfer: false, missing: ['nombre'], urgent: false })
+  })
+
+  it('al segundo intento pasa con el nombre del perfil', () => {
+    expect(
+      evaluateHandoffGate({ request: sinNombre(), attempts: 1, profileName: 'Rodrigo Movil' }),
+    ).toEqual({ transfer: true, missing: [], urgent: false, nameFromProfile: true })
+  })
+
+  it('sin nombre de perfil sigue bloqueado', () => {
+    expect(
+      evaluateHandoffGate({ request: sinNombre(), attempts: 3, profileName: '  ' }).transfer,
+    ).toBe(false)
+    expect(evaluateHandoffGate({ request: sinNombre(), attempts: 3 }).transfer).toBe(false)
+  })
+
+  it('si falta algo más que el nombre, el perfil no alcanza', () => {
+    expect(
+      evaluateHandoffGate({
+        request: request({ nombre: null, presupuesto: null }),
+        attempts: 2,
+        profileName: 'Rodrigo',
+      }).transfer,
+    ).toBe(false)
+  })
+
+  it('con nombre no marca nameFromProfile', () => {
+    expect(
+      evaluateHandoffGate({ request: request(), attempts: 1, profileName: 'Otro' }),
+    ).not.toHaveProperty('nameFromProfile')
+  })
+})

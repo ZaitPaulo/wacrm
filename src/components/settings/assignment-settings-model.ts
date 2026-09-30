@@ -20,6 +20,10 @@ export const MAX_REACTIVATE_DAYS = 365
 /** Valores con que se prende una regla cuyo campo estaba vacío. */
 export const DEFAULT_STALE_HOURS = 24
 export const DEFAULT_REACTIVATE_DAYS = 7
+/** Plazos de traspasos sin atender (546): tope y valores al prender. */
+export const MAX_HANDOFF_MINUTES = 1440
+export const DEFAULT_HANDOFF_REMIND_MINUTES = 15
+export const DEFAULT_HANDOFF_ESCALATE_MINUTES = 45
 
 export interface AssignmentSettingsResponse {
   stale_assign_after_hours: number | null
@@ -32,6 +36,11 @@ export interface AssignmentSettingsResponse {
   trade_in_agent_id: string | null
   /** Miembros vigentes (owner, admin, agent): candidatos para ese ajuste. */
   members: { user_id: string; full_name: string; role: string }[]
+  /** Minutos hasta recordarle al asesor un traspaso sin atender; null =
+   *  apagado. Ausente en respuestas de antes de la 546. */
+  handoff_remind_after_minutes?: number | null
+  /** Minutos hasta avisar a owner/admin; null = apagado. */
+  handoff_escalate_after_minutes?: number | null
 }
 
 /** Una fila del reparto. `percent` es el texto crudo del campo: validar
@@ -55,6 +64,10 @@ export interface AssignmentForm {
   reactivateDays: string
   /** `user_id` del asesor de ventas y permutas; '' = nadie. */
   tradeInAgentId: string
+  handoffRemindEnabled: boolean
+  handoffRemindMinutes: string
+  handoffEscalateEnabled: boolean
+  handoffEscalateMinutes: string
 }
 
 /** Claves de `Settings.assignment.ui.validation`. */
@@ -63,6 +76,7 @@ export interface AssignmentFormErrors {
   weights?: WeightsError
   stale?: 'hoursInvalid'
   reactivate?: 'daysInvalid'
+  handoff?: 'minutesInvalid' | 'handoffOrder'
 }
 
 export interface AssignmentPayload {
@@ -70,9 +84,11 @@ export interface AssignmentPayload {
   stale_assign_after_hours?: number | null
   bot_reactivate_after_days?: number | null
   trade_in_agent_id?: string | null
+  handoff_remind_after_minutes?: number | null
+  handoff_escalate_after_minutes?: number | null
 }
 
-export type ErrorField = 'weights' | 'stale' | 'reactivate' | 'tradeIn' | 'general'
+export type ErrorField = 'weights' | 'stale' | 'reactivate' | 'tradeIn' | 'handoff' | 'general'
 
 /** Enteros que suman 100; el sobrante va a los primeros (3 → 34/33/33). */
 export function evenSplit(n: number): number[] {
@@ -120,6 +136,14 @@ export function formFromResponse(res: AssignmentSettingsResponse): AssignmentFor
     reactivateEnabled: res.bot_reactivate_after_days !== null,
     reactivateDays: String(res.bot_reactivate_after_days ?? DEFAULT_REACTIVATE_DAYS),
     tradeInAgentId: res.trade_in_agent_id ?? '',
+    // `undefined` (respuesta vieja) cuenta como el valor por defecto;
+    // `null` es "apagado".
+    handoffRemindEnabled: res.handoff_remind_after_minutes !== null,
+    handoffRemindMinutes: String(res.handoff_remind_after_minutes ?? DEFAULT_HANDOFF_REMIND_MINUTES),
+    handoffEscalateEnabled: res.handoff_escalate_after_minutes !== null,
+    handoffEscalateMinutes: String(
+      res.handoff_escalate_after_minutes ?? DEFAULT_HANDOFF_ESCALATE_MINUTES,
+    ),
   }
 }
 
@@ -153,6 +177,21 @@ export function validateAssignmentForm(form: AssignmentForm): AssignmentFormErro
   }
   if (form.reactivateEnabled && !enRango(form.reactivateDays, 1, MAX_REACTIVATE_DAYS)) {
     errors.reactivate = 'daysInvalid'
+  }
+
+  const recordar = form.handoffRemindEnabled
+  const escalar = form.handoffEscalateEnabled
+  if (
+    (recordar && !enRango(form.handoffRemindMinutes, 1, MAX_HANDOFF_MINUTES)) ||
+    (escalar && !enRango(form.handoffEscalateMinutes, 1, MAX_HANDOFF_MINUTES))
+  ) {
+    errors.handoff = 'minutesInvalid'
+  } else if (
+    recordar &&
+    escalar &&
+    (entero(form.handoffEscalateMinutes) as number) <= (entero(form.handoffRemindMinutes) as number)
+  ) {
+    errors.handoff = 'handoffOrder'
   }
   return errors
 }
@@ -206,6 +245,14 @@ export function buildAssignmentPayload(
     body.trade_in_agent_id = form.tradeInAgentId || null
   }
 
+  const recordar = form.handoffRemindEnabled ? entero(form.handoffRemindMinutes) : null
+  const recordarAntes = initial.handoffRemindEnabled ? entero(initial.handoffRemindMinutes) : null
+  if (recordar !== recordarAntes) body.handoff_remind_after_minutes = recordar
+
+  const escalar = form.handoffEscalateEnabled ? entero(form.handoffEscalateMinutes) : null
+  const escalarAntes = initial.handoffEscalateEnabled ? entero(initial.handoffEscalateMinutes) : null
+  if (escalar !== escalarAntes) body.handoff_escalate_after_minutes = escalar
+
   return body
 }
 
@@ -218,5 +265,6 @@ export function serverErrorField(code: unknown): ErrorField {
   if (code.startsWith('stale_')) return 'stale'
   if (code.startsWith('reactivate_')) return 'reactivate'
   if (code.startsWith('trade_in_')) return 'tradeIn'
+  if (code.startsWith('handoff_')) return 'handoff'
   return 'general'
 }

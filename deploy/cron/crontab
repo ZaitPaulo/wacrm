@@ -48,3 +48,12 @@
 #
 # Al agregar esta línea hay que REINICIAR el contenedor del cron (ver arriba).
 */5 * * * * /tick.sh /api/assignment/cron
+
+# --- Traspasos sin atender: cada 5 minutos ----------------------------------
+# Recordatorio al asesor (15 min) y aviso a owner/admin (45 min) cuando un
+# traspaso del bot no se atiende, contados en horario de atención (migración
+# 546, cambio bot-fase-2-traspaso-sin-perdidas). No reasigna. Los plazos se
+# cambian en Ajustes → Asignación.
+#
+# Al agregar esta línea hay que REINICIAR el contenedor del cron (ver arriba).
+*/5 * * * * /tick.sh /api/handoff/sla/cron

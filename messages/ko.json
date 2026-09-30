@@ -403,6 +403,7 @@
       "preview": "미리보기",
       "headerValuePlaceholder": "헤더 변수 값",
       "bodyValuePlaceholder": "{val}의 값",
+      "placeholderValueHint": "실제 값을 입력하세요. 예: 고객 이름.",
       "urlSuffixValuePlaceholder": "URL 접미사 값",
       "finalUrl": "최종 URL: {url}",
       "back": "뒤로",
@@ -433,6 +434,8 @@
     },
     "aiBanner": {
       "pausedTitle": "이 대화에서 AI 어시스턴트가 일시 중지됨",
+      "waitingTitle": "담당자가 메시지를 보낼 때까지 봇이 고객을 응대합니다",
+      "waitingHint": "간단한 질문(가격, 사진, 주소)에 답하고 정보를 요청하지 않습니다. 첫 메시지를 보내면 바로 멈춥니다.",
       "activeText": "AI 어시스턴트가 자동으로 응답 중입니다",
       "takeOver": "직접 처리",
       "resume": "AI 재개",
@@ -2326,7 +2329,10 @@
         "stale_hours_invalid": "담당 상담사 없는 시간은 1에서 720(30일) 사이의 정수이거나, 규칙을 끄려면 비워 두어야 합니다.",
         "reactivate_days_invalid": "AI 재활성화 일수는 1에서 365 사이의 정수이거나, 끄려면 비워 두어야 합니다.",
         "save_failed": "배정 설정을 저장할 수 없습니다.",
-        "trade_in_agent_invalid": "판매 및 보상판매 담당자로 선택한 사람이 더 이상 계정 멤버가 아닙니다."
+        "trade_in_agent_invalid": "판매 및 보상판매 담당자로 선택한 사람이 더 이상 계정 멤버가 아닙니다.",
+        "handoff_remind_invalid": "알림 시간(분)은 1에서 1440 사이의 정수이거나, 끄려면 비워 두어야 합니다.",
+        "handoff_escalate_invalid": "관리자 알림 시간(분)은 1에서 1440 사이의 정수이거나, 끄려면 비워 두어야 합니다.",
+        "handoff_order_invalid": "관리자 알림은 담당자 알림 이후여야 합니다."
       },
       "ui": {
         "title": "상담원 배정",
@@ -2371,6 +2377,17 @@
           "help": "상담원이 있는 고객이 그 기간 이후 다시 메시지를 보내면 봇이 먼저 응대하고, 인계 시 같은 상담원에게 보냅니다. 관리자의 대화에는 적용되지 않습니다.",
           "off": "꺼짐: 상담원이 응대 중인 대화를 봇이 다시 맡지 않습니다."
         },
+        "handoff": {
+          "title": "응대되지 않은 전달",
+          "remindToggle": "담당자에게 알림",
+          "remindLabel": "대기 시간(분)",
+          "escalateToggle": "관리자에게 알림",
+          "escalateLabel": "대기 시간(분)",
+          "unit": "분",
+          "help": "봇이 전달한 후 담당자가 받은편지함에서 메시지를 보내지 않은 동안, 영업시간 내 시간만 셉니다. 대화를 재배정하지 않습니다.",
+          "remindOff": "꺼짐: 담당자에게 알리지 않습니다.",
+          "escalateOff": "꺼짐: 관리자에게 알리지 않습니다."
+        },
         "tradeIn": {
           "title": "판매 및 보상판매",
           "label": "판매 및 보상판매 담당 상담원",
@@ -2384,7 +2401,9 @@
           "weightsEmpty": "최소 한 명의 상담원은 0보다 큰 비율이 필요합니다.",
           "ineligible": "더 이상 상담원이 아닌 사람을 배분에서 제거하세요.",
           "hoursInvalid": "1에서 720 사이의 정수 시간을 입력하세요.",
-          "daysInvalid": "1에서 365 사이의 정수 일수를 입력하세요."
+          "daysInvalid": "1에서 365 사이의 정수 일수를 입력하세요.",
+          "minutesInvalid": "1에서 1440 사이의 정수 분을 입력하세요.",
+          "handoffOrder": "관리자 알림은 담당자 알림 이후여야 합니다."
         },
         "save": "변경 사항 저장",
         "saving": "저장 중…",
@@ -2922,8 +2941,32 @@
     "ogFooter": "링크를 열어 계정을 만들고 수락하세요"
   },
   "Handoff": {
-    "customerNotice": "담당 상담원을 배정했습니다. 곧 연락드리겠습니다. 🙌",
-    "customerNoticeNamed": "담당자가 곱 연락드릴 예정입니다. 담당자 이름은 {name}입니다."
+    "customerNotice": "담당 상담원을 배정했습니다. 연락드리겠습니다. 🙌",
+    "customerNoticeNamed": "담당자가 곱 연락드릴 예정입니다. 담당자 이름은 {name}입니다.",
+    "whenSoon": "몇 분 안에 연락드리겠습니다.",
+    "whenToday": "오늘 {time}부터 연락드리겠습니다.",
+    "whenTomorrow": "내일 {time}부터 연락드리겠습니다.",
+    "whenWeekday": "{day} {time}부터 연락드리겠습니다.",
+    "weekdays": {
+      "0": "일요일",
+      "1": "월요일",
+      "2": "화요일",
+      "3": "수요일",
+      "4": "목요일",
+      "5": "금요일",
+      "6": "토요일"
+    }
+  },
+  "HandoffSla": {
+    "reminderTitle": "대기 중인 고객: {client}",
+    "reminderBody": "봇이 전달한 후 {minutes}분 동안 첫 메시지를 기다리고 있습니다.",
+    "unattendedTitle": "{agent}님이 {client} 고객을 응대하지 않았습니다",
+    "unattendedTitleNoAgent": "담당자 없는 전달: {client}",
+    "unattendedBody": "봇이 전달한 후 {minutes}분 동안 기다리고 있습니다.",
+    "unknownClient": "고객"
+  },
+  "AiReply": {
+    "safeFallback": "죄송합니다, 메시지가 섞였습니다. 찾으시는 차량이나 예산을 알려주시면 옵션을 보여드리겠습니다."
   },
   "SocialQueue": {
     "pageTitle": "게시 대기열",

@@ -60,6 +60,9 @@ export interface AiConfig {
   /** Quien embebe. Se deriva del proveedor de la cuenta y no se
    *  configura: Gemini embebe con Gemini, todo lo demas con OpenAI. */
   embeddingsProvider: EmbeddingsProvider
+  /** Años máximos para crédito vehicular (migración 547); null o ausente
+   *  = sin regla. Opcional para no obligar a tocar cada fixture. */
+  creditMaxVehicleAgeYears?: number | null
 }
 
 /** A photo attached to a turn, already downloaded and reduced
@@ -191,6 +194,12 @@ export interface GenerateResult {
   handoff: HandoffRequest | null
   /** Provider token usage for this call, or null when unavailable. */
   usage: AiUsage | null
+  /**
+   * El modelo decidió no responder (`[[NO_REPLY]]`): un "ok" o un
+   * "gracias" mientras el cliente espera al asesor. Solo presente, y en
+   * `true`, cuando lo marcó.
+   */
+  silent?: true
 }
 
 /**

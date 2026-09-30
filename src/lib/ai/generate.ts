@@ -105,6 +105,10 @@ async function callProvider(
  */
 const HANDOFF_PATTERN = /\[\[HANDOFF\b([^\]]*)\]\]/i
 
+/** El modelo elige no responder: un "ok" mientras el cliente espera. */
+const NO_REPLY_PATTERN = /\[\[NO_REPLY\]\]/i
+const NO_REPLY_ALL = /\[\[NO_REPLY\]\]/gi
+
 /** `si` / `no` as the model writes them, accents and case included. */
 function parseCredito(value: string): boolean | null {
   const v = value.toLowerCase()
@@ -163,8 +167,12 @@ export function parseGeneration(
   raw: string,
   usage: AiUsage | null = null,
 ): GenerateResult {
-  const match = raw.match(HANDOFF_PATTERN)
+  // `[[NO_REPLY]]` se quita ANTES que nada: el filtro de fugas marca
+  // cualquier `[[`, y este marcador es legítimo (bot-fase-2).
+  const silent = NO_REPLY_PATTERN.test(raw)
+  const unsilenced = silent ? raw.replace(NO_REPLY_ALL, '') : raw
+  const match = unsilenced.match(HANDOFF_PATTERN)
   const handoff = match ? parseHandoffFields(match[1] ?? '') : null
-  const text = match ? raw.replace(HANDOFF_PATTERN, '').trim() : raw.trim()
-  return { text, handoff, usage }
+  const text = match ? unsilenced.replace(HANDOFF_PATTERN, '').trim() : unsilenced.trim()
+  return silent ? { text, handoff, usage, silent: true } : { text, handoff, usage }
 }

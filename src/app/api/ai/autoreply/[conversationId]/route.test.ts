@@ -105,6 +105,8 @@ describe('POST /api/ai/autoreply/[conversationId] — reanudar', () => {
     expect(res.status).toBe(200)
     expect(mocks.updatePayload).toEqual({
       ai_autoreply_disabled: false,
+      // Reactivar también termina la espera del asesor (bot-fase-2).
+      ai_waiting_agent_since: null,
       ai_reply_count: 0,
       ai_handoff_attempts: 0,
     })
@@ -178,7 +180,10 @@ describe('POST /api/ai/autoreply/[conversationId] — tomar el control', () => {
     const res = await POST(request({ paused: true, assign_to_me: true }), params)
 
     expect(res.status).toBe(200)
-    expect(mocks.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(mocks.updatePayload).toMatchObject({
+      ai_autoreply_disabled: true,
+      ai_waiting_agent_since: null,
+    })
     expect(mocks.updatePayload).not.toHaveProperty('ai_handoff_attempts')
     expect(mocks.escritoPor).toBe('sesion')
   })
@@ -198,7 +203,10 @@ describe('POST /api/ai/autoreply/[conversationId] — tomar el control', () => {
     const res = await POST(request({ paused: true, assign_to_me: true }), params)
 
     expect(res.status).toBe(200)
-    expect(mocks.updatePayload).toEqual({ ai_autoreply_disabled: true })
+    expect(mocks.updatePayload).toEqual({
+      ai_autoreply_disabled: true,
+      ai_waiting_agent_since: null,
+    })
   })
 
   it('un admin que toma un hilo sin asesor se lo asigna', async () => {
@@ -210,6 +218,7 @@ describe('POST /api/ai/autoreply/[conversationId] — tomar el control', () => {
     expect(res.status).toBe(200)
     expect(mocks.updatePayload).toEqual({
       ai_autoreply_disabled: true,
+      ai_waiting_agent_since: null,
       assigned_agent_id: 'user-admin',
     })
     expect(await res.json()).toMatchObject({ assigned_agent_id: 'user-admin' })

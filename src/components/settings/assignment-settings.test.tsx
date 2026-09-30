@@ -77,6 +77,10 @@ function render(over: Partial<AssignmentSettingsViewProps> = {}, form?: Assignme
     onStaleHoursChange: noop,
     onReactivateToggle: noop,
     onReactivateDaysChange: noop,
+    onHandoffRemindToggle: noop,
+    onHandoffRemindChange: noop,
+    onHandoffEscalateToggle: noop,
+    onHandoffEscalateChange: noop,
     onTradeInChange: noop,
     onSave: noop,
     ...over,
@@ -278,5 +282,25 @@ describe('AssignmentSettingsView — guardar', () => {
 
   it('guardando: el botón lo dice', () => {
     expect(render({ dirty: true, saving: true })).toContain(UI.saving)
+  })
+})
+
+describe('AssignmentSettingsView — traspasos sin atender', () => {
+  it('muestra la sección con los dos plazos por defecto', () => {
+    const html = render()
+    expect(html).toContain(UI.handoff.title)
+    expect(html).toContain(UI.handoff.remindToggle)
+    expect(html).toContain(UI.handoff.escalateToggle)
+    expect(html).toContain('value="15"')
+    expect(html).toContain('value="45"')
+  })
+
+  it('muestra el error de orden junto a la sección', () => {
+    const f = formFromResponse({
+      ...RESPUESTA,
+      handoff_remind_after_minutes: 45,
+      handoff_escalate_after_minutes: 15,
+    })
+    expect(texto(render({}, f))).toContain(UI.validation.handoffOrder)
   })
 })

@@ -49,6 +49,9 @@ interface AiThreadBannerProps {
   disabled: boolean;
   /** `conversations.ai_handoff_summary` — note the bot left on handoff. */
   handoffSummary?: string | null;
+  /** `conversations.ai_waiting_agent_since` — tras un traspaso, el bot
+   *  acompaña al cliente hasta el primer mensaje del asesor (546). */
+  waitingSince?: string | null;
   /** Asesor actual. Ya no esconde el banner: desde
    *  sticky-weighted-assignment el bot atiende aunque haya asesor (lo
    *  calla solo la pausa), así que "IA activa" + "Tomar" hace falta
@@ -79,6 +82,7 @@ export function AiThreadBanner({
   conversationId,
   disabled,
   handoffSummary,
+  waitingSince,
   onChange,
 }: AiThreadBannerProps) {
   const t = useTranslations("Inbox.aiBanner");
@@ -90,6 +94,10 @@ export function AiThreadBanner({
   // state via realtime) changes.
   const [paused, setPaused] = useState(disabled);
   useEffect(() => setPaused(disabled), [conversationId, disabled]);
+  // En espera del asesor el bot sigue respondiendo lo simple; tomar o
+  // reactivar la termina, así que el espejo local se apaga al tocar.
+  const [waiting, setWaiting] = useState(!!waitingSince);
+  useEffect(() => setWaiting(!!waitingSince), [conversationId, waitingSince]);
   // El resumen del traspaso ocupa varias líneas: se muestra la primera y
   // se despliega a pedido. Cada conversación abre plegada.
   const [expanded, setExpanded] = useState(false);
@@ -124,6 +132,7 @@ export function AiThreadBanner({
         }
         const j = await res.json().catch(() => ({}));
         setPaused(paused);
+        setWaiting(false);
         onChange?.({
           ai_autoreply_disabled: paused,
           // El asesor que quedó lo dice la ruta: tomar solo asigna un hilo
@@ -151,7 +160,10 @@ export function AiThreadBanner({
     return (
       <Banner tone="muted">
         <div className="w-full min-w-0 sm:flex-1">
-          <p className="font-medium text-foreground">{t("pausedTitle")}</p>
+          <p className="font-medium text-foreground">
+            {waiting ? t("waitingTitle") : t("pausedTitle")}
+          </p>
+          {waiting && <p className="text-muted-foreground">{t("waitingHint")}</p>}
           {handoffSummary && (
             <>
               <p

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { AiConfig, HandoffRequest } from './types'
+import { AiError, type AiConfig, type HandoffRequest } from './types'
 
 // Shared, hoisted mock state so the module mocks can close over it.
 const h = vi.hoisted(() => ({
@@ -25,6 +25,9 @@ const h = vi.hoisted(() => ({
     inventory: [] as Record<string, unknown>[],
     /** Referral del anuncio de la conversación (migración 526). */
     adReferral: null as Record<string, unknown> | null,
+    /** `contacts.name` del contacto, para el nombre del perfil. */
+    contactName: null as string | null,
+    contactReads: 0,
   },
 }))
 
@@ -89,6 +92,17 @@ vi.mock('./admin-client', () => ({
         }
         return chain
       }
+      if (table === 'contacts') {
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          maybeSingle: () => {
+            h.state.contactReads++
+            return Promise.resolve({ data: { name: h.state.contactName }, error: null })
+          },
+        }
+        return chain
+      }
       if (table === 'inventory_vehicles') {
         const chain = {
           select: () => chain,
@@ -123,8 +137,10 @@ vi.mock('./admin-client', () => ({
         select: () => conversations,
         eq: () => conversations,
         maybeSingle: () => Promise.resolve({ data: h.state.conv, error: null }),
+        // Acumula: el traspaso escribe con la RPC y después marca la
+        // espera del asesor en otro UPDATE (bot-fase-2).
         update: (payload: Record<string, unknown>) => {
-          h.state.updatePayload = payload
+          h.state.updatePayload = { ...(h.state.updatePayload ?? {}), ...payload }
           return { eq: () => Promise.resolve({ error: null }) }
         },
       }
@@ -205,6 +221,8 @@ beforeEach(() => {
     deal: 'created',
   }
   h.state.adReferral = null
+  h.state.contactName = null
+  h.state.contactReads = 0
   h.state.inventory = [
     {
       public_ref: 'XGCW8S',
@@ -943,3 +961,271 @@ describe('dispatchInboundToAiReply — fotos del cliente', () => {
 // contacto, el del lead que vuelve) y la continuidad por contacto se
 // prueban donde viven: en la base, con
 // supabase/tests/sticky_weighted_assignment.test.sql.
+
+// Revisión de conversaciones del 2026-09-29 (cambio bot-fase-1-calidad-respuesta).
+describe('dispatchInboundToAiReply — filtro de salida', () => {
+  const FUGA =
+    'The handoff only goes through once nombre, presupuesto, interes and credito are all filled in.'
+
+  it('regenera una fuga y envía solo la respuesta limpia', async () => {
+    h.generateReply
+      .mockResolvedValueOnce({ text: FUGA, handoff: null })
+      .mockResolvedValueOnce({ text: 'Tenemos un Sandero GT 2010 en $22.000.000.', handoff: null })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(2)
+    expect(h.generateReply.mock.calls[1][0].systemPrompt).toContain('razonamiento')
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toContain('Sandero GT 2010')
+  })
+
+  it('si la fuga persiste, manda el mensaje seguro y lo registra', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    h.generateReply.mockResolvedValue({ text: FUGA, handoff: null })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(2)
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    const enviado = h.engineSendText.mock.calls[0][0].text as string
+    expect(enviado).not.toContain('handoff')
+    expect(enviado).toMatch(/Disculpa|Sorry/)
+    expect(log.mock.calls.some((c) => String(c.join(' ')).includes('conv-1'))).toBe(true)
+    log.mockRestore()
+  })
+
+  it('el texto con fuga que acompaña a un traspaso no llega al cliente', async () => {
+    h.generateReply
+      .mockResolvedValueOnce({ text: FUGA, handoff: handoffRequest() })
+      .mockResolvedValueOnce({ text: 'Listo, ya te paso con el asesor.', handoff: null })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    const textos = h.engineSendText.mock.calls.map((c) => c[0].text as string)
+    expect(textos.some((t) => t.includes('handoff'))).toBe(false)
+    // El traspaso declarado en la primera respuesta se conserva.
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(textos[0]).toBe('Listo, ya te paso con el asesor.')
+  })
+})
+
+describe('dispatchInboundToAiReply — reintento ante fallo del proveedor', () => {
+  it('reintenta un tiempo agotado y responde sin traspasar', async () => {
+    h.generateReply
+      .mockRejectedValueOnce(new AiError('timeout', { code: 'timeout' }))
+      .mockResolvedValueOnce({ text: 'Hola, ¿qué buscas?', handoff: null })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(2)
+    expect(h.delay).toHaveBeenCalledWith(3000)
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toBe('Hola, ¿qué buscas?')
+    expect(h.state.updatePayload).toBeNull()
+  })
+
+  it('si el reintento también falla, traspasa por fallo técnico', async () => {
+    h.generateReply.mockRejectedValue(new AiError('red', { code: 'network_error' }))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(2)
+    expect(h.state.updatePayload?.ai_handoff_summary).toContain('no pudo responder')
+  })
+
+  it('no reintenta una clave inválida', async () => {
+    h.generateReply.mockRejectedValue(new AiError('bad key', { code: 'invalid_key' }))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(1)
+    expect(h.state.updatePayload?.ai_handoff_summary).toContain('no pudo responder')
+  })
+
+  it('si el cliente escribió durante la espera, no responde ni traspasa', async () => {
+    h.hasNewerCustomerMessage
+      .mockResolvedValueOnce(false) // tras la ventana de agrupación
+      .mockResolvedValueOnce(true) // antes del reintento
+    h.generateReply.mockRejectedValueOnce(new AiError('timeout', { code: 'timeout' }))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.state.updatePayload).toBeNull()
+  })
+})
+
+describe('dispatchInboundToAiReply — el traspaso no se come la respuesta', () => {
+  it('manda primero lo que escribió el modelo y después el aviso', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'La cuota exacta te la calcula el asesor con el banco.',
+      handoff: handoffRequest({ motivo: 'credito' }),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.engineSendText).toHaveBeenCalledTimes(2)
+    expect(h.engineSendText.mock.calls[0][0].text).toBe(
+      'La cuota exacta te la calcula el asesor con el banco.',
+    )
+    expect(h.engineSendText.mock.calls[0][0].aiGenerated).toBe(true)
+    expect(h.engineSendText.mock.calls[1][0].text).toMatch(/asesor|advisor|agent/i)
+  })
+
+  it('le agrega el enlace de la ficha al texto del traspaso', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://loramotors.co')
+    h.state.inventory = [{ ...h.state.inventory[0], id: 'veh-1' }]
+    h.generateReply.mockResolvedValue({
+      text: 'Ese Renault Sandero GT 2010 se puede revisar con el asesor.',
+      handoff: handoffRequest(),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.engineSendText.mock.calls[0][0].text).toContain('https://loramotors.co/vehiculo/veh-1')
+    vi.unstubAllEnvs()
+  })
+
+  it('si falla el envío del texto, el traspaso sigue', async () => {
+    h.engineSendText.mockRejectedValueOnce(new Error('meta caída'))
+    h.generateReply.mockResolvedValue({ text: 'Ya te paso.', handoff: handoffRequest() })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(h.engineSendText).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('dispatchInboundToAiReply — el traspaso deja al bot esperando al asesor', () => {
+  it('marca la espera, reinicia el cupo y los avisos', async () => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload).toMatchObject({
+      ai_autoreply_disabled: true,
+      ai_reply_count: 0,
+      handoff_reminded_at: null,
+      handoff_escalated_at: null,
+    })
+    expect(typeof h.state.updatePayload?.ai_waiting_agent_since).toBe('string')
+  })
+
+  it('también en el traspaso por fallo técnico', async () => {
+    h.generateReply.mockRejectedValue(new Error('boom'))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(typeof h.state.updatePayload?.ai_waiting_agent_since).toBe('string')
+  })
+})
+
+describe('dispatchInboundToAiReply — respuesta silenciosa', () => {
+  it('[[NO_REPLY]] sin texto no envía ni traspasa', async () => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: null, silent: true })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.state.updatePayload).toBeNull()
+  })
+})
+
+describe('dispatchInboundToAiReply — en espera del asesor', () => {
+  beforeEach(() => {
+    h.state.conv = {
+      assigned_agent_id: 'u-juan',
+      ai_autoreply_disabled: true,
+      ai_waiting_agent_since: '2026-09-08T23:00:00.000Z',
+      ai_reply_count: 0,
+      ai_handoff_attempts: 0,
+    }
+  })
+
+  it('responde aunque la IA esté pausada, con el prompt de espera y el asesor', async () => {
+    h.generateReply.mockResolvedValue({ text: 'Sí, ese Aveo tiene aire.', handoff: null })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    const prompt = h.generateReply.mock.calls[0][0].systemPrompt as string
+    expect(prompt).toContain('ALREADY HANDED OFF to an advisor named Juan')
+    expect(prompt).not.toContain('[[HANDOFF nombre=')
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toBe('Sí, ese Aveo tiene aire.')
+  })
+
+  it('usa un tope de 6 respuestas', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyMaxPerConversation: 30 }))
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.rpcCalls[0]).toEqual({
+      name: 'claim_ai_reply_slot',
+      args: { conversation_id: 'conv-1', max_replies: 6 },
+    })
+  })
+
+  it('no responde si ya agotó el cupo de espera', async () => {
+    h.state.conv = { ...h.state.conv, ai_reply_count: 6 }
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.generateReply).not.toHaveBeenCalled()
+  })
+
+  it('ignora un pedido de traspaso: no reasigna ni repite el aviso', async () => {
+    h.generateReply.mockResolvedValue({
+      text: 'Juan ya tiene tu caso.',
+      handoff: handoffRequest(),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.handoffArgs).toBeNull()
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toBe('Juan ya tiene tu caso.')
+  })
+
+  it('un [[NO_REPLY]] no envía nada', async () => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: null, silent: true })
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.state.handoffArgs).toBeNull()
+  })
+
+  it('una respuesta vacía en espera no traspasa de nuevo', async () => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: null })
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.state.handoffArgs).toBeNull()
+  })
+
+  it('pausada sin espera, se calla como siempre', async () => {
+    h.state.conv = { ...h.state.conv, ai_waiting_agent_since: null }
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.generateReply).not.toHaveBeenCalled()
+    expect(h.delay).not.toHaveBeenCalled()
+  })
+})
+
+describe('dispatchInboundToAiReply — nombre del perfil de WhatsApp', () => {
+  it('al segundo intento traspasa con el nombre del perfil, marcado', async () => {
+    h.state.conv = { ...h.state.conv, ai_handoff_attempts: 1 }
+    h.state.contactName = 'Rodrigo Movil'
+    h.generateReply.mockResolvedValue({
+      text: '',
+      handoff: handoffRequest({ nombre: null, motivo: 'credito' }),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.updatePayload?.ai_handoff_summary).toContain(
+      'Nombre: Rodrigo Movil (perfil de WhatsApp)',
+    )
+  })
+
+  it('no lee el contacto si el pedido ya trae nombre', async () => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.contactReads).toBe(0)
+  })
+})

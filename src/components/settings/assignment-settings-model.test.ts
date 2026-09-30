@@ -269,3 +269,45 @@ describe('serverErrorField', () => {
     expect(serverErrorField(undefined)).toBe('general')
   })
 })
+
+describe('plazos de traspasos sin atender', () => {
+  it('sin el campo en la respuesta, nacen prendidos en 15 y 45', () => {
+    const f = formFromResponse(respuesta())
+    expect(f).toMatchObject({
+      handoffRemindEnabled: true,
+      handoffRemindMinutes: '15',
+      handoffEscalateEnabled: true,
+      handoffEscalateMinutes: '45',
+    })
+  })
+
+  it('null en la respuesta es apagado', () => {
+    const f = formFromResponse(respuesta({ handoff_remind_after_minutes: null }))
+    expect(f.handoffRemindEnabled).toBe(false)
+  })
+
+  it('valida rango y orden', () => {
+    const f = formFromResponse(respuesta())
+    expect(validateAssignmentForm({ ...f, handoffRemindMinutes: '0' }).handoff).toBe('minutesInvalid')
+    expect(
+      validateAssignmentForm({ ...f, handoffRemindMinutes: '45', handoffEscalateMinutes: '15' }).handoff,
+    ).toBe('handoffOrder')
+    expect(
+      validateAssignmentForm({ ...f, handoffRemindEnabled: false, handoffEscalateMinutes: '5' }).handoff,
+    ).toBeUndefined()
+  })
+
+  it('manda solo lo que cambió', () => {
+    const inicial = formFromResponse(respuesta())
+    expect(buildAssignmentPayload({ ...inicial, handoffEscalateMinutes: '60' }, inicial)).toEqual({
+      handoff_escalate_after_minutes: 60,
+    })
+    expect(buildAssignmentPayload({ ...inicial, handoffRemindEnabled: false }, inicial)).toEqual({
+      handoff_remind_after_minutes: null,
+    })
+  })
+
+  it('los errores handoff_* van junto a su sección', () => {
+    expect(serverErrorField('handoff_order_invalid')).toBe('handoff')
+  })
+})

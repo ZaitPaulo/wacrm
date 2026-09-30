@@ -82,7 +82,12 @@ export async function POST(request: Request, { params }: Params) {
       )
     }
 
-    const update: Record<string, unknown> = { ai_autoreply_disabled: paused }
+    // Tomar el control o reactivar terminan la espera del asesor: en los
+    // dos casos una persona decidió qué pasa con el hilo.
+    const update: Record<string, unknown> = {
+      ai_autoreply_disabled: paused,
+      ai_waiting_agent_since: null,
+    }
     if (paused) {
       const nuevo = asesorAlTomar({ assignToMe, userId, currentAssigneeId: asignadoActual })
       if (nuevo !== undefined) update.assigned_agent_id = nuevo

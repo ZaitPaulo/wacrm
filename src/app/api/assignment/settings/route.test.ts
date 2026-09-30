@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   upserts: [] as Record<string, unknown>[],
   rpcCalls: [] as { fn: string; args: Record<string, unknown> }[],
   rpcError: null as { code?: string; message: string } | null,
+  upsertError: null as { code?: string; message: string } | null,
 }))
 
 vi.mock('@/lib/auth/account', () => ({
@@ -55,7 +56,7 @@ function cliente() {
         maybeSingle: () => Promise.resolve({ data: mocks.settings, error: null }),
         upsert: (row: Record<string, unknown>) => {
           mocks.upserts.push(row)
-          return Promise.resolve({ error: null })
+          return Promise.resolve({ error: mocks.upsertError })
         },
         then: (resolve: (v: unknown) => unknown) => resolve({ data: datos(), error: null }),
       }
@@ -93,6 +94,7 @@ beforeEach(() => {
   mocks.upserts = []
   mocks.rpcCalls = []
   mocks.rpcError = null
+  mocks.upsertError = null
   mocks.requireRole.mockReset().mockResolvedValue({
     supabase: cliente(),
     accountId: 'acct-1',
@@ -256,5 +258,34 @@ describe('PUT /api/assignment/settings', () => {
     expect(res.status).toBe(500)
     expect(await res.json()).toMatchObject({ code: 'save_failed' })
     spy.mockRestore()
+  })
+})
+
+describe('PUT /api/assignment/settings — plazos de traspasos sin atender', () => {
+  it('guarda los dos plazos', async () => {
+    const res = await put({ handoff_remind_after_minutes: 10, handoff_escalate_after_minutes: 30 })
+    expect(res.status).toBe(200)
+    expect(mocks.upserts).toEqual([
+      { account_id: 'acct-1', handoff_remind_after_minutes: 10, handoff_escalate_after_minutes: 30 },
+    ])
+  })
+
+  it('un plazo que choca con el otro guardado es 400 handoff_order_invalid', async () => {
+    mocks.upsertError = {
+      code: '23514',
+      message: 'violates check constraint "assignment_settings_handoff_order_check"',
+    }
+    const res = await put({ handoff_escalate_after_minutes: 5 })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ code: 'handoff_order_invalid' })
+  })
+
+  it('sin fila de ajustes, el GET devuelve 15 y 45', async () => {
+    mocks.settings = null
+    const res = await GET()
+    expect(await res.json()).toMatchObject({
+      handoff_remind_after_minutes: 15,
+      handoff_escalate_after_minutes: 45,
+    })
   })
 })

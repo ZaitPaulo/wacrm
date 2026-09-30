@@ -431,6 +431,9 @@ describe('sendMessageToConversation — el asesor que escribe pausa al bot', () 
       senderId: 'u-juan',
     });
     expect(captured.conversation?.ai_autoreply_disabled).toBe(true);
+    // Y termina la espera del asesor: el bot deja de acompañar
+    // (bot-fase-2-traspaso-sin-perdidas).
+    expect(captured.conversation).toHaveProperty('ai_waiting_agent_since', null);
   });
 
   // La API v1, las automatizaciones y los flujos no son una persona
@@ -443,5 +446,6 @@ describe('sendMessageToConversation — el asesor que escribe pausa al bot', () 
       contentText: 'enviado por la API',
     });
     expect(captured.conversation).not.toHaveProperty('ai_autoreply_disabled');
+    expect(captured.conversation).not.toHaveProperty('ai_waiting_agent_since');
   });
 });

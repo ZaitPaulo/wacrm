@@ -49,3 +49,19 @@ describe('loadAiConfig requireActive', () => {
     ).toBeNull()
   })
 })
+
+describe('loadAiConfig — antigüedad máxima para crédito (547)', () => {
+  it('lee el tope de años', async () => {
+    const config = await loadAiConfig(
+      dbReturning({ ...ROW, credit_max_vehicle_age_years: 10 }),
+      'acct',
+      { requireActive: false },
+    )
+    expect(config?.creditMaxVehicleAgeYears).toBe(10)
+  })
+
+  it('sin la columna, la regla queda apagada', async () => {
+    const config = await loadAiConfig(dbReturning(ROW), 'acct', { requireActive: false })
+    expect(config?.creditMaxVehicleAgeYears).toBeNull()
+  })
+})

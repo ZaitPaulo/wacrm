@@ -22,6 +22,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { extractVariableIndices } from "@/lib/whatsapp/template-validators";
+import {
+  firstNameForGreeting,
+  greetingVariableIndices,
+  isPlaceholderValue,
+} from "@/lib/whatsapp/template-prefill";
 import { useTranslations } from "next-intl";
 
 export interface TemplateSendValues {
@@ -34,6 +39,9 @@ interface TemplatePickerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (template: MessageTemplate, values: TemplateSendValues) => void;
+  /** Nombre del contacto al que va la plantilla. Con él se llena el
+   *  saludo ("Hola {{1}}") con su primer nombre; ver `template-prefill`. */
+  contactName?: string | null;
 }
 
 function renderBodyPreview(body: string, params: string[]): string {
@@ -78,6 +86,7 @@ export function TemplatePicker({
   open,
   onOpenChange,
   onSelect,
+  contactName,
 }: TemplatePickerProps) {
   const t = useTranslations("Inbox.templatePicker");
 
@@ -156,7 +165,14 @@ export function TemplatePicker({
       return;
     }
     setSelected(template);
-    setParams(new Array(slots.bodyVars.length).fill(""));
+    // El saludo viene con el primer nombre del contacto; lo demás, vacío.
+    // Sin esto el asesor tenía que escribirlo a mano y, sin saberlo,
+    // escribía "1" para poder enviar (2026-09-28).
+    const greeting = new Set(greetingVariableIndices(template.body_text));
+    const firstName = firstNameForGreeting(contactName);
+    setParams(
+      slots.bodyVars.map((v) => (firstName && greeting.has(v) ? firstName : "")),
+    );
     setHeaderText("");
     setButtonParams({});
   }
@@ -181,7 +197,10 @@ export function TemplatePicker({
   const canConfirm =
     !!selected &&
     !!slots &&
-    slots.bodyVars.every((_, i) => (params[i] ?? "").trim().length > 0) &&
+    slots.bodyVars.every((_, i) => {
+      const value = params[i] ?? "";
+      return value.trim().length > 0 && !isPlaceholderValue(value);
+    }) &&
     (slots.headerVarCount === 0 || headerText.trim().length > 0) &&
     slots.urlButtonSlots.every(
       (s) => (buttonParams[s.index] ?? "").trim().length > 0,
@@ -285,8 +304,12 @@ export function TemplatePicker({
                     setParams(next);
                   }}
                   placeholder={t("bodyValuePlaceholder", { val: `{{${v}}}` })}
+                  aria-invalid={isPlaceholderValue(params[i] ?? "")}
                   className="border-border bg-muted text-foreground placeholder:text-muted-foreground"
                 />
+                {isPlaceholderValue(params[i] ?? "") && (
+                  <p className="text-xs text-destructive">{t("placeholderValueHint")}</p>
+                )}
               </div>
             ))}
             {slots?.urlButtonSlots.map((slot) => (

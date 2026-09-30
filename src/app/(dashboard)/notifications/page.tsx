@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import type { Notification } from "@/types";
-import { Bell, CheckCheck, Loader2, MessageCircle, UserPlus } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  CheckCheck,
+  Clock,
+  Loader2,
+  MessageCircle,
+  UserPlus,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { dateLocale } from "@/lib/date-locale";
 import { Button } from "@/components/ui/button";
@@ -14,10 +22,13 @@ import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { PushNotificationsCard } from "@/components/notifications/push-notifications-card";
 
-// Icono por tipo de aviso: asignación o mensaje nuevo de un cliente.
+// Icono por tipo de aviso: asignación, mensaje nuevo de un cliente, o un
+// traspaso del bot sin atender (recordatorio al asesor / aviso a admins).
 const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
   conversation_assigned: UserPlus,
   new_message: MessageCircle,
+  handoff_reminder: Clock,
+  handoff_unattended: AlertTriangle,
 };
 
 export default function NotificationsPage() {

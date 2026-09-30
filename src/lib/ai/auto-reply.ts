@@ -2,8 +2,9 @@ import { supabaseAdmin } from './admin-client'
 import { loadAiConfig } from './config'
 import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
-import { generateReply } from './generate'
+import { generateReply, type GenerateArgs } from './generate'
 import {
+  aiProviderRetryDelayMs,
   aiReplyDebounceMs,
   buildGateRetryInstruction,
   buildSystemPrompt,
@@ -14,7 +15,8 @@ import { evaluateHandoffGate } from './handoff-gate'
 import { primerNombre } from './pick-agent'
 import { buildHandoffDealTitle } from './handoff-deal'
 import { aiHandoffAssign } from '@/lib/assignment/auto-assign'
-import type { HandoffRequest } from './types'
+import { AiError, type GenerateResult, type HandoffRequest } from './types'
+import { detectLeak, LEAK_RETRY_INSTRUCTION, safeFallbackText } from './output-guard'
 import { buildInventoryIndex, type InventoryIndex } from './inventory-index'
 import { ensureVehicleLinks } from './vehicle-links'
 import { loadAdContext } from './ad-context'
@@ -22,7 +24,7 @@ import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { attachPhotos, loadNewCustomerPhotos, type NewPhotos } from './photos'
 import { engineSendText } from '@/lib/flows/meta-send'
-import { notifyCustomerOfHandoff } from '@/lib/handoff/notify-customer'
+import { handoffWhenSentence, notifyCustomerOfHandoff } from '@/lib/handoff/notify-customer'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 /** Lo que se lee de la conversacion antes de decidir si contestar. */
@@ -32,7 +34,18 @@ interface ConversationState {
   /** Transferencias que el gate de datos ya rechazo en este hilo
    *  (migracion 519). Solo la abre el escape por urgencia. */
   ai_handoff_attempts: number
+  /** El hilo espera el primer mensaje del asesor tras un traspaso: con
+   *  la IA pausada, el bot acompaña (migración 546). */
+  ai_waiting_agent_since: string | null
+  assigned_agent_id: string | null
 }
+
+/**
+ * Tope de respuestas del bot mientras el cliente espera al asesor. Corto
+ * a propósito: acompaña, no reemplaza al asesor, y cada respuesta cuesta
+ * tokens de la clave del titular (bot-fase-2).
+ */
+const WAITING_MAX_REPLIES = 6
 
 interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
@@ -117,16 +130,24 @@ export async function dispatchInboundToAiReply(
 
     const { data: convRow, error: convErr } = await db
       .from('conversations')
-      .select('ai_autoreply_disabled, ai_reply_count, ai_handoff_attempts')
+      .select(
+        'ai_autoreply_disabled, ai_reply_count, ai_handoff_attempts, ai_waiting_agent_since, assigned_agent_id',
+      )
       .eq('id', conversationId)
       .maybeSingle()
     if (convErr || !convRow) return
     const conv = convRow as ConversationState
     convCtx = conv
-    if (conv.ai_autoreply_disabled) return // handed off / turned off here
+    // Pausada tras un traspaso, pero el asesor aún no escribe: el bot
+    // acompaña en modo espera. Pausada por cualquier otra razón: silencio.
+    const waiting = conv.ai_autoreply_disabled && !!conv.ai_waiting_agent_since
+    if (conv.ai_autoreply_disabled && !waiting) return // handed off / turned off here
+    const maxReplies = waiting
+      ? Math.min(config.autoReplyMaxPerConversation, WAITING_MAX_REPLIES)
+      : config.autoReplyMaxPerConversation
     // Cheap early-out; the authoritative cap check is the atomic claim
     // below (this read can race a concurrent inbound).
-    if (conv.ai_reply_count >= config.autoReplyMaxPerConversation) return
+    if (conv.ai_reply_count >= maxReplies) return
 
     const inbound = { id: inboundMessageId, createdAt: inboundCreatedAt }
 
@@ -158,7 +179,7 @@ export async function dispatchInboundToAiReply(
       'claim_ai_reply_slot',
       {
         conversation_id: conversationId,
-        max_replies: config.autoReplyMaxPerConversation,
+        max_replies: maxReplies,
       },
     )
     if (claimErr) {
@@ -193,7 +214,7 @@ export async function dispatchInboundToAiReply(
     // Tres lecturas independientes, en paralelo: la espera es la de la mas
     // lenta, no la suma. La lenta suelen ser las fotos —dos llamadas a
     // Meta cada una—, y no tienen por que sumarse al knowledge base.
-    const [photos, knowledge, inventory, adContext] = await Promise.all([
+    const [photos, knowledge, inventory, adContext, waitingContext] = await Promise.all([
       // No lanza por contrato. El catch es para que ni un fallo imprevisto
       // de las fotos acabe en traspaso: se responde sin ellas.
       loadNewCustomerPhotos(db, { accountId, conversationId }).catch(
@@ -211,9 +232,15 @@ export async function dispatchInboundToAiReply(
       // acerto a recuperar: sin esto el bot le dice a un cliente que no
       // hay nada en su presupuesto viendo 5 fichas de 123. Con fotos es
       // ademas contra lo que se reconoce el carro de la captura.
-      buildInventoryIndex(db, accountId),
+      buildInventoryIndex(db, accountId, {
+        creditMaxAgeYears: config.creditMaxVehicleAgeYears,
+      }),
       // De qué anuncio vino el cliente. No lanza: sin él se responde igual.
       loadAdContext(db, conversationId),
+      // Quién lo atiende y cuándo, solo en espera. No lanza.
+      waiting
+        ? loadWaitingContext(db, accountId, conv.assigned_agent_id)
+        : Promise.resolve(null),
     ])
 
     // Las fotos se pegan ANTES de decidir si hay algo que responder: una
@@ -230,28 +257,41 @@ export async function dispatchInboundToAiReply(
       inventory,
       hasPhotos: messages.some((m) => m.images?.length),
       adContext,
+      waiting: waitingContext,
+      creditRule: config.creditMaxVehicleAgeYears
+        ? { maxAgeYears: config.creditMaxVehicleAgeYears }
+        : null,
     })
-
-    const { text, handoff, usage } = await generateReply({
-      config,
-      systemPrompt,
-      messages,
-    })
-
 
     // Record token spend on the account's BYO key. Fire-and-forget so it
     // never adds latency to the customer-facing send: `logAiUsage`
     // swallows its own errors, so the floating promise can't reject.
-    // Logged regardless of handoff — the provider call happened either
-    // way.
-    void logAiUsage(db, {
-      accountId,
+    // Logged per provider call —a retry or a leak regeneration is spend
+    // too— and regardless of handoff.
+    const safe: SafeReplyContext = {
+      db,
       conversationId,
-      mode: 'auto_reply',
-      provider: config.provider,
-      model: config.model,
-      usage,
-    })
+      inbound,
+      onUsage: (usage) =>
+        void logAiUsage(db, {
+          accountId,
+          conversationId,
+          mode: 'auto_reply',
+          provider: config.provider,
+          model: config.model,
+          usage,
+        }),
+    }
+
+    const { text, handoff, silent } = await generateSafeReply(
+      { config, systemPrompt, messages },
+      safe,
+    )
+
+    // El modelo eligió no responder (un "ok", un "gracias"): no se envía
+    // nada y, sobre todo, no se cae al camino de "respuesta vacía", que
+    // traspasa.
+    if (silent && !text && !handoff) return
 
     // La generación tarda 10-15 s, más que la ventana de agrupación. Si
     // el cliente escribió mientras tanto, esta respuesta ya llega tarde:
@@ -261,13 +301,40 @@ export async function dispatchInboundToAiReply(
     // el nuevo.
     if (await hasNewerCustomerMessage(db, conversationId, inbound)) return
 
+    // En espera del asesor el bot solo acompaña: se ignora cualquier
+    // pedido de traspaso (ya se traspasó) y una respuesta vacía no vuelve
+    // a traspasar. Solo sale el texto, si lo hay.
+    if (waiting) {
+      if (text) {
+        await engineSendText({
+          initiative: 'reply',
+          accountId,
+          userId: configOwnerUserId,
+          conversationId,
+          contactId,
+          text: withVehicleLinks(text, inventory),
+          aiGenerated: true,
+        })
+      }
+      return
+    }
+
     // El modelo PIDE transferir; el gate decide. Antes bastaba con que
     // lo pidiera, y por eso salian hilos sin un solo carro mostrado.
     if (handoff) {
+      // El nombre del perfil solo hace falta si el cliente no dio el suyo:
+      // una lectura, y solo en ese caso.
+      const profileName = handoff.nombre?.trim()
+        ? null
+        : await loadContactName(db, contactId)
       const gate = evaluateHandoffGate({
         request: handoff,
         attempts: conv.ai_handoff_attempts ?? 0,
+        profileName,
       })
+      if (gate.nameFromProfile && profileName) {
+        handoff.nombre = `${profileName.trim()} (perfil de WhatsApp)`
+      }
 
       if (!gate.transfer) {
         // Nada de transferir: ni asignar asesor, ni apagar el bot, ni
@@ -284,14 +351,17 @@ export async function dispatchInboundToAiReply(
         const reply =
           text ||
           (
-            await generateReply({
-              config,
-              systemPrompt: `${systemPrompt}\n\n${buildGateRetryInstruction({
-                missing: gate.missing,
-                urgent: gate.urgent,
-              })}`,
-              messages,
-            })
+            await generateSafeReply(
+              {
+                config,
+                systemPrompt: `${systemPrompt}\n\n${buildGateRetryInstruction({
+                  missing: gate.missing,
+                  urgent: gate.urgent,
+                })}`,
+                messages,
+              },
+              safe,
+            )
           ).text
 
         if (reply) {
@@ -307,6 +377,27 @@ export async function dispatchInboundToAiReply(
           })
         }
         return
+      }
+
+      // Lo que el modelo escribió junto al pedido va ANTES del aviso. Antes
+      // se descartaba, y el cliente que preguntó "¿de cuánto sería la
+      // cuota?" al completar sus datos solo recibía "Uno de nuestros
+      // asesores…" (revisión del 2026-09-29). Si este envío falla, el
+      // traspaso sigue: la asignación y el aviso importan más.
+      if (text) {
+        try {
+          await engineSendText({
+            initiative: 'reply',
+            accountId,
+            userId: configOwnerUserId,
+            conversationId,
+            contactId,
+            text: withVehicleLinks(text, inventory),
+            aiGenerated: true,
+          })
+        } catch (sendErr) {
+          console.error('[ai auto-reply] no se pudo enviar la respuesta previa al traspaso:', sendErr)
+        }
       }
 
       await handOffToHuman({
@@ -361,6 +452,10 @@ export async function dispatchInboundToAiReply(
       aiGenerated: true,
     })
   } catch (err) {
+    // El cliente escribió mientras se esperaba un reintento: su mensaje
+    // nuevo tiene su propio dispatch, que responde con todo el contexto.
+    if (err instanceof SupersededError) return
+
     console.error('[ai auto-reply] dispatch failed:', err)
 
     // EL SILENCIO ES LA PEOR RESPUESTA. Si la generacion revienta —el
@@ -399,6 +494,142 @@ export async function dispatchInboundToAiReply(
       }
     }
   }
+}
+
+/** `contacts.name` tal como vino de WhatsApp, o null. No lanza. */
+async function loadContactName(
+  db: ReturnType<typeof supabaseAdmin>,
+  contactId: string,
+): Promise<string | null> {
+  try {
+    const { data } = await db
+      .from('contacts')
+      .select('name')
+      .eq('id', contactId)
+      .maybeSingle<{ name: string | null }>()
+    return data?.name?.trim() || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Quién atiende al cliente en espera y cuándo le escribe, para el prompt.
+ * Best-effort: sin nombre o sin horario, el bot acompaña igual.
+ */
+async function loadWaitingContext(
+  db: ReturnType<typeof supabaseAdmin>,
+  accountId: string,
+  agentId: string | null,
+): Promise<{ agentName: string | null; when: string | null }> {
+  const [agentName, when] = await Promise.all([
+    (async () => {
+      if (!agentId) return null
+      try {
+        const { data } = await db
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', agentId)
+          .maybeSingle<{ full_name: string | null }>()
+        return primerNombre(data?.full_name ?? null)
+      } catch {
+        return null
+      }
+    })(),
+    handoffWhenSentence(accountId).catch(() => null),
+  ])
+  return { agentName, when }
+}
+
+/** Se abandona el dispatch: llegó un mensaje más nuevo del cliente. */
+class SupersededError extends Error {
+  constructor() {
+    super('superseded by a newer customer message')
+    this.name = 'SupersededError'
+  }
+}
+
+/**
+ * Fallos del proveedor que valen un segundo intento. `invalid_key` no
+ * está: fallaría igual, y solo sumaría espera antes del traspaso.
+ */
+const TRANSIENT_AI_ERRORS = new Set([
+  'timeout',
+  'network_error',
+  'rate_limited',
+  'provider_error',
+  'empty_response',
+])
+
+interface SafeReplyContext {
+  db: ReturnType<typeof supabaseAdmin>
+  conversationId: string
+  inbound: { id: string; createdAt: string }
+  onUsage: (usage: GenerateResult['usage']) => void
+}
+
+/**
+ * `generateReply` con dos redes debajo:
+ *
+ * 1. Un fallo pasajero del proveedor se reintenta UNA vez tras
+ *    `aiProviderRetryDelayMs()`. Sin esto, cada tropiezo de Gemini
+ *    terminaba en traspaso por "fallo técnico" (22 en septiembre de 2026).
+ *    Antes de reintentar se mira si el cliente escribió algo nuevo: si
+ *    lo hizo, se abandona con `SupersededError`.
+ * 2. El texto pasa por `detectLeak`. Una fuga se regenera una vez con
+ *    `LEAK_RETRY_INSTRUCTION`; si persiste, sale el mensaje seguro, o
+ *    nada si la respuesta traía un traspaso (el aviso ya le habla al
+ *    cliente). El texto filtrado no se envía nunca. Pasó el 2026-09-26:
+ *    un cliente recibió el razonamiento del modelo en inglés.
+ *
+ * El traspaso declarado en la primera respuesta se conserva si la
+ * regeneración no lo repite: la fuga está en el texto, no en la intención.
+ */
+async function generateSafeReply(
+  args: GenerateArgs,
+  ctx: SafeReplyContext,
+): Promise<GenerateResult> {
+  const first = await generateWithRetry(args, ctx)
+  const firstCheck = detectLeak(first.text)
+  if (!firstCheck.leaked) return first
+
+  console.warn(
+    `[ai auto-reply] fuga en la conversación ${ctx.conversationId} (${firstCheck.reason}); se regenera`,
+  )
+  const second = await generateWithRetry(
+    { ...args, systemPrompt: `${args.systemPrompt}\n\n${LEAK_RETRY_INSTRUCTION}` },
+    ctx,
+  )
+  const handoff = second.handoff ?? first.handoff
+  const secondCheck = detectLeak(second.text)
+  if (!secondCheck.leaked) return { ...second, handoff }
+
+  console.error(
+    `[ai auto-reply] fuga persistente en la conversación ${ctx.conversationId} (${secondCheck.reason}); se envía el mensaje seguro`,
+  )
+  return { ...second, handoff, text: handoff ? '' : await safeFallbackText() }
+}
+
+async function generateWithRetry(
+  args: GenerateArgs,
+  ctx: SafeReplyContext,
+): Promise<GenerateResult> {
+  let result: GenerateResult
+  try {
+    result = await generateReply(args)
+  } catch (err) {
+    if (!(err instanceof AiError) || !TRANSIENT_AI_ERRORS.has(err.code)) throw err
+    console.warn(
+      `[ai auto-reply] fallo pasajero del proveedor (${err.code}) en la conversación ${ctx.conversationId}; se reintenta`,
+    )
+    await delay(aiProviderRetryDelayMs())
+    if (await hasNewerCustomerMessage(ctx.db, ctx.conversationId, ctx.inbound)) {
+      throw new SupersededError()
+    }
+    result = await generateReply(args)
+  }
+  ctx.onUsage(result.usage)
+  return result
 }
 
 /** El texto con el enlace de cada vehículo que nombra y no lo trae. Sin
@@ -466,6 +697,23 @@ async function handOffToHuman(args: {
     console.warn(
       `[ai auto-reply] sin negocio para la conversacion ${args.conversationId}: ${resultado.deal}`,
     )
+  }
+
+  // El hilo queda esperando al asesor: el bot pasa a acompañar (responde
+  // lo concreto, no califica) hasta que una persona escriba. Cupo nuevo
+  // para ese modo y avisos de plazo en cero para este traspaso
+  // (bot-fase-2-traspaso-sin-perdidas).
+  const { error: waitErr } = await args.db
+    .from('conversations')
+    .update({
+      ai_waiting_agent_since: new Date().toISOString(),
+      ai_reply_count: 0,
+      handoff_reminded_at: null,
+      handoff_escalated_at: null,
+    })
+    .eq('id', args.conversationId)
+  if (waitErr) {
+    console.error('[ai auto-reply] no se pudo marcar la espera del asesor:', waitErr)
   }
 
   await notifyCustomerOfHandoff({

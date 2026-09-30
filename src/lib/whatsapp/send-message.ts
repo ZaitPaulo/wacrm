@@ -584,7 +584,9 @@ export async function sendMessageToConversation(
       // mensaje, la misma que pausa los flujos justo abajo. Solo con
       // `senderId`: la API v1, las automatizaciones y los flujos no son
       // una persona tomando el hilo.
-      ...(senderId ? { ai_autoreply_disabled: true } : {}),
+      // Y termina la espera del asesor tras un traspaso: desde aquí el
+      // bot ya no acompaña (bot-fase-2-traspaso-sin-perdidas).
+      ...(senderId ? { ai_autoreply_disabled: true, ai_waiting_agent_since: null } : {}),
     })
     .eq('id', conversationId);
 

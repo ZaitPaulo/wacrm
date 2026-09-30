@@ -659,3 +659,30 @@ describe('generateReply — unsupported provider', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
+
+describe('parseGeneration — [[NO_REPLY]]', () => {
+  it('lo quita y marca la respuesta como silenciosa', () => {
+    expect(parseGeneration('[[NO_REPLY]]')).toEqual({
+      text: '',
+      handoff: null,
+      usage: null,
+      silent: true,
+    })
+  })
+
+  it('tolera espacios y minúsculas', () => {
+    expect(parseGeneration('  [[no_reply]] ').silent).toBe(true)
+  })
+
+  it('sin el marcador no hay campo silent', () => {
+    expect(parseGeneration('Hola')).not.toHaveProperty('silent')
+  })
+})
+
+describe('parseGeneration — [[NO_REPLY]] repetido', () => {
+  it('reconoce el marcador en llamadas seguidas (la regex no guarda estado)', () => {
+    expect(parseGeneration('[[NO_REPLY]]').silent).toBe(true)
+    expect(parseGeneration('[[NO_REPLY]]').silent).toBe(true)
+    expect(parseGeneration('[[NO_REPLY]] [[NO_REPLY]]').text).toBe('')
+  })
+})

@@ -8,7 +8,11 @@ import {
   type OutsideWindowOption,
   type SenderKind,
 } from './window';
-import { debeEsperar, parseHorario } from './business-hours';
+import {
+  debeEsperar,
+  parseHorario,
+  type ConfiguracionHorario,
+} from './business-hours';
 
 /** Quién tomó la iniciativa de un envío. Ver `OutboundOptions`. */
 export type Initiative = 'reply' | 'unprompted';
@@ -314,6 +318,19 @@ export async function fueraDeHorario(
   db: SupabaseClient,
   accountId: string
 ): Promise<boolean> {
+  const config = await leerHorarioCuenta(db, accountId);
+  return config ? debeEsperar(config) : false;
+}
+
+/**
+ * El horario de atención de la cuenta, o `null` si no se pudo leer o
+ * está apagado. Lo usan el silencio fuera de horario y el aviso de
+ * traspaso ("te escribe mañana desde las 8:00 a. m.").
+ */
+export async function leerHorarioCuenta(
+  db: SupabaseClient,
+  accountId: string
+): Promise<ConfiguracionHorario | null> {
   const { data, error } = await db
     .from('accounts')
     .select('quiet_hours_enabled, business_hours, holiday_calendar')
@@ -326,15 +343,15 @@ export async function fueraDeHorario(
 
   if (error) {
     console.error('[outbound] no se pudo leer el horario:', error.message);
-    return false;
+    return null;
   }
-  if (!data?.quiet_hours_enabled) return false;
+  if (!data?.quiet_hours_enabled) return null;
 
-  return debeEsperar({
+  return {
     enabled: true,
     hours: parseHorario(data.business_hours),
     holidayCalendar: data.holiday_calendar === 'CO' ? 'CO' : null,
-  });
+  };
 }
 
 /** True si ese canal ya sabe enviar. Para la UI, que oculta lo que no. */

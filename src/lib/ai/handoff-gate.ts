@@ -56,6 +56,9 @@ export interface HandoffGateResult {
   missing: (RequiredHandoffField | CreditProfileField)[]
   /** Whether the request was urgent (complaint / asked for a person). */
   urgent: boolean
+  /** Pasó con el nombre del perfil de WhatsApp porque el cliente no lo
+   *  dio (bot-fase-2). Solo presente, y en `true`, en ese caso. */
+  nameFromProfile?: true
 }
 
 /**
@@ -80,8 +83,11 @@ export function evaluateHandoffGate(args: {
   /** `conversations.ai_handoff_attempts` — how many times this thread's
    *  handoff has already been refused. */
   attempts: number
+  /** `contacts.name`, tal como vino de WhatsApp. Solo se usa si el
+   *  cliente no dio su nombre y ya hubo un intento rechazado. */
+  profileName?: string | null
 }): HandoffGateResult {
-  const { request, attempts } = args
+  const { request, attempts, profileName } = args
   const urgent = isUrgentHandoff(request.motivo)
 
   if (urgent) {
@@ -104,7 +110,21 @@ export function evaluateHandoffGate(args: {
       ? CREDIT_PROFILE_FIELDS.filter((f) => !isPresent(request, f))
       : []
 
-  // No attempt-based escape for the four required fields: a sale can
+  // El nombre dejó de ser un peaje (revisión del 2026-09-29: 21 hilos
+  // terminaron en "¿cómo es tu nombre?"). Si es lo ÚNICO que falta y ya
+  // se pidió una vez (un intento rechazado), pasa con el del perfil de
+  // WhatsApp; el resumen lo marca como tal. Los otros tres datos siguen
+  // sin salida por intentos: sin ellos el asesor no sabe qué vender.
+  if (
+    missing.length === 1 &&
+    missing[0] === 'nombre' &&
+    attempts >= 1 &&
+    profileName?.trim()
+  ) {
+    return { transfer: true, missing: [], urgent, nameFromProfile: true }
+  }
+
+  // No attempt-based escape for the other required fields: a sale can
   // wait. If it couldn't, the gate would evaporate a few turns into
   // every thread.
   if (missing.length > 0) {

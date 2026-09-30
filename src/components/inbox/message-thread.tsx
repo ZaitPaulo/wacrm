@@ -1426,6 +1426,7 @@ export function MessageThread({
         conversationId={conversation.id}
         disabled={conversation.ai_autoreply_disabled ?? false}
         handoffSummary={conversation.ai_handoff_summary}
+        waitingSince={conversation.ai_waiting_agent_since}
         assignedAgentId={assignedAgentId}
         currentUserId={user?.id}
         onChange={(patch) => {
@@ -1454,6 +1455,7 @@ export function MessageThread({
         open={templateModalOpen}
         onOpenChange={setTemplateModalOpen}
         onSelect={handleSendTemplate}
+        contactName={contact.name}
       />
 
       {/* Full-size viewer for the thread's images/videos. Renders nothing
