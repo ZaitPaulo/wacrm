@@ -5,7 +5,9 @@ Cómo se arma la publicación de un vehículo: texto propuesto, límites por red
 ## Requirements
 ### Requirement: La publicación se arma con los datos que ya tiene el vehículo
 
-La publicación preparada SHALL construirse a partir de la ficha del vehículo: sus imágenes y sus datos comerciales —marca, línea, año, precio, kilometraje y ficha técnica—, sin pedirle nada nuevo a quien cargó el auto.
+La publicación preparada SHALL construirse a partir de la ficha del vehículo: sus imágenes y sus datos comerciales —marca, línea, año, precio, kilometraje y ficha técnica—, sin pedirle nada nuevo a quien cargó el auto. El texto SHALL seguir la plantilla de publicación de la cuenta (ver `social-post-template`).
+
+El precio publicado SHALL ser el **precio con garantía** del vehículo. Cuando el vehículo no tenga precio con garantía cargado, SHALL publicarse su precio de venta, de modo que ningún vehículo quede sin precio.
 
 El precio SHALL mostrarse en la moneda de la cuenta, con el mismo formato que usa la vitrina.
 
@@ -23,6 +25,16 @@ El precio SHALL mostrarse en la moneda de la cuenta, con el mismo formato que us
 
 - **WHEN** se compara el precio de la publicación con el de la vitrina
 - **THEN** ambos se muestran en la misma moneda y con el mismo formato
+
+#### Scenario: Vehículo con precio con garantía
+
+- **WHEN** se prepara la publicación de un vehículo con precio de venta 35.000.000 y precio con garantía 37.100.000
+- **THEN** el precio que muestra el texto propuesto es 37.100.000
+
+#### Scenario: Vehículo sin precio con garantía
+
+- **WHEN** se prepara la publicación de un vehículo que solo tiene precio de venta
+- **THEN** el texto muestra el precio de venta como precio
 
 ### Requirement: La publicación es un carrusel con las fotos del vehículo
 
@@ -200,3 +212,4 @@ Lo editado por una persona SHALL quedar acotado a la publicación que editó, po
 
 - **WHEN** cambia un dato público del negocio que aparece en el texto
 - **THEN** las publicaciones pendientes sin editar de todas las redes se refrescan con el texto nuevo
+

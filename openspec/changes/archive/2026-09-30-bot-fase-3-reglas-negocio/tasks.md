@@ -16,8 +16,8 @@
 
 ## 4. Contenido en producción
 
-- [ ] 4.1 Redactar el prompt y el documento "Financiación" nuevos sobre el texto exportado, y revisarlos con el usuario.
-- [ ] 4.2 Cargarlos: el documento desde Ajustes → IA (reindexa) y el prompt desde la misma pantalla.
+- [x] 4.1 Redactar el prompt y el documento "Financiación" nuevos sobre el texto exportado, y revisarlos con el usuario.
+- [x] 4.2 Cargarlos (2026-09-29): por SQL en una transacción que borró los trozos viejos de Financiación, y reindexado desde Ajustes → IA; verificado con 2 trozos embebidos.
 
 ## 5. Verificación
 
