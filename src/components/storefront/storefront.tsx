@@ -247,6 +247,11 @@ export function VehicleCard({
   } else {
     specsParts.push('—')
   }
+  // Justo después del km: la línea se corta a un renglón, y el cilindraje
+  // pesa más en la decisión que el combustible, que es lo que se pierde.
+  if (v.engine_displacement?.trim()) {
+    specsParts.push(s('engineValue', { value: v.engine_displacement.trim() }))
+  }
   if (v.transmission) {
     const opt = TRANSMISSIONS.find((o) => o.value === v.transmission)
     specsParts.push(opt ? t(opt.labelKey) : v.transmission)

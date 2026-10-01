@@ -32,6 +32,8 @@ export interface ShowcaseVehicle {
   transmission: string | null
   fuel_type: string | null
   body_type: string | null
+  /** Cilindraje en texto libre ("1.5", "2.0 TDI"), tal como lo carga el operador. */
+  engine_displacement: string | null
   condition: string | null
   features: Record<string, unknown> | unknown[] | null
   images: string[] | null

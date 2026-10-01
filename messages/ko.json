@@ -2878,6 +2878,8 @@
     "features": "옵션",
     "condition": "상태",
     "color": "색상",
+    "engine": "배기량",
+    "engineValue": "엔진 {value}",
     "contact": "연락처",
     "administration": "관리",
     "privacy": "개인정보 처리방침",

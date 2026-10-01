@@ -21,6 +21,7 @@ const mockVehicles: ShowcaseVehicle[] = [
     transmission: 'manual',
     fuel_type: 'gasoline',
     body_type: 'suv',
+    engine_displacement: null,
     condition: 'used',
     features: null,
     images: ['https://example.com/duster.jpg'],
@@ -36,6 +37,7 @@ const mockVehicles: ShowcaseVehicle[] = [
     transmission: 'automatic',
     fuel_type: 'hybrid',
     body_type: 'suv',
+    engine_displacement: null,
     condition: 'used',
     features: null,
     images: ['https://example.com/corolla.jpg'],
@@ -51,6 +53,7 @@ const mockVehicles: ShowcaseVehicle[] = [
     transmission: 'automatic',
     fuel_type: 'gasoline',
     body_type: 'hatchback',
+    engine_displacement: null,
     condition: 'used',
     features: null,
     images: [], // No photos
@@ -66,6 +69,7 @@ const mockVehicles: ShowcaseVehicle[] = [
     transmission: 'automatic',
     fuel_type: 'gasoline',
     body_type: 'sedan',
+    engine_displacement: null,
     condition: 'new',
     features: null,
     images: null, // null photos

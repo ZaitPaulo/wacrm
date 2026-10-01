@@ -2878,6 +2878,8 @@
     "features": "Features",
     "condition": "Condition",
     "color": "Color",
+    "engine": "Engine",
+    "engineValue": "{value} engine",
     "contact": "Contact",
     "administration": "Administration",
     "privacy": "Privacy",

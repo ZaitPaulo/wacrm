@@ -50,8 +50,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const shareTitle = `${name} | ${vehicleName} — ${price}`
   const pageTitle = `${vehicleName} — ${price} | ${name}`
   const t = await getTranslations('Inventory')
+  const s = await getTranslations('Storefront')
   const specs: string[] = []
   if (v.mileage != null) specs.push(`${formatNumber(v.mileage)} km`)
+  if (v.engine_displacement?.trim()) {
+    specs.push(s('engineValue', { value: v.engine_displacement.trim() }))
+  }
   if (v.transmission) specs.push(labelOf(t, TRANSMISSIONS, v.transmission))
   if (v.fuel_type) specs.push(labelOf(t, FUEL_TYPES, v.fuel_type))
   const description =
@@ -106,6 +110,7 @@ export default async function VehiclePage({ params }: Params) {
   const priceFormatted = formatPrice(v.price, account.default_currency)
 
   const specRows: [string, string][] = [
+    [s('engine'), v.engine_displacement?.trim() || '—'],
     [s('transmission'), labelOf(t, TRANSMISSIONS, v.transmission)],
     [s('fuel'), labelOf(t, FUEL_TYPES, v.fuel_type)],
     [s('bodyType'), labelOf(t, BODY_TYPES, v.body_type)],
@@ -143,7 +148,7 @@ export default async function VehiclePage({ params }: Params) {
     ...(v.body_type ? { bodyType: labelOf(t, BODY_TYPES, v.body_type) } : {}),
     offers: {
       '@type': 'Offer',
-      priceCurrency: 'USD',
+      priceCurrency: account.default_currency,
       price: v.price,
       availability: 'https://schema.org/InStock',
       url: `${base}/vehiculo/${v.id}`,

@@ -2871,6 +2871,8 @@
     "features": "Características",
     "condition": "Condición",
     "color": "Color",
+    "engine": "Cilindraje",
+    "engineValue": "Motor {value}",
     "contact": "Contacto",
     "administration": "Administración",
     "privacy": "Privacidad",

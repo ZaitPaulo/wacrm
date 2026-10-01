@@ -91,7 +91,7 @@ export default async function StorefrontPage() {
     ...(account.public_address ? { address: account.public_address } : {}),
     makesOffer: vehicles.slice(0, 50).map((v) => ({
       '@type': 'Offer',
-      priceCurrency: 'USD',
+      priceCurrency: account.default_currency,
       price: v.price,
       availability: 'https://schema.org/InStock',
       itemOffered: {
