@@ -2525,7 +2525,7 @@
     },
     "images": {
       "upload": "Upload image",
-      "hint": "PNG, JPG or WEBP (max. 5 MB each). Drag the photos to reorder them: the first one is the vehicle's cover and the one that leads the social post."
+      "hint": "PNG, JPG or WEBP (max. 5 MB each). Photos are uploaded in file name order. The first one is the vehicle's cover and the one that leads the social post; you can change it with the star or by dragging."
     },
     "specs": {
       "transmission": {
@@ -2561,6 +2561,7 @@
     },
     "toasts": {
       "uploadFailed": "Couldn't upload the image",
+      "uploadFailedNamed": "Couldn't upload {name}.",
       "imageTooLarge": "{name} is still over 5 MB after optimizing. Use a lighter photo.",
       "loadFailed": "Couldn't load the inventory",
       "requiredFields": "Brand, model and year are required",
@@ -2945,6 +2946,8 @@
   "Handoff": {
     "customerNotice": "We have assigned a sales agent who will get in touch with you. 🙌",
     "customerNoticeNamed": "One of our advisors will get in touch with you. Their name is {name}.",
+    "customerVisitClosing": "You can now come to the dealership; remember to ask for your advisor {name}.",
+    "customerVisitClosingLater": "When you come to the dealership, remember to ask for your advisor {name}.",
     "whenSoon": "They will message you within the next few minutes.",
     "whenToday": "They will message you today from {time}.",
     "whenTomorrow": "They will message you tomorrow from {time}.",

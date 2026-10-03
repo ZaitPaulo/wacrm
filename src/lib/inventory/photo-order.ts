@@ -58,3 +58,51 @@ export function photoCutoff(
   const strictest = Math.min(...finite);
   return imageCount > strictest ? strictest : null;
 }
+
+/**
+ * Ordena los archivos recién elegidos por nombre, con orden natural.
+ *
+ * Existe porque el `FileList` de `<input type="file" multiple>` NO
+ * llega en el orden que la persona ve: el estándar no fija ninguno y
+ * cada plataforma entrega el suyo. El diálogo de Windows, por ejemplo,
+ * pone primero el archivo que tenía el foco —el último clic de la
+ * selección—, así que elegir "01.jpg" y luego Mayús+clic en "10.jpg"
+ * devuelve 10, 01, 02… y la portada (la que lleva el diseño del feed)
+ * cae en el segundo lugar sin que nadie la haya movido.
+ *
+ * El nombre es lo único estable que tenemos y es el orden que se ve en
+ * el explorador: `numeric` hace que "foto 2" vaya antes que "foto 10" y
+ * `sensitivity: 'base'` ignora mayúsculas y tildes. `sort` es estable,
+ * así que dos nombres equivalentes conservan el orden de llegada.
+ *
+ * La base se compara antes que la extensión: con el nombre entero, el
+ * espacio (que va antes que el punto) mandaba "foto (2).jpg" delante de
+ * "foto.jpg", y la copia le quitaba la portada al original. La extensión
+ * solo desempata dos bases equivalentes.
+ *
+ * Genérica sobre `{ name }` para probarla sin `File`. No muta la lista.
+ */
+export function sortFilesByName<T extends { name: string }>(
+  files: readonly T[]
+): T[] {
+  const compare = (x: string, y: string) =>
+    x.localeCompare(y, 'es', { numeric: true, sensitivity: 'base' });
+
+  return [...files].sort((a, b) => {
+    const [baseA, extA] = splitExtension(a.name);
+    const [baseB, extB] = splitExtension(b.name);
+    return compare(baseA, baseB) || compare(extA, extB);
+  });
+}
+
+/**
+ * Separa "nombre.ext" en base y extensión por el ÚLTIMO punto: las
+ * descargas de WhatsApp Web llevan la hora con puntos en la base
+ * ("… at 10.15.32 AM.jpeg"). Sin punto, o con el punto solo al inicio
+ * (".jpg", un archivo oculto), todo el nombre es la base.
+ */
+function splitExtension(name: string): [string, string] {
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0) return [name, ''];
+  return [name.slice(0, dot), name.slice(dot + 1)];
+}

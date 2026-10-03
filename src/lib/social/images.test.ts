@@ -237,6 +237,28 @@ describe('ensurePublishableImages', () => {
     expect(out[1]).toContain('bucket.example.com');
     expect(out[2]).toBe('https://cdn.example.com/tercera.jpg');
   });
+
+  // Las fotos que sube el CRM salen en WebP (compress-image), así que en
+  // la práctica la portada SIEMPRE pasa por la conversión. Su copia
+  // tiene que seguir en el índice 0: es la que lleva el diseño del feed.
+  it('la portada convertida sigue primera aunque se mezcle con JPEG', async () => {
+    const { db } = fakeDb();
+    const portada = 'https://cdn.example.com/portada.webp';
+    const tercera = 'https://cdn.example.com/tercera.webp';
+
+    const out = await ensurePublishableImages({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      db: db as any,
+      accountId: ACCOUNT_ID,
+      imageUrls: [portada, 'https://cdn.example.com/segunda.jpg', tercera],
+    });
+
+    expect(out).toEqual([
+      `https://bucket.example.com/${convertedObjectPath(ACCOUNT_ID, portada)}`,
+      'https://cdn.example.com/segunda.jpg',
+      `https://bucket.example.com/${convertedObjectPath(ACCOUNT_ID, tercera)}`,
+    ]);
+  });
 });
 
 describe('un fallo de imagen nunca se reporta como problema de conexión', () => {

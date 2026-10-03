@@ -3,6 +3,7 @@ import {
   makeCoverImage,
   photoCutoff,
   reorderImages,
+  sortFilesByName,
 } from '@/lib/inventory/photo-order';
 
 const PHOTOS = ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg', 'e.jpg'];
@@ -102,5 +103,124 @@ describe('photoCutoff', () => {
 
   it('ignora máximos inválidos', () => {
     expect(photoCutoff(15, [0, Number.NaN, 10])).toBe(10);
+  });
+});
+
+describe('sortFilesByName', () => {
+  // Sólo importa `name`: se prueba con objetos planos para no depender
+  // de `File`, que en Node existe pero no hace falta.
+  const names = (files: { name: string }[]) => files.map((f) => f.name);
+  const asFiles = (list: string[]) => list.map((name) => ({ name }));
+
+  it('devuelve la portada primero aunque el selector la entregue última', () => {
+    // Lo que hace el diálogo de Windows al seleccionar con clic en la
+    // primera y Mayús+clic en la última: la del foco viene adelante.
+    const fromPicker = asFiles(['05.jpg', '01.jpg', '02.jpg', '03.jpg', '04.jpg']);
+    expect(names(sortFilesByName(fromPicker))).toEqual([
+      '01.jpg',
+      '02.jpg',
+      '03.jpg',
+      '04.jpg',
+      '05.jpg',
+    ]);
+  });
+
+  it('ordena los números como números, igual que el explorador', () => {
+    const fromPicker = asFiles(['foto 10.jpg', 'foto 2.jpg', 'foto 1.jpg']);
+    expect(names(sortFilesByName(fromPicker))).toEqual([
+      'foto 1.jpg',
+      'foto 2.jpg',
+      'foto 10.jpg',
+    ]);
+  });
+
+  it('no distingue mayúsculas de minúsculas', () => {
+    const fromPicker = asFiles(['b.JPG', 'A.jpg', 'c.jpg']);
+    expect(names(sortFilesByName(fromPicker))).toEqual(['A.jpg', 'b.JPG', 'c.jpg']);
+  });
+
+  it('conserva el orden de llegada entre nombres equivalentes', () => {
+    const first = { name: 'IMG.jpg', id: 1 };
+    const second = { name: 'img.jpg', id: 2 };
+    expect(sortFilesByName([first, second])).toEqual([first, second]);
+  });
+
+  it('no muta la lista original', () => {
+    const fromPicker = asFiles(['b.jpg', 'a.jpg']);
+    sortFilesByName(fromPicker);
+    expect(names(fromPicker)).toEqual(['b.jpg', 'a.jpg']);
+  });
+
+  it('acepta una lista vacía', () => {
+    expect(sortFilesByName([])).toEqual([]);
+  });
+
+  // Auditoría QA: los nombres que entregan cámaras y celulares.
+  it('ceros a la izquierda: IMG_0009 antes que IMG_0010 y IMG_0100', () => {
+    const fromPicker = asFiles(['IMG_0100.jpg', 'IMG_0010.jpg', 'IMG_0009.jpg']);
+    expect(names(sortFilesByName(fromPicker))).toEqual([
+      'IMG_0009.jpg',
+      'IMG_0010.jpg',
+      'IMG_0100.jpg',
+    ]);
+  });
+
+  it('tildes y eñe: como en español, sin mandar las tildadas al final', () => {
+    const fromPicker = asFiles(['oso.jpg', 'ñandú.jpg', 'Éxito.jpg', 'nube.jpg', 'zeta.jpg']);
+    expect(names(sortFilesByName(fromPicker))).toEqual([
+      'Éxito.jpg',
+      'nube.jpg',
+      'ñandú.jpg',
+      'oso.jpg',
+      'zeta.jpg',
+    ]);
+  });
+
+  it('extensiones distintas no alteran el orden numérico', () => {
+    const fromPicker = asFiles(['10.HEIC', '02.png', '3.jpeg', '1.jpg']);
+    expect(names(sortFilesByName(fromPicker))).toEqual([
+      '1.jpg',
+      '02.png',
+      '3.jpeg',
+      '10.HEIC',
+    ]);
+  });
+
+  // Auditoría QA: comparar el nombre entero mete la extensión en la
+  // pelea, y como el espacio va antes que el punto, "foto (2).jpg"
+  // quedaba antes que "foto.jpg" y la portada dejaba de ser la primera.
+  it('el original sin sufijo va antes que sus copias "(2)", "(3)"', () => {
+    const fromPicker = asFiles(['foto (3).jpg', 'foto.jpg', 'foto (2).jpg']);
+    expect(names(sortFilesByName(fromPicker))).toEqual([
+      'foto.jpg',
+      'foto (2).jpg',
+      'foto (3).jpg',
+    ]);
+  });
+
+  it('descargas de WhatsApp Web: la base con puntos va antes que "(1)" y "(2)"', () => {
+    const base = 'WhatsApp Image 2026-10-02 at 10.15.32 AM';
+    const fromPicker = asFiles([`${base} (2).jpeg`, `${base}.jpeg`, `${base} (1).jpeg`]);
+    expect(names(sortFilesByName(fromPicker))).toEqual([
+      `${base}.jpeg`,
+      `${base} (1).jpeg`,
+      `${base} (2).jpeg`,
+    ]);
+  });
+
+  it('misma base: desempata por extensión, y sin extensión va primero', () => {
+    const fromPicker = asFiles(['foto.png', 'foto.jpg', 'foto']);
+    expect(names(sortFilesByName(fromPicker))).toEqual(['foto', 'foto.jpg', 'foto.png']);
+  });
+
+  it('un nombre que empieza por punto se trata como base, no como extensión', () => {
+    const fromPicker = asFiles(['b.jpg', '.jpg', 'a.jpg']);
+    expect(names(sortFilesByName(fromPicker))).toEqual(['.jpg', 'a.jpg', 'b.jpg']);
+  });
+
+  it('no muta un FileList real (solo lectura, vía Array.from)', () => {
+    const list = Object.freeze(asFiles(['b.jpg', 'a.jpg']));
+    expect(names(sortFilesByName(list))).toEqual(['a.jpg', 'b.jpg']);
+    expect(names([...list])).toEqual(['b.jpg', 'a.jpg']);
   });
 });

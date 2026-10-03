@@ -2518,7 +2518,7 @@
     },
     "images": {
       "upload": "Subir imagen",
-      "hint": "PNG, JPG o WEBP (máx. 5 MB c/u). Arrastra las fotos para ordenarlas: la primera es la portada del vehículo y la que encabeza la publicación en redes."
+      "hint": "PNG, JPG o WEBP (máx. 5 MB c/u). Las fotos se suben en orden por nombre de archivo. La primera es la portada del vehículo y la que encabeza la publicación en redes; puedes cambiarla con la estrella o arrastrando."
     },
     "specs": {
       "transmission": {
@@ -2554,6 +2554,7 @@
     },
     "toasts": {
       "uploadFailed": "No se pudo subir la imagen",
+      "uploadFailedNamed": "No se pudo subir {name}.",
       "imageTooLarge": "{name} sigue pesando más de 5 MB después de optimizarla. Usa una foto más liviana.",
       "loadFailed": "No se pudo cargar el inventario",
       "requiredFields": "Marca, modelo y año son obligatorios",
@@ -2945,6 +2946,8 @@
   "Handoff": {
     "customerNotice": "Te asignamos un asesor comercial que se comunicará contigo. 🙌",
     "customerNoticeNamed": "Uno de nuestros asesores se pondrá en contacto contigo. Su nombre es {name}.",
+    "customerVisitClosing": "Ya puedes acercarte al concesionario y recuerda preguntar por tu asesor {name}.",
+    "customerVisitClosingLater": "Cuando vengas al concesionario, recuerda preguntar por tu asesor {name}.",
     "whenSoon": "Te escribe en los próximos minutos.",
     "whenToday": "Te escribe hoy desde las {time}.",
     "whenTomorrow": "Te escribe mañana desde las {time}.",

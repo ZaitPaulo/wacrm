@@ -76,6 +76,7 @@ import {
 import { compressImage } from '@/lib/storage/compress-image';
 import { VehiclePhotoOrder } from '@/components/inventory/vehicle-photo-order';
 import { photoCutoff } from '@/lib/inventory/photo-order';
+import { uploadPhotoBatch } from '@/lib/inventory/upload-batch';
 // Solo los NÚMEROS de cada red, que son módulos de constantes puras:
 // acá no se sabe qué redes están conectadas —eso costaría una petición
 // más al abrir el formulario— así que el corte se señala contra el más
@@ -545,30 +546,52 @@ export default function InventoryPage() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Sube las fotos elegidas en el input y las agrega al final del borrador
+   * abierto. Mientras dura (`uploadingImages`), el diálogo no se cierra y
+   * Guardar queda desactivado: las URLs llegan al terminar la tanda, y
+   * deben caer en esta ficha y antes de guardarla.
+   */
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = '';
     if (files.length === 0) return;
     setUploadingImages(true);
     try {
-      const urls: string[] = [];
-      for (const file of files) {
+      // La tanda ordena por nombre (el `FileList` no respeta el orden que
+      // la persona ve; ver `sortFilesByName`) y una foto que falla no
+      // corta las demás: lo que ya subió vuelve siempre en `urls`. Antes
+      // un error a mitad de camino dejaba esas fotos huérfanas en el
+      // bucket y fuera de la ficha.
+      const { urls, failed } = await uploadPhotoBatch(files, {
         // Comprimir antes de subir: una foto de celular supera de largo
         // el tope de 5 MB del bucket, y sin esto la mitad de las fotos
         // de un vehículo fallan.
-        const optimized = await compressImage(file);
-        if (optimized.size > MEDIA_MAX_BYTES_BY_KIND.image) {
-          toast.error(t('toasts.imageTooLarge', { name: file.name }));
-          continue;
-        }
-        const { publicUrl } = await uploadAccountMedia(
-          'showcase-media',
-          optimized
-        );
-        urls.push(publicUrl);
+        compress: compressImage,
+        upload: async (optimized) =>
+          (await uploadAccountMedia('showcase-media', optimized)).publicUrl,
+        maxBytes: MEDIA_MAX_BYTES_BY_KIND.image,
+      });
+      // Al FINAL, nunca adelante: si el vehículo ya tiene portada, subir
+      // más fotos no la desplaza.
+      if (urls.length > 0) {
+        setDraft((d) => ({ ...d, images: [...d.images, ...urls] }));
       }
-      setDraft((d) => ({ ...d, images: [...d.images, ...urls] }));
+      // Un aviso por foto, con su nombre: la persona tiene que saber
+      // cuáles volver a subir. El detalle técnico va de descripción.
+      for (const failure of failed) {
+        if (failure.reason === 'tooLarge') {
+          toast.error(t('toasts.imageTooLarge', { name: failure.name }));
+        } else {
+          toast.error(t('toasts.uploadFailedNamed', { name: failure.name }), {
+            description:
+              failure.error instanceof Error ? failure.error.message : undefined,
+          });
+        }
+      }
     } catch (err) {
+      // `uploadPhotoBatch` no lanza por una foto; esto queda para lo
+      // inesperado, como antes.
       toast.error(
         err instanceof Error ? err.message : t('toasts.uploadFailed')
       );
@@ -1001,8 +1024,21 @@ export default function InventoryPage() {
         </Table>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          // No se cierra mientras suben fotos: `handleImageUpload` agrega las
+          // URLs al borrador vigente al terminar, y si entretanto se abrió
+          // otro vehículo, las fotos caerían en la ficha equivocada.
+          if (!open && uploadingImages) return;
+          setDialogOpen(open);
+        }}
+      >
+        <DialogContent
+          className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+          // La X se oculta durante la subida por lo mismo: igual no cerraría.
+          showCloseButton={!uploadingImages}
+        >
           <DialogHeader>
             <DialogTitle>
               {editing ? t('dialog.editTitle') : t('dialog.createTitle')}
@@ -1538,11 +1574,15 @@ export default function InventoryPage() {
             <Button
               variant="outline"
               onClick={() => setDialogOpen(false)}
-              disabled={saving}
+              // Cerrar a mitad de una subida mandaría las fotos al borrador
+              // equivocado (ver `onOpenChange` del diálogo).
+              disabled={saving || uploadingImages}
             >
               {t('dialog.cancel')}
             </Button>
-            <Button onClick={save} disabled={saving}>
+            {/* Guardar espera a que terminen las fotos: si no, el vehículo se
+                guarda sin las que faltaban y esas quedan huérfanas en el bucket. */}
+            <Button onClick={save} disabled={saving || uploadingImages}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editing ? t('dialog.save') : t('dialog.create')}
             </Button>

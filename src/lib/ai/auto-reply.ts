@@ -516,13 +516,16 @@ async function loadContactName(
 /**
  * Quién atiende al cliente en espera y cuándo le escribe, para el prompt.
  * Best-effort: sin nombre o sin horario, el bot acompaña igual.
+ *
+ * El primer nombre es como el bot se refiere al asesor; el completo, el
+ * que le dice al cliente que pregunte al llegar al concesionario.
  */
 async function loadWaitingContext(
   db: ReturnType<typeof supabaseAdmin>,
   accountId: string,
   agentId: string | null,
-): Promise<{ agentName: string | null; when: string | null }> {
-  const [agentName, when] = await Promise.all([
+): Promise<{ agentName: string | null; agentFullName: string | null; when: string | null }> {
+  const [agentFullName, when] = await Promise.all([
     (async () => {
       if (!agentId) return null
       try {
@@ -531,14 +534,14 @@ async function loadWaitingContext(
           .select('full_name')
           .eq('user_id', agentId)
           .maybeSingle<{ full_name: string | null }>()
-        return primerNombre(data?.full_name ?? null)
+        return data?.full_name?.trim() || null
       } catch {
         return null
       }
     })(),
     handoffWhenSentence(accountId).catch(() => null),
   ])
-  return { agentName, when }
+  return { agentName: primerNombre(agentFullName), agentFullName, when }
 }
 
 /** Se abandona el dispatch: llegó un mensaje más nuevo del cliente. */
@@ -656,7 +659,8 @@ function withVehicleLinks(text: string, inventory: InventoryIndex | null): strin
  * asesor. Ver `openspec/changes/sticky-weighted-assignment/design.md`.
  *
  * Y avisa al cliente, con el primer nombre de quien lo va a atender
- * —tambien cuando es su asesor de siempre—.
+ * —tambien cuando es su asesor de siempre—; si vino a pedir una visita,
+ * con el nombre completo de por quién preguntar en el concesionario.
  *
  * Si la RPC falla (la migracion no esta, la base no responde), el bot se
  * pausa igual y la nota se guarda: un cliente que pidio un humano no
@@ -722,5 +726,9 @@ async function handOffToHuman(args: {
     conversationId: args.conversationId,
     contactId: args.contactId,
     agentName: primerNombre(resultado.agent?.fullName),
+    // Por visita, el aviso dice por quién preguntar al llegar, y ahí va el
+    // nombre completo.
+    agentFullName: resultado.agent?.fullName ?? null,
+    visit: args.request?.motivo === 'visita',
   })
 }

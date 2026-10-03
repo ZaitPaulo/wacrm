@@ -102,6 +102,53 @@ describe('publishImagePost', () => {
     expect(fetchMock).toHaveBeenCalledTimes(13);
   });
 
+  // La portada (la del diseño del feed) define el encuadre de todo el
+  // carrusel: el hijo N tiene que ser la foto N, y `children` tiene que
+  // listarlos en ese mismo orden.
+  it('crea los hijos en el orden de las fotos y los lista igual en el padre', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ id: 'c-portada' }))
+      .mockResolvedValueOnce(ok({ id: 'c-2' }))
+      .mockResolvedValueOnce(ok({ id: 'c-3' }))
+      .mockResolvedValueOnce(ok({ id: 'parent-1' }))
+      .mockResolvedValueOnce(ok({ id: 'parent-1', status_code: 'FINISHED' }))
+      .mockResolvedValueOnce(ok({ id: 'post-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const imageUrls = ['portada.jpg', '2.jpg', '3.jpg'].map(
+      (n) => `https://cdn.example.com/${n}`
+    );
+    await publishImagePost({ ...AUTH, imageUrls, caption: 'Tres' });
+
+    const childUrls = [0, 1, 2].map(
+      (i) => JSON.parse(fetchMock.mock.calls[i][1].body).image_url
+    );
+    expect(childUrls).toEqual(imageUrls);
+    expect(JSON.parse(fetchMock.mock.calls[3][1].body).children).toBe(
+      'c-portada,c-2,c-3'
+    );
+  });
+
+  it('al recortar conserva la portada y descarta por el final', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => ok({ id: 'x', status_code: 'FINISHED' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const imageUrls = Array.from(
+      { length: 14 },
+      (_, i) => `https://cdn.example.com/${i}.jpg`
+    );
+    await publishImagePost({ ...AUTH, imageUrls, caption: 'Muchas' });
+
+    const childUrls = Array.from(
+      { length: 10 },
+      (_, i) => JSON.parse(fetchMock.mock.calls[i][1].body).image_url
+    );
+    expect(childUrls).toEqual(imageUrls.slice(0, 10));
+  });
+
   it('espera a que Instagram termine de procesar antes de publicar', async () => {
     // El contenedor no está listo en cuanto Instagram devuelve su id.
     // Publicarlo antes de tiempo devuelve "Media ID is not available", que

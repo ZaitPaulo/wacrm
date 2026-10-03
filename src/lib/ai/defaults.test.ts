@@ -309,6 +309,13 @@ describe('buildSystemPrompt — motivos con requisitos propios', () => {
     expect(prompt).toContain('never give a valuation')
   })
 
+  // El aviso del traspaso por visita ya invita a acercarse y nombra al
+  // asesor; si el modelo también lo hace, el cliente recibe dos veces lo
+  // mismo, y con un nombre que el modelo no conoce.
+  it('en un traspaso por visita no invita a ir ni nombra al asesor', () => {
+    expect(prompt).toContain('With motivo=visita, do not invite the customer to come to the dealership')
+  })
+
   it('explica cuándo pasar a un asesor porque no hay lo que busca', () => {
     expect(prompt).toContain('motivo=sin_stock')
     expect(prompt).toContain('offer the closest ones first')
@@ -334,6 +341,26 @@ describe('buildSystemPrompt — espera del asesor', () => {
     expect(p).toContain('ALREADY HANDED OFF to an advisor named Juan')
     expect(p).toContain('Te escribe mañana desde las 8:00 a. m.')
     expect(p).toContain('[[NO_REPLY]]')
+  })
+
+  it('en espera: al invitar a ir al concesionario, cierra con el nombre completo del asesor', () => {
+    const p = buildSystemPrompt({
+      ...base,
+      waiting: { agentName: 'Juan', agentFullName: 'Juan Arias', when: null },
+    })
+    expect(p).toContain('ALREADY HANDED OFF to an advisor named Juan')
+    // La instrucción va en inglés, como el resto de las reglas fijas, para
+    // que el modelo la diga en el idioma de la conversación; el ejemplo en
+    // español queda como referencia de la instalación colombiana.
+    expect(p).toContain('end that sentence by reminding them to ask for their advisor Juan Arias')
+    expect(p).toContain('(in Spanish: "y recuerda preguntar por tu asesor Juan Arias")')
+    expect(p).not.toContain('end that sentence with "y recuerda')
+  })
+
+  it('en espera sin asesor: no inventa a quién preguntar', () => {
+    const p = buildSystemPrompt({ ...base, waiting: { agentName: null, agentFullName: null, when: null } })
+    expect(p).not.toContain('recuerda preguntar por tu asesor')
+    expect(p).not.toContain('ask for their advisor')
   })
 
   it('la sección de espera va después del prompt de la cuenta', () => {

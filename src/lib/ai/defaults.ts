@@ -229,7 +229,13 @@ export function buildSystemPrompt(args: {
    * La conversacion ya se traspaso y espera el primer mensaje del asesor
    * (bot-fase-2): el bot acompaña, no califica ni traspasa.
    */
-  waiting?: { agentName: string | null; when: string | null } | null
+  waiting?: {
+    agentName: string | null
+    /** Nombre completo, para decirle al cliente por quién preguntar en
+     *  el concesionario. Opcional: sin él no se da esa indicación. */
+    agentFullName?: string | null
+    when: string | null
+  } | null
   /** Regla de antigüedad para crédito vehicular (migración 547): el
    *  índice trae la columna "crédito vehicular". */
   creditRule?: { maxAgeYears: number } | null
@@ -282,7 +288,11 @@ export function buildSystemPrompt(args: {
         'Two reasons have their own requirements. ' +
         'motivo=vende_su_carro is for a customer who wants to SELL their own vehicle to the business (not trade it in for one of ours — that is permuta): before handing off, ask one thing at a time for make, model, year, mileage, the city on the plate, some photos, and the price they are asking; never give a valuation or say what it is worth. Put all of the vehicle data in interes; it needs only nombre and interes. ' +
         'motivo=sin_stock is for a customer nothing in the inventory works for — you showed them the closest alternatives and they turned them down, or nothing is within their budget: put what they are looking for in interes and their budget in presupuesto; it needs nombre, presupuesto and interes. Do not use it just because the exact year or colour they named is missing: offer the closest ones first.\n' +
-        'The exception is motivo=reclamo and motivo=pide_humano: those need only nombre, because a customer who is upset or who asked for a person must never be held back while you collect sales data.',
+        'The exception is motivo=reclamo and motivo=pide_humano: those need only nombre, because a customer who is upset or who asked for a person must never be held back while you collect sales data.\n' +
+        // El aviso que sigue al traspaso por visita ya invita a acercarse y
+        // dice por quién preguntar: si el modelo también lo hace, el cliente
+        // recibe dos invitaciones, y con un asesor que el modelo no conoce.
+        'With motivo=visita, do not invite the customer to come to the dealership and do not name an advisor: the message sent right after the handoff does both.',
     )
   }
 
@@ -355,6 +365,14 @@ export function buildSystemPrompt(args: {
         `if they ask about being attended, or just check in ("hola?", "me van a escribir?"), tell them ${
           waiting.agentName ? waiting.agentName : 'their advisor'
         } has their case${waiting.when ? ' and when they will write' : ''}, in one short sentence; ` +
+        // Quien llega al concesionario tiene que saber por quién preguntar;
+        // en la recepción buscan al asesor por su nombre completo. La
+        // instrucción va en inglés como el resto de las reglas fijas, para
+        // que el modelo la diga en el idioma de la conversación; el ejemplo
+        // en español es solo la referencia de la instalación colombiana.
+        (waiting.agentFullName
+          ? `if you invite the customer to come to the dealership, or confirm a visit, end that sentence by reminding them to ask for their advisor ${waiting.agentFullName} (in Spanish: "y recuerda preguntar por tu asesor ${waiting.agentFullName}"); `
+          : '') +
         'if the message needs no answer at all ("ok", "gracias", an emoji), reply with exactly [[NO_REPLY]] and nothing else.',
     )
   }

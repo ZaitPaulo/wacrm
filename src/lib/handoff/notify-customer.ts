@@ -34,26 +34,69 @@ const FALLBACK =
 
 /**
  * Read the notice from the install's catalogue (`Handoff.*`) and add the
- * sentence that says when the agent will write, if there is one.
+ * sentence that says when the agent will write, if there is one, plus the
+ * visit closing when it applies.
  *
  * Con nombre se usa la forma que lo nombra, que es una frase aparte y no
  * el texto anónimo con el nombre pegado: cada idioma decide dónde va el
  * nombre dentro de la oración. Lo mismo la frase de tiempo, que va
  * después como oración propia.
+ *
+ * Traspaso por visita con asesor: el aviso cierra invitando a acercarse
+ * al concesionario y diciendo por quién preguntar, con el nombre
+ * completo —en la recepción lo buscan así—. Para no nombrarlo dos veces,
+ * la apertura es la anónima ("Te asignamos un asesor…") y el nombre va
+ * solo al final, después de la frase de tiempo, que así sigue teniendo
+ * sujeto ("Te escribe…" es ese asesor). Fuera de horario el cierre no
+ * dice "ya puedes acercarte" (ver `visitClosingTemplate`).
  */
-async function notice(agentName: string | null, when: HandoffWhen | null): Promise<string> {
+async function notice(
+  agent: { name: string | null; fullName: string | null; visit: boolean },
+  when: HandoffWhen | null,
+): Promise<string> {
   const handoff = await loadCatalogSection('Handoff')
   if (!handoff) return FALLBACK
 
+  // El nombre entra con una función de reemplazo y no como string: con un
+  // string, `replace` interpreta $&, $` y $' dentro del reemplazo, y un
+  // nombre que los contenga reescribiría el aviso en vez de aparecer tal cual.
+  const fullName = agent.fullName
+  const closingTemplate = visitClosingTemplate(handoff, when)
+  const closing =
+    agent.visit && fullName && closingTemplate
+      ? closingTemplate.replace('{name}', () => fullName)
+      : null
+
+  const name = agent.name
   const base =
-    agentName && typeof handoff.customerNoticeNamed === 'string'
-      ? handoff.customerNoticeNamed.replace('{name}', agentName)
+    !closing && name && typeof handoff.customerNoticeNamed === 'string'
+      ? handoff.customerNoticeNamed.replace('{name}', () => name)
       : typeof handoff.customerNotice === 'string'
         ? handoff.customerNotice
         : FALLBACK
 
-  const sentence = whenSentence(handoff, when)
-  return sentence ? `${base} ${sentence}` : base
+  return [base, whenSentence(handoff, when), closing].filter(Boolean).join(' ')
+}
+
+/**
+ * Qué cierre lleva el aviso de visita según cuándo escribe el asesor.
+ *
+ * "Ya puedes acercarte" solo es verdad si el asesor está por escribir
+ * (`soon`) o si no sabemos el horario. Fuera de horario —hoy más tarde,
+ * mañana o otro día— seguía a "Te escribe mañana desde las 8:00 a. m." y
+ * se contradecía: el cliente no sabía si ir ya o esperar. Ahí la
+ * invitación queda para cuando venga, sin decirle que ya puede.
+ *
+ * Si la instalación todavía no tiene la clave nueva en su catálogo, el
+ * cierre de siempre: mejor la frase vieja que perder la invitación.
+ */
+function visitClosingTemplate(
+  handoff: Record<string, unknown>,
+  when: HandoffWhen | null,
+): string | null {
+  const pick = (key: string) => (typeof handoff[key] === 'string' ? (handoff[key] as string) : null)
+  const later = when !== null && when.kind !== 'soon'
+  return (later ? pick('customerVisitClosingLater') : null) ?? pick('customerVisitClosing')
 }
 
 /** "…las 8:00 a. m.." → "…las 8:00 a. m.": la hora en español ya termina
@@ -114,6 +157,15 @@ async function whenForAccount(accountId: string): Promise<HandoffWhen | null> {
   }
 }
 
+/**
+ * Le avisa al cliente por el mismo canal que su conversación pasó a un
+ * asesor: quién lo atiende, cuándo le escribe y, si vino a pedir una
+ * visita, por quién preguntar al llegar (ver `notice`).
+ *
+ * Nunca lanza: sin conversación o contacto no hay a quién escribir y se
+ * sale; un fallo al enviar solo se registra, porque el traspaso ya está
+ * hecho y el aviso no puede tumbarlo.
+ */
 export async function notifyCustomerOfHandoff(args: {
   accountId: string
   /** Audit column on the outbound message; the flow / config owner. */
@@ -124,6 +176,11 @@ export async function notifyCustomerOfHandoff(args: {
    *  asesor asignable, o la derivacion vino de un flujo— el aviso
    *  vuelve a la forma anonima: nunca se promete un nombre inexistente. */
   agentName?: string | null
+  /** Nombre completo del mismo asesor, para la invitación de la visita. */
+  agentFullName?: string | null
+  /** El bot traspasó porque el cliente quiere visitar el concesionario
+   *  (`motivo=visita`). Solo cambia el aviso si además hay asesor. */
+  visit?: boolean
 }): Promise<void> {
   if (!args.conversationId || !args.contactId) return
   try {
@@ -133,7 +190,14 @@ export async function notifyCustomerOfHandoff(args: {
       userId: args.userId,
       conversationId: args.conversationId,
       contactId: args.contactId,
-      text: await notice(args.agentName ?? null, await whenForAccount(args.accountId)),
+      text: await notice(
+        {
+          name: args.agentName ?? null,
+          fullName: args.agentFullName?.trim() || null,
+          visit: args.visit ?? false,
+        },
+        await whenForAccount(args.accountId),
+      ),
     })
   } catch (err) {
     console.error('[handoff] customer notice failed:', err)

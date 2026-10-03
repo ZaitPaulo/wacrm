@@ -182,6 +182,23 @@ function aiConfig(overrides: Partial<AiConfig> = {}): AiConfig {
   }
 }
 
+/** La conversación ya tiene asesor y la base lo conserva: el lead que
+ *  vuelve. */
+function keepBrayan() {
+  h.state.conv = {
+    assigned_agent_id: 'u-brayan',
+    ai_autoreply_disabled: false,
+    ai_reply_count: 0,
+    ai_handoff_attempts: 0,
+  }
+  h.state.handoffResult = {
+    outcome: 'kept',
+    source: 'kept',
+    agent: { userId: 'u-brayan', profileId: 'p-brayan', fullName: 'Brayan Hernández' },
+    deal: 'created',
+  }
+}
+
 /** Peticion de transferencia con los cuatro datos y el perfil de
  *  credito: la que el gate deja pasar. Los tests que prueban el bloqueo
  *  quitan campos. */
@@ -693,6 +710,8 @@ describe('dispatchInboundToAiReply — a quién se asigna', () => {
   })
 
   it('le dice al cliente el primer nombre de quien lo va a atender', async () => {
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest({ motivo: 'credito' }) })
+
     await dispatchInboundToAiReply(ARGS)
 
     // Juan Marino Arias → "Juan": así se presenta un vendedor, no con el
@@ -702,25 +721,93 @@ describe('dispatchInboundToAiReply — a quién se asigna', () => {
     expect(aviso).not.toContain('Marino')
   })
 
-  // El lead que vuelve: su asesor se conserva, y el cliente sabe que es él.
-  it('nombra al asesor de siempre cuando la base lo conserva', async () => {
-    h.state.conv = {
-      assigned_agent_id: 'u-brayan',
-      ai_autoreply_disabled: false,
-      ai_reply_count: 0,
-      ai_handoff_attempts: 0,
+  // Por visita, el cliente tiene que saber por quién preguntar al llegar:
+  // ahí sí va el nombre completo.
+  it('en un traspaso por visita, invita a acercarse y nombra al asesor completo', async () => {
+    // El catálogo de la instalación colombiana: la frase se verifica literal.
+    vi.stubEnv('NEXT_PUBLIC_APP_LOCALE', 'es')
+    try {
+      await dispatchInboundToAiReply(ARGS)
+    } finally {
+      vi.unstubAllEnvs()
     }
+
+    const aviso = h.engineSendText.mock.calls[0][0].text as string
+    expect(aviso).toContain('acercarte al concesionario y recuerda preguntar por tu asesor Juan Marino Arias')
+  })
+
+  it('en un traspaso por visita sin asesor, no nombra a nadie', async () => {
+    h.state.handoffResult = { outcome: 'no_agent', source: 'none', agent: null, deal: 'created' }
+    // Con el catálogo en español: con el inglés por defecto la frase en
+    // español nunca aparecería y la aserción no probaría nada.
+    vi.stubEnv('NEXT_PUBLIC_APP_LOCALE', 'es')
+    try {
+      await dispatchInboundToAiReply(ARGS)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+
+    const aviso = h.engineSendText.mock.calls[0][0].text as string
+    expect(aviso.startsWith('Te asignamos un asesor comercial')).toBe(true)
+    expect(aviso).not.toContain('recuerda preguntar por tu asesor')
+    expect(aviso).not.toContain('acercarte al concesionario')
+  })
+
+  it('en un traspaso por visita con asesor sin nombre en el perfil, el aviso es anónimo', async () => {
     h.state.handoffResult = {
-      outcome: 'kept',
-      source: 'kept',
-      agent: { userId: 'u-brayan', profileId: 'p-brayan', fullName: 'Brayan Hernández' },
+      outcome: 'assigned',
+      source: 'weighted',
+      agent: { userId: 'u-x', profileId: 'p-x', fullName: '   ' },
       deal: 'created',
     }
+    vi.stubEnv('NEXT_PUBLIC_APP_LOCALE', 'es')
+    try {
+      await dispatchInboundToAiReply(ARGS)
+    } finally {
+      vi.unstubAllEnvs()
+    }
 
-    await dispatchInboundToAiReply(ARGS)
+    const aviso = h.engineSendText.mock.calls[0][0].text as string
+    expect(aviso.startsWith('Te asignamos un asesor comercial')).toBe(true)
+    expect(aviso).not.toContain('recuerda preguntar por tu asesor')
+    expect(aviso).not.toContain('Su nombre es')
+  })
+
+  // El lead que vuelve: su asesor se conserva, y el cliente sabe que es él.
+  // Con motivo 'credito': la petición por defecto es por visita y pasaría
+  // por el cierre de visita, no por el aviso con el primer nombre.
+  it('nombra al asesor de siempre cuando la base lo conserva', async () => {
+    keepBrayan()
+    h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest({ motivo: 'credito' }) })
+    vi.stubEnv('NEXT_PUBLIC_APP_LOCALE', 'es')
+    try {
+      await dispatchInboundToAiReply(ARGS)
+    } finally {
+      vi.unstubAllEnvs()
+    }
 
     expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
-    expect(h.engineSendText.mock.calls[0][0].text).toContain('Brayan')
+    const aviso = h.engineSendText.mock.calls[0][0].text as string
+    expect(aviso).toContain('Su nombre es Brayan.')
+    expect(aviso).not.toContain('Hernández')
+    expect(aviso).not.toContain('recuerda preguntar por tu asesor')
+  })
+
+  // La misma conservación, pero por visita: el cliente que vuelve al
+  // concesionario pregunta por su asesor de siempre, con nombre completo.
+  it('por visita, invita a preguntar por el asesor de siempre con su nombre completo', async () => {
+    keepBrayan()
+    vi.stubEnv('NEXT_PUBLIC_APP_LOCALE', 'es')
+    try {
+      await dispatchInboundToAiReply(ARGS)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+
+    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+    const aviso = h.engineSendText.mock.calls[0][0].text as string
+    expect(aviso).toContain('recuerda preguntar por tu asesor Brayan Hernández')
+    expect(aviso).not.toContain('Su nombre es')
   })
 
   it('deja el hilo en la cola compartida cuando no hay asesores', async () => {
@@ -1152,6 +1239,8 @@ describe('dispatchInboundToAiReply — en espera del asesor', () => {
 
     const prompt = h.generateReply.mock.calls[0][0].systemPrompt as string
     expect(prompt).toContain('ALREADY HANDED OFF to an advisor named Juan')
+    // El nombre completo, para cuando invite al cliente a ir al concesionario.
+    expect(prompt).toContain('recuerda preguntar por tu asesor Juan Marino Arias')
     expect(prompt).not.toContain('[[HANDOFF nombre=')
     expect(h.engineSendText).toHaveBeenCalledTimes(1)
     expect(h.engineSendText.mock.calls[0][0].text).toBe('Sí, ese Aveo tiene aire.')

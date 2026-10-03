@@ -136,6 +136,28 @@ describe('publishPhotoPost', () => {
     expect(JSON.parse(bodyOf(fetchMock, 10).attached_media)).toHaveLength(10);
   });
 
+  it('al recortar sube primero la portada y descarta por el final', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) =>
+      String(url).includes('/feed')
+        ? ok({ id: 'post-1' })
+        : ok({ id: `photo-${fetchMock.mock.calls.length}` })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const many = Array.from(
+      { length: 15 },
+      (_, i) => `https://cdn.example.com/${i}.jpg`
+    );
+    await publishPhotoPost({ ...AUTH, imageUrls: many, caption: 'Muchas' });
+
+    const uploaded = Array.from({ length: 10 }, (_, i) => bodyOf(fetchMock, i).url);
+    expect(uploaded).toEqual(many.slice(0, 10));
+    // Y la entrada las adjunta en ese mismo orden: la portada primero.
+    expect(JSON.parse(bodyOf(fetchMock, 10).attached_media)[0]).toEqual({
+      media_fbid: 'photo-1',
+    });
+  });
+
   it('rechaza publicar sin imágenes', async () => {
     await expect(
       publishPhotoPost({ ...AUTH, imageUrls: [], caption: 'Nada' })
