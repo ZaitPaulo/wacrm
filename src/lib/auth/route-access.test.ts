@@ -13,6 +13,8 @@ import {
 // aparecer nunca en ADMIN_ONLY_ROUTES.
 const OPERATIONAL_ROUTES = [
   "/inbox",
+  // La Agenda (agenda-citas): cada asesor ve la suya, el viewer la consulta.
+  "/agenda",
   "/notifications",
   "/contacts",
   "/documents",

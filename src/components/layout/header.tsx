@@ -22,6 +22,7 @@ import { canAccessSection } from "@/components/settings/settings-sections";
 const pageTitles: Record<string, string> = {
   "/dashboard": "dashboard",
   "/inbox": "inbox",
+  "/agenda": "agenda",
   "/notifications": "notifications",
   "/contacts": "contacts",
   "/pipelines": "pipelines",

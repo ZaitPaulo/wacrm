@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   dispatchInboundToFlows: vi.fn(),
   dispatchInboundToAiReply: vi.fn(),
   dispatchWebhookEvent: vi.fn(),
+  handleAppointmentReply: vi.fn(),
   state: {
     // Result the message upsert's .select() resolves to. A genuine insert
     // returns the row; a replayed delivery conflicts and returns [].
@@ -206,6 +207,9 @@ vi.mock('@/lib/flows/engine', () => ({
 vi.mock('@/lib/ai/auto-reply', () => ({
   dispatchInboundToAiReply: h.dispatchInboundToAiReply,
 }));
+vi.mock('@/lib/appointments/customer-reply', () => ({
+  handleAppointmentReply: h.handleAppointmentReply,
+}));
 vi.mock('@/lib/webhooks/deliver', () => ({
   dispatchWebhookEvent: h.dispatchWebhookEvent,
 }));
@@ -274,6 +278,7 @@ beforeEach(() => {
   h.state.automationStarted = 0;
   h.state.automationCompleted = 0;
   h.dispatchInboundToFlows.mockResolvedValue({ consumed: false });
+  h.handleAppointmentReply.mockResolvedValue({ consumed: false });
   h.dispatchInboundToAiReply.mockResolvedValue(undefined);
   h.dispatchWebhookEvent.mockResolvedValue(undefined);
   h.runAutomationsForTrigger.mockImplementation(() => {
@@ -284,6 +289,47 @@ beforeEach(() => {
         resolve();
       }, 0);
     });
+  });
+});
+
+describe('inbound webhook: botones del recordatorio de cita (agenda-citas)', () => {
+  const citaTap = {
+    id: 'wamid.CITA1',
+    from: '15551230000',
+    timestamp: '1700000000',
+    type: 'button',
+    button: {
+      text: 'Confirmo',
+      payload: 'cita:3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90:confirmar:1791406800',
+    },
+  };
+
+  it('lo atiende la Agenda y no pasa por flujos, disparadores ni bot', async () => {
+    h.handleAppointmentReply.mockResolvedValue({ consumed: true, outcome: 'confirmed' });
+    await runWebhook(citaTap);
+
+    expect(h.handleAppointmentReply).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ replyId: citaTap.button.payload })
+    );
+    expect(h.dispatchInboundToFlows).not.toHaveBeenCalled();
+    const triggers = h.runAutomationsForTrigger.mock.calls.map(
+      (call) => (call[0] as { triggerType: string }).triggerType
+    );
+    expect(triggers).not.toContain('interactive_reply');
+    expect(triggers).not.toContain('new_message_received');
+    expect(h.dispatchInboundToAiReply).not.toHaveBeenCalled();
+  });
+
+  it('si no es de una cita, sigue a los flujos como siempre', async () => {
+    await runWebhook({ ...citaTap, button: { text: 'Sí', payload: 'YES' } });
+    expect(h.dispatchInboundToFlows).toHaveBeenCalled();
+  });
+
+  it('un fallo de la Agenda no tumba la entrada', async () => {
+    h.handleAppointmentReply.mockRejectedValue(new Error('boom'));
+    await runWebhook(citaTap);
+    expect(h.dispatchInboundToFlows).toHaveBeenCalled();
   });
 });
 

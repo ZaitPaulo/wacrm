@@ -121,6 +121,25 @@ function esFestivo(
   return calendario === 'CO' && esFestivoColombiano(fecha);
 }
 
+/**
+ * La franja abierta de la fecha dada, en minutos desde la medianoche, o
+ * `null` si ese día está cerrado (o es festivo). La usa la Agenda para
+ * saber qué horas puede ofrecer.
+ */
+export function franjaDelDia(
+  hours: HorarioSemanal,
+  fecha: Date,
+  holidayCalendar?: 'CO' | null
+): { desde: number; hasta: number } | null {
+  if (esFestivo(holidayCalendar, fecha)) return null;
+  const franja = hours[DIAS[fecha.getDay()]];
+  if (!franja) return null;
+  const desde = aMinutos(franja[0]);
+  const hasta = aMinutos(franja[1]);
+  if (desde === null || hasta === null || hasta <= desde) return null;
+  return { desde, hasta };
+}
+
 /** ¿`now` cae dentro del horario de atención? */
 export function dentroDeHorario(
   hours: HorarioSemanal,

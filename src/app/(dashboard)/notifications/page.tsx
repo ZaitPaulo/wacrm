@@ -6,7 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import type { Notification } from "@/types";
 import {
+  AlarmClock,
   AlertTriangle,
+  CalendarCheck,
+  CalendarX,
+  CarFront,
+  ClipboardCheck,
+  UserX,
+  CalendarClock,
+  CalendarDays,
+  CalendarPlus,
   Bell,
   CheckCheck,
   Clock,
@@ -21,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { PushNotificationsCard } from "@/components/notifications/push-notifications-card";
+import { notificationHref } from "@/lib/push/payload";
 
 // Icono por tipo de aviso: asignación, mensaje nuevo de un cliente, o un
 // traspaso del bot sin atender (recordatorio al asesor / aviso a admins).
@@ -29,6 +39,16 @@ const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
   new_message: MessageCircle,
   handoff_reminder: Clock,
   handoff_unattended: AlertTriangle,
+  appointment_assigned: CalendarPlus,
+  appointment_change_requested: CalendarClock,
+  appointment_digest: CalendarDays,
+  appointment_vehicle_unavailable: CarFront,
+  appointment_pre_visit: AlarmClock,
+  appointment_customer_confirmed: CalendarCheck,
+  appointment_updated: CalendarClock,
+  appointment_unassigned: CalendarX,
+  appointment_attendance_pending: ClipboardCheck,
+  appointment_no_show: UserX,
 };
 
 export default function NotificationsPage() {
@@ -135,9 +155,9 @@ export default function NotificationsPage() {
   const handleClick = useCallback(
     (n: Notification) => {
       if (!n.read_at) markRead(n.id);
-      if (n.conversation_id) {
-        router.push(`/inbox?c=${n.conversation_id}`);
-      }
+      // Mismo destino que el push y el aviso emergente.
+      const href = notificationHref(n);
+      if (href !== "/notifications") router.push(href);
     },
     [markRead, router],
   );

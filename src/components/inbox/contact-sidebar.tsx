@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { getAllowedTargetStages } from "@/lib/pipelines/stage-transitions";
 import { formatVehicleLabel } from "@/lib/pipelines/deal-vehicle";
 import { DealForm } from "@/components/pipelines/deal-form";
+import { ContactAppointments } from "@/components/agenda/contact-appointments";
 import type {
   Contact,
   Deal,
@@ -400,6 +401,10 @@ export function ContactSidebar({ contact, className }: ContactSidebarProps) {
               </div>
             )}
           </div>
+
+          {/* Citas en la Agenda (agenda-citas): la próxima y las anteriores.
+              No dibuja nada si el contacto no tiene ninguna. */}
+          <ContactAppointments contactId={contact.id} />
 
           {/* Divider */}
           <div className="my-4 border-t border-border" />

@@ -18,6 +18,7 @@ import {
   viewedConversationId,
   type AlertableRow,
 } from "@/lib/push/client";
+import { notificationHref } from "@/lib/push/payload";
 import type { Notification } from "@/types";
 
 /**
@@ -128,11 +129,14 @@ export function InAppNotificationAlerts() {
           if (decision !== "alert") return;
 
           playChime();
-          const url = row.conversation_id ? `/inbox?c=${row.conversation_id}` : "/notifications";
+          const url = notificationHref(row);
           // Mismo id por conversación: los mensajes seguidos reemplazan el
           // aviso emergente en vez de apilarlo, igual que el del sistema.
           toast(row.title, {
-            id: row.conversation_id ? `conversation-${row.conversation_id}` : row.id,
+            id:
+              row.conversation_id && !row.type.startsWith("appointment_")
+                ? `conversation-${row.conversation_id}`
+                : row.id,
             description: row.body ? row.body.split("\n")[0] : undefined,
             duration: 8000,
             action: {

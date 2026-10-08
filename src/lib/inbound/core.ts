@@ -13,6 +13,7 @@ import { reactivateBotForReturningLead } from '@/lib/ai/returning-lead';
 import { aiVisionMaxImages } from '@/lib/ai/defaults';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
 import { recordVehicleInquiry } from '@/lib/inventory/inquiries';
+import { handleAppointmentReply } from '@/lib/appointments/customer-reply';
 import type { AdReferral } from './ad-referral';
 
 // ============================================================
@@ -448,7 +449,30 @@ export async function fanOutInbound(ctx: InboundFanout): Promise<void> {
   // `first_inbound_message`) still fire even when consumed — those
   // are about WHO is messaging, not what they said.
   // ============================================================
-  const flowResult = await dispatchInboundToFlows({
+  // ============================================================
+  // Botones del recordatorio de una cita (agenda-citas).
+  //
+  // Va antes que los flujos: "Confirmo" o "Necesito cambiar la hora"
+  // cambian la cita de forma determinista y no hay nada que interpretar.
+  // Si lo consume, se trata como un mensaje consumido por un flujo (sin
+  // disparadores de contenido) y el bot ya no contesta porque trae
+  // `interactiveReplyId`. Un fallo acá no puede tumbar la entrada.
+  // ============================================================
+  const appointmentReply = inbound.interactiveReplyId
+    ? await handleAppointmentReply(db, {
+        accountId,
+        contactId,
+        conversationId,
+        replyId: inbound.interactiveReplyId,
+      }).catch((err) => {
+        console.error('[appointments] respuesta al recordatorio falló:', err);
+        return { consumed: false as const };
+      })
+    : { consumed: false as const };
+
+  const flowResult = appointmentReply.consumed
+    ? { consumed: true }
+    : await dispatchInboundToFlows({
     accountId,
     userId: auditUserId,
     contactId,

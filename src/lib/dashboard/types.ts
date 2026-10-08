@@ -251,3 +251,21 @@ export interface AgentPerformanceRow {
   /** Cuántos entrantes entraron en el promedio. */
   responseSamples: number
 }
+
+/**
+ * Una fila de «Citas y asistencia» (agenda-citas-avisos): lo que hizo un
+ * asesor con sus citas en el período. `attendanceRate` es null cuando no
+ * hay ninguna cita marcada: sin datos, no 0 %.
+ */
+export interface AppointmentMetricsRow {
+  agentUserId: string
+  fullName: string
+  appointments: number
+  attended: number
+  noShow: number
+  unmarked: number
+  cancelled: number
+  /** Entre 0 y 1. */
+  attendanceRate: number | null
+  salesFromVisit: number
+}

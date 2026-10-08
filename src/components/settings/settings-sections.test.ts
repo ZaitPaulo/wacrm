@@ -42,6 +42,15 @@ describe('canAccessSection', () => {
     expect(resolveSection('social-posts', 'agent')).toBe('profile');
   });
 
+  it('reserva la configuración de la Agenda a admin y owner', () => {
+    // Decide qué plantillas y a qué hora le escribe el sistema a los
+    // clientes; la RLS de appointment_settings ya exige admin.
+    expect(SECTION_META.appointments.group).toBe('workspace');
+    expect(canAccessSection('appointments', 'owner')).toBe(true);
+    expect(canAccessSection('appointments', 'agent')).toBe(false);
+    expect(resolveSection('appointments', 'viewer')).toBe('profile');
+  });
+
   it('deja a cada rol entrar a sus propias secciones de cuenta', () => {
     for (const role of ACCOUNT_ROLES) {
       for (const section of ACCOUNT_GROUP_SECTIONS) {

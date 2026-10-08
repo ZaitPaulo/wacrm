@@ -222,7 +222,20 @@ export type NotificationType =
   // Traspaso del bot sin atender (migración 546): recordatorio al asesor
   // y aviso a owner/admin.
   | 'handoff_reminder'
-  | 'handoff_unattended';
+  | 'handoff_unattended'
+  // Agenda de citas (migración 548): cita asignada, el cliente pidió
+  // cambiar la hora y el resumen diario de visitas.
+  | 'appointment_assigned'
+  | 'appointment_change_requested'
+  | 'appointment_digest'
+  // Avisos de la Agenda (migración 549, agenda-citas-avisos).
+  | 'appointment_vehicle_unavailable'
+  | 'appointment_pre_visit'
+  | 'appointment_customer_confirmed'
+  | 'appointment_updated'
+  | 'appointment_unassigned'
+  | 'appointment_attendance_pending'
+  | 'appointment_no_show';
 
 export interface Notification {
   id: string;
@@ -232,6 +245,10 @@ export interface Notification {
   type: NotificationType;
   conversation_id?: string;
   contact_id?: string;
+  /** Cita a la que lleva el aviso (tipos `appointment_*`). */
+  appointment_id?: string;
+  /** Destino explícito cuando no basta la conversación o la cita (549). */
+  link_path?: string;
   /** Who triggered it. Null when an automation/system assigned it. */
   actor_user_id?: string;
   title: string;

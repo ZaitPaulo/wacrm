@@ -15,6 +15,7 @@ import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
 import { InstagramConfig } from '@/components/settings/instagram-config';
 import { FacebookConfig } from '@/components/settings/facebook-config';
 import { SocialPostSettings } from '@/components/settings/social-post-settings';
+import { AppointmentSettings } from '@/components/settings/appointment-settings';
 import { TemplateManager } from '@/components/settings/template-manager';
 import { QuickRepliesManager } from '@/components/settings/quick-replies-manager';
 import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel';
@@ -111,6 +112,7 @@ function SettingsPageInner() {
     showcase: <ShowcaseSettings />,
     'business-hours': <BusinessHoursSettings />,
     assignment: <AssignmentSettings />,
+    appointments: <AppointmentSettings />,
     members: <MembersTab />,
     api: <ApiKeysSettings />,
   };

@@ -30,6 +30,7 @@ import {
   Workflow,
   X,
   Zap,
+  CalendarDays,
 } from "lucide-react";
 import { type AccountRole } from "@/lib/auth/roles";
 import { canAccessPath, homeForRole } from "@/lib/auth/route-access";
@@ -102,6 +103,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { href: "/inbox", labelKey: "inbox", icon: MessageSquare },
+  { href: "/agenda", labelKey: "agenda", icon: CalendarDays },
   { href: "/notifications", labelKey: "notifications", icon: Bell },
   { href: "/contacts", labelKey: "contacts", icon: Users },
   { href: "/inventory", labelKey: "inventory", icon: Car },

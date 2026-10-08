@@ -5,6 +5,7 @@ import {
   PUSH_TTL_SECONDS,
   buildPushPayload,
   buildTestPushPayload,
+  notificationHref,
   pushSendOptions,
   pushTopic,
 } from './payload'
@@ -90,5 +91,61 @@ describe('buildTestPushPayload', () => {
     expect(p.test).toBe(true)
     expect(p.tag).toBe('push-test')
     expect(p.url).toBe('/notifications')
+  })
+})
+
+describe('avisos de la Agenda (agenda-citas)', () => {
+  const CITA = '3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90'
+
+  it('una cita asignada lleva a la Agenda en esa cita, no a la bandeja', () => {
+    const n = notif({ type: 'appointment_assigned', appointment_id: CITA })
+    expect(notificationHref(n)).toBe(`/agenda?cita=${CITA}`)
+    const p = buildPushPayload(n)
+    expect(p.url).toBe(`/agenda?cita=${CITA}`)
+    // No reemplaza el aviso de mensajes de la misma conversación.
+    expect(p.tag).toBe('notification-n-1')
+    expect(pushTopic(n)).toBeUndefined()
+  })
+
+  it('el pedido de cambio también va a la cita', () => {
+    expect(
+      notificationHref(notif({ type: 'appointment_change_requested', appointment_id: CITA }))
+    ).toBe(`/agenda?cita=${CITA}`)
+  })
+
+  it('el resumen diario abre la vista Día', () => {
+    expect(notificationHref(notif({ type: 'appointment_digest', conversation_id: null }))).toBe(
+      '/agenda?vista=dia'
+    )
+  })
+
+  it('un destino explícito manda (asistencia sin marcar)', () => {
+    expect(
+      notificationHref(
+        notif({ type: 'appointment_attendance_pending', link_path: '/agenda?vista=dia&fecha=2026-10-07' })
+      )
+    ).toBe('/agenda?vista=dia&fecha=2026-10-07')
+    // Nunca a otro sitio, aunque la columna lo traiga.
+    expect(notificationHref(notif({ type: 'appointment_pre_visit', appointment_id: CITA, link_path: '//evil.com' }))).toBe(
+      `/agenda?cita=${CITA}`
+    )
+  })
+
+  it('los avisos nuevos de cita van a la cita', () => {
+    for (const type of [
+      'appointment_vehicle_unavailable',
+      'appointment_pre_visit',
+      'appointment_customer_confirmed',
+      'appointment_updated',
+      'appointment_unassigned',
+      'appointment_no_show',
+    ] as const) {
+      expect(notificationHref(notif({ type, appointment_id: CITA }))).toBe(`/agenda?cita=${CITA}`)
+    }
+  })
+
+  it('una conversación sigue yendo a la bandeja', () => {
+    expect(notificationHref(notif())).toBe(`/inbox?c=${CONV}`)
+    expect(notificationHref(notif({ conversation_id: null }))).toBe('/notifications')
   })
 })

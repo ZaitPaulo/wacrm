@@ -44,12 +44,42 @@ export interface PushableNotification {
   title: string
   body?: string | null
   conversation_id?: string | null
+  /** Avisos de la Agenda (migración 548): la cita a la que llevan. */
+  appointment_id?: string | null
+  /** Destino explícito (549): p. ej. la vista Día de una fecha. */
+  link_path?: string | null
 }
+
+/** Ruta propia: empieza con una barra y no con dos (igual que el CHECK de la 549). */
+const OWN_PATH_RE = /^\/[^/]/
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+function isAppointmentNotice(n: Pick<PushableNotification, 'type'>): boolean {
+  return n.type.startsWith('appointment_')
+}
+
+/** La conversación del aviso, salvo en los de la Agenda, que van a la cita. */
 function conversationOf(n: PushableNotification): string | null {
+  if (isAppointmentNotice(n)) return null
   return n.conversation_id && UUID_RE.test(n.conversation_id) ? n.conversation_id : null
+}
+
+/**
+ * A dónde lleva tocar un aviso. Una sola regla para el push, la campana
+ * y el aviso emergente: una conversación abre la bandeja; una cita, la
+ * Agenda en esa cita; el resumen diario, la vista Día de hoy.
+ */
+export function notificationHref(n: PushableNotification): string {
+  if (n.link_path && OWN_PATH_RE.test(n.link_path)) return n.link_path
+  if (n.type === 'appointment_digest') return '/agenda?vista=dia'
+  if (isAppointmentNotice(n)) {
+    return n.appointment_id && UUID_RE.test(n.appointment_id)
+      ? `/agenda?cita=${n.appointment_id}`
+      : '/agenda'
+  }
+  const conversationId = conversationOf(n)
+  return conversationId ? `/inbox?c=${conversationId}` : '/notifications'
 }
 
 function truncate(text: string, max: number): string {
@@ -64,7 +94,7 @@ export function buildPushPayload(n: PushableNotification): PushPayload {
     body: truncate(n.body ?? '', PUSH_BODY_MAX),
     tag: conversationId ? `conversation-${conversationId}` : `notification-${n.id}`,
     renotify: true,
-    url: conversationId ? `/inbox?c=${conversationId}` : '/notifications',
+    url: notificationHref(n),
     notificationId: n.id,
     type: n.type,
     test: false,

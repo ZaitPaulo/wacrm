@@ -17,6 +17,7 @@ import type {
   PipelineStageSlice,
   ResponseTimeBucket,
   ResponseTimeSummary,
+  AppointmentMetricsRow,
 } from './types'
 
 // ------------------------------------------------------------
@@ -506,4 +507,49 @@ export async function loadAgentPerformance(db: DB): Promise<AgentPerformanceRow[
         : toNumber(row.avg_first_response_seconds),
     responseSamples: toNumber(row.response_samples),
   }))
+}
+
+export interface AppointmentMetricsRpcRow {
+  agent_user_id: string
+  full_name: string
+  appointments: number | string
+  attended: number | string
+  no_show: number | string
+  unmarked: number | string
+  cancelled: number | string
+  attendance_rate: number | string | null
+  sales_from_visit: number | string
+}
+
+/**
+ * Citas y asistencia por asesor en [from, to) (migración 549). La RPC
+ * devuelve cero filas a quien no es owner o admin, igual que la de
+ * rendimiento: el montaje lo decide la página por permiso.
+ */
+export async function loadAppointmentMetrics(
+  db: DB,
+  from: Date,
+  to: Date,
+): Promise<AppointmentMetricsRow[]> {
+  const { data, error } = await db.rpc('appointment_attendance_metrics', {
+    p_from: from.toISOString(),
+    p_to: to.toISOString(),
+  })
+  if (error) throw error
+  return ((data ?? []) as AppointmentMetricsRpcRow[]).map(mapAppointmentMetricsRow)
+}
+
+export function mapAppointmentMetricsRow(row: AppointmentMetricsRpcRow): AppointmentMetricsRow {
+  return {
+    agentUserId: row.agent_user_id,
+    fullName: row.full_name,
+    appointments: toNumber(row.appointments),
+    attended: toNumber(row.attended),
+    noShow: toNumber(row.no_show),
+    unmarked: toNumber(row.unmarked),
+    cancelled: toNumber(row.cancelled),
+    // Null se conserva: sin citas marcadas no hay porcentaje, no es 0 %.
+    attendanceRate: row.attendance_rate === null ? null : toNumber(row.attendance_rate),
+    salesFromVisit: toNumber(row.sales_from_visit),
+  }
 }

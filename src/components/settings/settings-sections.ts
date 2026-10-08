@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   Clock,
   Coins,
   Megaphone,
@@ -42,6 +43,7 @@ export const SETTINGS_SECTIONS = [
   'quick-replies',
   'business-hours',
   'assignment',
+  'appointments',
   'fields',
   'deals',
   'showcase',
@@ -86,6 +88,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   'quick-replies': { id: 'quick-replies', label: 'Quick replies', icon: Zap, group: 'workspace', adminOnly: true },
   'business-hours': { id: 'business-hours', label: 'Business hours', icon: Clock, group: 'workspace', adminOnly: true },
   assignment: { id: 'assignment', label: 'Agent assignment', icon: Shuffle, group: 'workspace', adminOnly: true },
+  appointments: { id: 'appointments', label: 'Calendar', icon: CalendarDays, group: 'workspace', adminOnly: true },
   fields: { id: 'fields', label: 'Fields & tags', icon: Tags, group: 'workspace', adminOnly: true },
   deals: { id: 'deals', label: 'Deals & currency', icon: Coins, group: 'workspace', adminOnly: true },
   showcase: { id: 'showcase', label: 'Public showcase', icon: Store, group: 'workspace', adminOnly: true },

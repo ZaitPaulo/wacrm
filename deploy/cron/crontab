@@ -57,3 +57,15 @@
 #
 # Al agregar esta línea hay que REINICIAR el contenedor del cron (ver arriba).
 */5 * * * * /tick.sh /api/handoff/sla/cron
+
+# --- Agenda de citas: cada minuto -------------------------------------------
+# Confirmación al cliente al agendar o mover una cita, recordatorio el día
+# anterior (plantilla con los botones "Confirmo" / "Necesito cambiar la
+# hora") y resumen diario de visitas para cada asesor (migración 548, cambio
+# agenda-citas). Cada minuto porque la confirmación sale de una cola: el
+# asesor agenda y el cliente la recibe en menos de dos minutos. Las pasadas
+# sin trabajo terminan en milisegundos. Los mensajes al cliente nacen
+# apagados y se activan en Ajustes → Agenda.
+#
+# Al agregar esta línea hay que REINICIAR el contenedor del cron (ver arriba).
+* * * * * /tick.sh /api/appointments/cron

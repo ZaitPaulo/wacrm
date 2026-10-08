@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { useCan } from '@/hooks/use-can';
+import { ScheduleVisitButton } from '@/components/agenda/schedule-visit-button';
 import { usePresence } from '@/hooks/use-presence';
 import { PresenceDot } from '@/components/presence/presence-dot';
 import { presenceLabel } from '@/lib/presence';
@@ -1210,6 +1211,12 @@ export function MessageThread({
               del teléfono; de ahí el `hidden lg:inline-flex`. Es el
               mismo `refreshButton` declarado arriba, no una copia. */}
           {refreshButton}
+
+          {/* Agendar visita (agenda-citas): cliente, conversación y asesor
+              precargados. Se oculta solo para quien no puede crear citas. */}
+          {conversation && contact && (
+            <ScheduleVisitButton conversation={conversation} contact={contact} />
+          )}
 
           {/* Status dropdown */}
           <DropdownMenu>

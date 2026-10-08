@@ -20,6 +20,7 @@ import {
 import {
   loadActivity,
   loadAgentPerformance,
+  loadAppointmentMetrics,
   loadConversationsSeries,
   loadMetrics,
   loadPipelineDonut,
@@ -35,6 +36,7 @@ import {
 import type {
   ActivityItem,
   AgentPerformanceRow,
+  AppointmentMetricsRow,
   ConversationsSeriesPoint,
   InventoryAging,
   InventorySnapshot,
@@ -58,6 +60,7 @@ import { InventoryMixChart } from '@/components/dashboard/inventory-mix-chart'
 import { MarginPanel } from '@/components/dashboard/margin-panel'
 import { VehicleInterestList } from '@/components/dashboard/vehicle-interest-list'
 import { AgentPerformanceTable } from '@/components/dashboard/agent-performance-table'
+import { AppointmentMetricsCard } from '@/components/dashboard/appointment-metrics-card'
 
 import { useTranslations } from 'next-intl'
 
@@ -136,6 +139,14 @@ export default function DashboardPage() {
   const [agentPerformanceLoading, setAgentPerformanceLoading] = useState(true)
   const [agentPerformanceError, setAgentPerformanceError] = useState(false)
 
+  // --- Citas y asistencia (agenda-citas-avisos) ----------------------
+  // Mismo permiso y mismo trato del fallo que la tabla de rendimiento,
+  // pero con el período del selector: la asistencia sin período no dice
+  // nada.
+  const [appointmentMetrics, setAppointmentMetrics] = useState<AppointmentMetricsRow[] | null>(null)
+  const [appointmentMetricsLoading, setAppointmentMetricsLoading] = useState(true)
+  const [appointmentMetricsError, setAppointmentMetricsError] = useState(false)
+
   /**
    * Recarga las métricas que dependen del período. El bloque comercial
    * reutiliza el mismo selector de rango que la serie de conversaciones
@@ -195,6 +206,22 @@ export default function DashboardPage() {
       .finally(() => setAgentPerformanceLoading(false))
   }, [])
 
+  /** Carga «Citas y asistencia» del período. Sin skeleton acá: ver `loadAgents`. */
+  const loadAppointments = useCallback((days: RangeDays) => {
+    const db = createClient()
+    void loadAppointmentMetrics(db, rangeStart(days), new Date())
+      .then((rows) => {
+        setAppointmentMetrics(rows)
+        setAppointmentMetricsError(false)
+      })
+      .catch((err) => {
+        console.error('[dashboard] appointment metrics failed:', err)
+        setAppointmentMetrics(null)
+        setAppointmentMetricsError(true)
+      })
+      .finally(() => setAppointmentMetricsLoading(false))
+  }, [])
+
   const retryAgentPerformance = useCallback(() => {
     setAgentPerformanceLoading(true)
     setAgentPerformanceError(false)
@@ -247,10 +274,13 @@ export default function DashboardPage() {
 
     // Sin permiso no se pide: la RPC devolvería vacío igual, pero una
     // llamada que nunca se va a mostrar es una ida al servidor de más.
-    if (showAgentPerformance) loadAgents()
+    if (showAgentPerformance) {
+      loadAgents()
+      loadAppointments(30)
+    }
 
     loadRanged(30, showMargins)
-  }, [loadRanged, showMargins, showAgentPerformance, loadAgents])
+  }, [loadRanged, showMargins, showAgentPerformance, loadAgents, loadAppointments])
 
   useEffect(() => {
     loadAll()
@@ -270,6 +300,10 @@ export default function DashboardPage() {
       setInterestLoading(true)
       if (showMargins) setMarginsLoading(true)
       loadRanged(r, showMargins)
+      if (showAgentPerformance) {
+        setAppointmentMetricsLoading(true)
+        loadAppointments(r)
+      }
       if (series[r] !== null) return
       setSeriesLoading(true)
       const db = createClient()
@@ -278,7 +312,7 @@ export default function DashboardPage() {
         .catch((err) => console.error('[dashboard] series failed:', err))
         .finally(() => setSeriesLoading(false))
     },
-    [series, loadRanged, showMargins],
+    [series, loadRanged, showMargins, showAgentPerformance, loadAppointments],
   )
 
   return (
@@ -501,6 +535,21 @@ export default function DashboardPage() {
             loading={agentPerformanceLoading}
             error={agentPerformanceError}
             onRetry={retryAgentPerformance}
+          />
+        )}
+
+        {/* Citas y asistencia por asesor, con el período del selector. */}
+        {showAgentPerformance && (
+          <AppointmentMetricsCard
+            rows={appointmentMetrics}
+            loading={appointmentMetricsLoading}
+            error={appointmentMetricsError}
+            onRetry={() => {
+              setAppointmentMetricsLoading(true)
+              setAppointmentMetricsError(false)
+              loadAppointments(range)
+            }}
+            days={range}
           />
         )}
 

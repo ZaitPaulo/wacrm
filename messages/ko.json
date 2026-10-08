@@ -41,7 +41,8 @@
     "menuSettings": "설정",
     "menuSignOut": "로그아웃",
     "social": "게시",
-    "pendingPosts": "검토 대기 게시물 {count}개"
+    "pendingPosts": "검토 대기 게시물 {count}개",
+    "agenda": "일정"
   },
   "Header": {
     "dashboard": "대시보드",
@@ -58,7 +59,8 @@
     "defaultAvatar": "아바타",
     "menuProfile": "프로필",
     "menuSettings": "설정",
-    "menuSignOut": "로그아웃"
+    "menuSignOut": "로그아웃",
+    "agenda": "일정"
   },
   "ModeToggle": {
     "switchMode": "{mode} 모드로 전환"
@@ -233,6 +235,26 @@
     },
     "emptyState": {
       "title": "아직 데이터가 충분하지 않습니다"
+    },
+    "appointmentMetrics": {
+      "title": "Appointments and attendance",
+      "description": "Per agent, appointments in the last {days} days.",
+      "colAgent": "Agent",
+      "colAppointments": "Appointments",
+      "colAttended": "Attended",
+      "colNoShow": "No-show",
+      "colUnmarked": "Unmarked",
+      "colCancelled": "Cancelled",
+      "colRate": "Attendance",
+      "colSales": "Sales from visits",
+      "noRate": "No marked appointments in the period",
+      "rateNote": "Attendance = attended ÷ (attended + no-show). Unmarked appointments don't count: mark them in the calendar.",
+      "salesNote": "Sales from visits: vehicles marked as sold with the buyer linked, who had attended an appointment in the previous 30 days.",
+      "empty": "No appointments in the period",
+      "emptyHint": "Booked visits will show up here.",
+      "error": "Could not load appointments",
+      "errorHint": "Check the connection and try again.",
+      "retry": "Retry"
     }
   },
   "Inbox": {
@@ -1974,7 +1996,8 @@
       "showcase": "공개 쇼케이스",
       "business-hours": "영업 시간",
       "assignment": "상담원 배정",
-      "social-posts": "Social posts"
+      "social-posts": "Social posts",
+      "appointments": "일정"
     },
     "groups": {
       "account": "계정",
@@ -2446,6 +2469,45 @@
         "contacto": "Business contact channel",
         "nombre": "Business name"
       }
+    },
+    "appointments": {
+      "title": "일정",
+      "subtitle": "Appointment length, the agents' daily summary and WhatsApp messages to customers.",
+      "duration": "Default appointment length",
+      "minutes": "{count} minutes",
+      "digestTime": "Daily summary time",
+      "digestTimeHint": "Each agent gets a notice with today's visits and yesterday's without attendance marked.",
+      "contractTitle": "What the templates must look like",
+      "contract": "Approved by Meta, no image or variable header, and up to four variables in this order: 1 is the customer name, 2 the date and time, 3 the agent and 4 the vehicle. The reminder needs exactly two quick-reply buttons: the first confirms, the second asks to change the time.",
+      "enable": "Send messages to customers",
+      "enableHint": "Confirmation when an appointment is booked or moved, and a reminder the day before. Off, the calendar still works but messages no one.",
+      "confirmationTemplate": "Confirmation template",
+      "confirmationHint": "Only used when the customer hasn't written in the last 24 hours; otherwise the confirmation goes as plain text.",
+      "reminderTemplate": "Reminder template",
+      "reminderHint": "Sent the day before, with the “Confirm” and “Change the time” buttons.",
+      "reminderTime": "Reminder time",
+      "reminderTimeHint": "From this time on, and always within business hours.",
+      "noTemplate": "None",
+      "needTemplates": "Pick both templates to turn messages on.",
+      "invalidTemplates": "One of the selected templates can't be used for the calendar.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Calendar settings saved",
+      "saveFailed": "Could not save the settings.",
+      "problems": {
+        "missing": "The template no longer exists",
+        "not_approved": "not approved",
+        "media_header": "has a media header",
+        "header_variable": "header has a variable",
+        "too_many_variables": "more than 4 variables",
+        "variables_not_consecutive": "variables skip a number",
+        "reminder_buttons": "needs two quick-reply buttons",
+        "button_needs_value": "a button needs a value"
+      },
+      "preVisit": "Upcoming visit notice",
+      "preVisitHint": "Each agent gets a notice before each of their appointments.",
+      "preVisitOff": "Off",
+      "preVisitBefore": "{count} minutes before"
     }
   },
   "Inventory": {
@@ -3034,5 +3096,159 @@
   },
   "Pwa": {
     "description": "CRM 받은편지함, 거래 및 알림."
+  },
+  "Agenda": {
+    "title": "일정",
+    "newAppointment": "새 예약",
+    "scheduleVisit": "방문 예약",
+    "views": {
+      "dia": "일",
+      "semana": "주",
+      "mes": "월"
+    },
+    "nav": {
+      "previous": "이전",
+      "today": "오늘",
+      "next": "다음"
+    },
+    "filter": {
+      "all": "모든 상담원"
+    },
+    "week": {
+      "range": "{month} {from} – {to}, {year}"
+    },
+    "day": {
+      "count": "{count, plural, =0 {No appointments} =1 {1 appointment} other {# appointments}}"
+    },
+    "month": {
+      "count": "{count, plural, =1 {1 appt.} other {# appts.}}"
+    },
+    "weekdaysShort": {
+      "mon": "월",
+      "tue": "화",
+      "wed": "수",
+      "thu": "목",
+      "fri": "금",
+      "sat": "토",
+      "sun": "일"
+    },
+    "empty": {
+      "noAgents": "There are no agents to show."
+    },
+    "status": {
+      "scheduled": "예정",
+      "confirmed": "확인됨",
+      "attended": "방문함",
+      "no_show": "노쇼",
+      "cancelled": "취소됨"
+    },
+    "purpose": {
+      "view_vehicle": "See a vehicle",
+      "test_drive": "Test drive",
+      "appraisal": "Trade-in appraisal",
+      "signing": "Signing",
+      "delivery": "Delivery"
+    },
+    "dialog": {
+      "createTitle": "Schedule visit",
+      "editTitle": "Edit appointment",
+      "description": "Only the agent's free times within business hours are offered.",
+      "cancel": "Cancel",
+      "save": "Save changes",
+      "create": "Schedule visit",
+      "created": "Appointment scheduled",
+      "updated": "Appointment updated"
+    },
+    "fields": {
+      "contact": "Customer",
+      "contactPlaceholder": "Pick a customer",
+      "contactSearch": "Search by name or phone",
+      "contactEmpty": "No customer matches",
+      "contactMore": "And {count} more: type to narrow.",
+      "agent": "Agent",
+      "agentPlaceholder": "Pick an agent",
+      "purpose": "Purpose",
+      "date": "Date",
+      "duration": "Duration",
+      "minutes": "{count} min",
+      "time": "Time (free slots for {agent})",
+      "noSlots": "No free times that day.",
+      "vehicles": "Vehicles of interest",
+      "removeVehicle": "Remove vehicle",
+      "vehicleAdd": "Add a vehicle",
+      "vehicleNone": "None",
+      "vehicleSearch": "Search make, model, year or plate",
+      "vehicleEmpty": "No vehicle matches",
+      "vehicleSuggested": "Viewed by the customer",
+      "vehicleInventory": "Inventory",
+      "vehicleReserved": "Reserved",
+      "notes": "Notes",
+      "notesPlaceholder": "E.g. coming with spouse; asks about financing",
+      "notify": "Send WhatsApp confirmation and reminder",
+      "notifyChange": "Tell the customer about the change"
+    },
+    "errors": {
+      "overlap": "That time is already taken. Pick another.",
+      "saveFailed": "Could not save the appointment.",
+      "loadFailed": "Could not load appointments.",
+      "notFound": "That appointment doesn't exist or you can't access it."
+    },
+    "move": {
+      "title": "Move the appointment?",
+      "from": "From:",
+      "to": "To:",
+      "agent": "With:",
+      "confirm": "Move",
+      "done": "Appointment moved"
+    },
+    "sheet": {
+      "changeRequested": "The customer asked to change the time. Message them and reschedule.",
+      "customerConfirmed": "The customer confirmed on WhatsApp.",
+      "when": "When",
+      "conversation": "Conversation",
+      "openConversation": "Open in inbox",
+      "history": "History"
+    },
+    "actions": {
+      "confirm": "Confirm",
+      "attended": "Attended",
+      "no_show": "No-show",
+      "cancel": "Cancel appointment",
+      "reschedule": "Reschedule",
+      "reassign": "Change agent",
+      "reopen": "Reopen",
+      "done": {
+        "confirm": "Appointment confirmed",
+        "attended": "Marked as attended",
+        "no_show": "Marked as no-show",
+        "cancel": "Appointment cancelled",
+        "reopen": "Appointment reopened"
+      }
+    },
+    "history": {
+      "created": "Appointment created",
+      "rescheduled": "Moved from {from} to {to}",
+      "reassigned": "Moved from {from} to {to}",
+      "status_changed": "Status: {to}",
+      "customer_confirmed": "Customer confirmed",
+      "customer_change_requested": "Customer asked to change the time",
+      "confirmation_sent": "Confirmation sent to the customer",
+      "confirmation_skipped": "Confirmation not sent (no way to message them)",
+      "confirmation_failed": "Confirmation failed to send",
+      "reminder_sent": "Reminder sent",
+      "reminder_skipped": "Reminder not sent",
+      "reminder_failed": "Reminder failed to send",
+      "system": "system"
+    },
+    "contact": {
+      "title": "예약",
+      "next": "다음 예약"
+    },
+    "vehicleStatus": {
+      "available": "Available",
+      "reserved": "Reserved",
+      "sold": "Sold",
+      "hidden": "Hidden"
+    }
   }
 }
