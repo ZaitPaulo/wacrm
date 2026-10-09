@@ -42,6 +42,12 @@ Excepción por el nombre: si lo único que falta es el nombre y la conversación
 - **AND** el auto-reply sigue activo en ese hilo
 - **AND** el cliente recibe un mensaje que le pregunta por su presupuesto
 
+#### Scenario: El texto del pedido anunciaba el traspaso
+
+- **WHEN** el modelo pide transferir sin el nombre y junto al marcador escribe "le paso tus datos a un asesor"
+- **THEN** ese texto NO SHALL enviarse: el sistema descarta el texto que acompañaba a un pedido rechazado y regenera la respuesta con la instrucción de seguir atendiendo
+- **AND** la respuesta regenerada no le anuncia al cliente un traspaso ni que un asesor lo va a contactar
+
 #### Scenario: El cliente da su presupuesto en el primer turno
 
 - **WHEN** el cliente dice su presupuesto y el modelo pide transferir sin haber mostrado ningún vehículo

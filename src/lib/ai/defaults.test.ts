@@ -253,6 +253,13 @@ describe('buildGateRetryInstruction — perfil de crédito', () => {
     expect(text).toMatch(/[Nn]ever ask for their ID number/)
   })
 
+  it('le prohíbe anunciar un traspaso que no ocurrió', () => {
+    for (const urgent of [false, true]) {
+      const text = buildGateRetryInstruction({ missing: ['nombre'], urgent })
+      expect(text).toContain('that has not happened yet')
+    }
+  })
+
   it('no agrega esa advertencia cuando falta otro dato', () => {
     const text = buildGateRetryInstruction({ missing: ['presupuesto'], urgent: false })
     expect(text).not.toContain('ID number')

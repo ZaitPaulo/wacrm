@@ -345,24 +345,24 @@ export async function dispatchInboundToAiReply(
           .update({ ai_handoff_attempts: (conv.ai_handoff_attempts ?? 0) + 1 })
           .eq('id', conversationId)
 
-        // Casi siempre el modelo escribe algo junto al marcador; ese
-        // texto ya suele preguntar lo que falta y sale tal cual. Solo
-        // cuando manda el marcador pelado hay que volver a generar.
-        const reply =
-          text ||
-          (
-            await generateSafeReply(
-              {
-                config,
-                systemPrompt: `${systemPrompt}\n\n${buildGateRetryInstruction({
-                  missing: gate.missing,
-                  urgent: gate.urgent,
-                })}`,
-                messages,
-              },
-              safe,
-            )
-          ).text
+        // Lo que el modelo escribió junto al marcador se descarta y se
+        // regenera SIEMPRE. Ese texto lo escribió creyendo que el traspaso
+        // pasaba, y a veces lo anuncia: "le paso tus datos a un asesor"
+        // salió el 2026-10-09 sin traspaso ni asesor, y el cliente quedó
+        // esperando a nadie. Cuesta una llamada más, solo en este camino.
+        const reply = (
+          await generateSafeReply(
+            {
+              config,
+              systemPrompt: `${systemPrompt}\n\n${buildGateRetryInstruction({
+                missing: gate.missing,
+                urgent: gate.urgent,
+              })}`,
+              messages,
+            },
+            safe,
+          )
+        ).text
 
         if (reply) {
           await engineSendText({

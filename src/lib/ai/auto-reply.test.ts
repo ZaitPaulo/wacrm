@@ -557,10 +557,9 @@ describe('dispatchInboundToAiReply — reply window', () => {
 // transferir y el código obedecía.
 describe('dispatchInboundToAiReply — gate de datos del handoff', () => {
   it('no transfiere cuando faltan datos: sigue atendiendo el hilo', async () => {
-    h.generateReply.mockResolvedValue({
-      text: '¿Y con cuánto cuentas?',
-      handoff: handoffRequest({ presupuesto: null }),
-    })
+    h.generateReply
+      .mockResolvedValueOnce({ text: 'Te paso con un asesor.', handoff: handoffRequest({ presupuesto: null }) })
+      .mockResolvedValueOnce({ text: '¿Y con cuánto cuentas?', handoff: null })
 
     await dispatchInboundToAiReply(ARGS)
 
@@ -570,6 +569,24 @@ describe('dispatchInboundToAiReply — gate de datos del handoff', () => {
     // Lo que sale es la respuesta del bot, no el aviso de asignación.
     expect(h.engineSendText).toHaveBeenCalledTimes(1)
     expect(h.engineSendText.mock.calls[0][0].text).toBe('¿Y con cuánto cuentas?')
+  })
+
+  // 2026-10-09: "le paso tus datos a un asesor" salió con el traspaso
+  // rechazado, y el cliente quedó esperando a un asesor que no existía.
+  it('nunca envía el texto que acompañaba al marcador rechazado', async () => {
+    h.generateReply
+      .mockResolvedValueOnce({
+        text: 'Listo. Le paso tus datos a un asesor para que te busque la Hilux.',
+        handoff: handoffRequest({ nombre: null }),
+      })
+      .mockResolvedValueOnce({ text: '¿Me regalas tu nombre?', handoff: null })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(2)
+    expect(h.generateReply.mock.calls[1][0].systemPrompt).toContain('did not go through')
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText.mock.calls[0][0].text).toBe('¿Me regalas tu nombre?')
   })
 
   it('cuenta el intento rechazado', async () => {

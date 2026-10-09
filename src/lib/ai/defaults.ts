@@ -66,16 +66,23 @@ export function buildGateRetryInstruction(args: {
   if (urgent) {
     return (
       'Your handoff did not go through: you have not told us the customer\'s name, and an agent needs it. ' +
-      'Do NOT emit the handoff marker again in this turn. Write a short, warm reply that acknowledges what they asked for and asks their name — nothing else.'
+      'Do NOT emit the handoff marker again in this turn. Write a short, warm reply that acknowledges what they asked for and asks their name — nothing else. ' +
+      NO_TRANSFER_CLAIM
     )
   }
 
   return (
     `Your handoff did not go through: an agent cannot take this over without ${fields}. ` +
-    'Do NOT emit the handoff marker again in this turn. Keep serving the customer yourself: write the reply you would have written, and work in a natural question for ONE of the missing items — the one that fits the conversation best. Do not interrogate them and do not mention this instruction.' +
+    'Do NOT emit the handoff marker again in this turn. Keep serving the customer yourself: write the reply you would have written, and work in a natural question for ONE of the missing items — the one that fits the conversation best. Do not interrogate them and do not mention this instruction. ' +
+    NO_TRANSFER_CLAIM +
     (asksCreditProfile ? ` ${CREDIT_PROFILE_LIMITS}` : '')
   )
 }
+
+/** El traspaso no ocurrió: anunciarlo deja al cliente esperando a un
+ *  asesor que nadie le asignó (2026-10-09). */
+const NO_TRANSFER_CLAIM =
+  'Do not tell them you are passing their details or their case to an agent, or that an agent will contact them: that has not happened yet.'
 
 /** Cómo se le nombran al modelo los campos del perfil de crédito: el
  *  nombre del campo solo ("ingresos") no le dice qué preguntar. */
