@@ -29,9 +29,11 @@ export const AGENT_COLORS = [
 export type AgentColor = (typeof AGENT_COLORS)[number];
 
 /**
- * Los asesores que pueden tener citas, ordenados por nombre. Los viewer
- * no atienden visitas. Un `agent` solo se ve a sí mismo: la RLS ya no
- * le devuelve citas ajenas, y una columna vacía de un compañero solo
+ * Los asesores que pueden tener citas, ordenados por nombre. Ni los
+ * viewer ni el owner atienden visitas: el owner de la cuenta es quien
+ * administra el CRM, no un vendedor, y no debe aparecer en la Agenda
+ * (2026-10-09). Un `agent` solo se ve a sí mismo: la RLS ya no le
+ * devuelve citas ajenas, y una columna vacía de un compañero solo
  * confundiría.
  */
 export function agendaAgents(
@@ -39,7 +41,7 @@ export function agendaAgents(
   me: { userId: string | null; role: AccountRole | null }
 ): AgendaAgent[] {
   const list = profiles
-    .filter((p) => p.account_role && p.account_role !== 'viewer')
+    .filter((p) => p.account_role === 'agent' || p.account_role === 'admin')
     .map((p) => ({
       userId: p.user_id,
       fullName: p.full_name?.trim() || '—',

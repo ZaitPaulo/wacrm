@@ -79,7 +79,7 @@ Cada creación, cambio de hora, reasignación y cambio de estado, además de cad
 - **THEN** existe un evento `rescheduled` con la hora anterior y la nueva
 
 ### Requirement: Visibilidad y escritura por rol
-Una cita SHALL ser visible para owner, admin y viewer de la cuenta, y para el rol `agent` solo si es el asesor asignado. Crear y editar citas SHALL requerir al menos el rol `agent`. Un `agent` solo SHALL poder crear o dejar citas asignadas a sí mismo; asignar o reasignar a otro asesor SHALL requerir owner o admin. El asesor asignado SHALL ser miembro de la cuenta con rol `agent` o superior. Ningún rol SHALL poder borrar citas: se cancelan.
+Una cita SHALL ser visible para owner, admin y viewer de la cuenta, y para el rol `agent` solo si es el asesor asignado. Crear y editar citas SHALL requerir al menos el rol `agent`. Un `agent` solo SHALL poder crear o dejar citas asignadas a sí mismo; asignar o reasignar a otro asesor SHALL requerir owner o admin. El asesor asignado SHALL ser miembro de la cuenta con rol `agent` o superior. El owner NO SHALL aparecer en la Agenda: ni en la lista de asesores, ni en las columnas, ni en el filtro. Ningún rol SHALL poder borrar citas: se cancelan.
 
 #### Scenario: Asesor ve solo las suyas
 - **WHEN** Carlos (agent) consulta las citas de la semana

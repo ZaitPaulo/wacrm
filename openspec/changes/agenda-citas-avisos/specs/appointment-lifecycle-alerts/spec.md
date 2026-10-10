@@ -76,11 +76,11 @@ Después del cierre del horario de atención de un día (a las 18:00 si la cuent
 - **THEN** Angélica no recibe aviso
 
 ### Requirement: Aviso de cliente que no asistió
-Cuando una cita pasa a `no_show`, el sistema SHALL crear una notificación `appointment_no_show` para cada miembro owner o admin de la cuenta, excepto quien hizo el cambio, con el cliente, el asesor y la fecha de la cita.
+Cuando una cita pasa a `no_show`, el sistema SHALL crear una notificación `appointment_no_show` para cada miembro admin de la cuenta (el owner no participa en la Agenda), excepto quien hizo el cambio, con el cliente, el asesor y la fecha de la cita.
 
 #### Scenario: El asesor marca no asistió
 - **WHEN** Carlos marca «no asistió» en la cita de Tomás Acosta
-- **THEN** cada owner y admin recibe «Tomás Acosta no asistió a su cita con Carlos del martes 7 de octubre, 9:00 a. m.»
+- **THEN** cada admin recibe «Tomás Acosta no asistió a su cita con Carlos del martes 7 de octubre, 9:00 a. m.»
 
 #### Scenario: Lo marca un admin
 - **WHEN** un admin marca «no asistió»
