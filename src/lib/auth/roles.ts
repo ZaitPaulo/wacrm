@@ -145,6 +145,19 @@ export function canReassignConversations(role: AccountRole): boolean {
   return hasMinRole(role, "admin");
 }
 
+/**
+ * Si un miembro se ofrece como opción en las listas de asesores: asignar
+ * una conversación o un negocio, filtrar la bandeja, el informe de
+ * gestión, las acciones "asignar" de automatizaciones y flujos, y el
+ * asesor de ventas y permutas. El owner administra el CRM y no atiende
+ * clientes (pedido del 2026-10-17, igual que en la Agenda desde la 550);
+ * el viewer solo mira. Solo esconde opciones: la base sigue aceptando a
+ * cualquier miembro, y lo que ya esté asignado al owner se sigue viendo.
+ */
+export function isAssignableRole(role: string | null | undefined): boolean {
+  return role === "admin" || role === "agent";
+}
+
 /** Owner only: irreversible destructive operations. */
 export function canDeleteAccount(role: AccountRole): boolean {
   return role === "owner";

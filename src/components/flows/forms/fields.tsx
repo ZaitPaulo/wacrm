@@ -36,6 +36,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 import type { AccountMember } from "@/types";
+import { isAssignableRole } from "@/lib/auth/roles";
 import { NODE_META, type BuilderNode } from "../shared";
 
 export function TextRow({
@@ -176,7 +177,9 @@ export function AgentSelectRow({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">{t("agentUnassigned")}</SelectItem>
-            {members.map((m) => (
+            {members
+              .filter((m) => isAssignableRole(m.role) || m.user_id === value)
+              .map((m) => (
               <SelectItem key={m.user_id} value={m.user_id}>
                 {m.full_name || m.email || m.user_id}
               </SelectItem>

@@ -9,6 +9,7 @@ import { usePresence } from '@/hooks/use-presence';
 import { PresenceDot } from '@/components/presence/presence-dot';
 import { presenceLabel } from '@/lib/presence';
 import { assignmentErrorKey } from '@/lib/inbox/assignment-errors';
+import { isAssignableRole } from '@/lib/auth/roles';
 import { cn } from '@/lib/utils';
 import type {
   Conversation,
@@ -31,6 +32,7 @@ import {
   RefreshCw,
   PanelRightOpen,
   PanelRightClose,
+  CheckCheck,
 } from 'lucide-react';
 import { format, isToday, isYesterday, differenceInHours } from 'date-fns';
 import { useTranslations } from 'next-intl';
@@ -116,6 +118,15 @@ interface MessageThreadProps {
    */
   contactPanelOpen?: boolean;
   onToggleContactPanel?: () => void;
+  /**
+   * "Marcar como atendido" (chats-por-responder): la página refleja el
+   * cambio de `awaiting_reply_since` en la lista sin esperar al realtime.
+   * Se llama con `null` al marcar y con el valor anterior si falla.
+   */
+  onAwaitingReplyChange?: (
+    conversationId: string,
+    awaitingReplySince: string | null
+  ) => void;
 }
 
 function formatDateSeparator(
@@ -203,6 +214,7 @@ export function MessageThread({
   onRefresh,
   contactPanelOpen,
   onToggleContactPanel,
+  onAwaitingReplyChange,
 }: MessageThreadProps) {
   const t = useTranslations('Inbox.messageThread');
   const tTimer = useTranslations('Inbox.sessionTimer');
@@ -215,11 +227,25 @@ export function MessageThread({
   // rechazaría igual con 403, y ofrecer algo que va a fallar es peor que
   // no ofrecerlo.
   const canReassign = useCan('reassign-conversations');
+  // Marcar como atendido es cerrar la espera sin contestar: lo puede
+  // hacer quien puede contestar.
+  const canSend = useCan('send-messages');
   const { getPresence, getRow, now } = usePresence();
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  // Opciones del menú "Asignar": sin owner ni viewer. `profiles` sigue
+  // completo para poner nombre al asignado actual, sea quien sea.
+  const assignableProfiles = useMemo(
+    () =>
+      profiles.filter(
+        (p) =>
+          isAssignableRole(p.account_role) ||
+          p.user_id === conversation?.assigned_agent_id
+      ),
+    [profiles, conversation?.assigned_agent_id]
+  );
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   // Purely visual spin state for the manual-refresh button. The actual
   // refetch is fire-and-forget through `onRefresh` (which bumps the
@@ -718,6 +744,27 @@ export function MessageThread({
     [conversation, onStatusChange]
   );
 
+  // Cierra la espera sin enviar nada (p. ej. el cliente solo dijo
+  // "gracias 👍"). Optimista: la lista lo refleja de una vez y se revierte
+  // si la base lo rechaza.
+  const handleMarkAttended = useCallback(async () => {
+    if (!conversation?.awaiting_reply_since) return;
+    const previous = conversation.awaiting_reply_since;
+    onAwaitingReplyChange?.(conversation.id, null);
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('conversations')
+      .update({ awaiting_reply_since: null })
+      .eq('id', conversation.id);
+
+    if (error) {
+      console.error('Failed to mark conversation attended:', error.message);
+      onAwaitingReplyChange?.(conversation.id, previous);
+      toast.error(t('markAttendedFailed'));
+    }
+  }, [conversation, onAwaitingReplyChange, t]);
+
   const handleOpenTemplates = useCallback(() => {
     setTemplateModalOpen(true);
   }, []);
@@ -1212,6 +1259,20 @@ export function MessageThread({
               mismo `refreshButton` declarado arriba, no una copia. */}
           {refreshButton}
 
+          {/* Marcar como atendido (chats-por-responder): solo con espera
+              abierta y para quien puede contestar. */}
+          {canSend && conversation?.awaiting_reply_since && (
+            <button
+              type="button"
+              onClick={handleMarkAttended}
+              title={t('markAttended')}
+              className="text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-11 items-center justify-center gap-1 rounded-md px-3 text-xs max-lg:rounded-full max-lg:bg-muted/60 lg:h-7 lg:px-2"
+            >
+              <CheckCheck className="h-3.5 w-3.5" />
+              <span className="max-sm:sr-only">{t('markAttended')}</span>
+            </button>
+          )}
+
           {/* Agendar visita (agenda-citas): cliente, conversación y asesor
               precargados. Se oculta solo para quien no puede crear citas. */}
           {conversation && contact && (
@@ -1292,7 +1353,7 @@ export function MessageThread({
               align="end"
               className="border-border bg-popover"
             >
-              {profiles.length === 0 ? (
+              {assignableProfiles.length === 0 ? (
                 <DropdownMenuItem
                   disabled
                   className="text-muted-foreground text-sm"
@@ -1300,7 +1361,7 @@ export function MessageThread({
                   {t('noTeammates')}
                 </DropdownMenuItem>
               ) : (
-                profiles.map((p) => {
+                assignableProfiles.map((p) => {
                   const isSelected = p.user_id === assignedAgentId;
                   const presence = getPresence(p.user_id);
                   return (

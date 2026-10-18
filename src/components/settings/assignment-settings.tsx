@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useCan } from '@/hooks/use-can';
 import { useAuth } from '@/hooks/use-auth';
+import { isAssignableRole } from '@/lib/auth/roles';
 import { assignmentSettingsErrorKey } from '@/lib/assignment/settings';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -594,7 +595,11 @@ export function AssignmentSettingsView(props: AssignmentSettingsViewProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NADIE}>{t('tradeIn.none')}</SelectItem>
-                {props.members.map((m) => (
+                {props.members
+                  .filter(
+                    (m) => isAssignableRole(m.role) || m.user_id === form.tradeInAgentId
+                  )
+                  .map((m) => (
                   <SelectItem key={m.user_id} value={m.user_id}>
                     {`${m.full_name.trim() || t('weights.unnamed')} · ${tRoles(m.role)}`}
                   </SelectItem>

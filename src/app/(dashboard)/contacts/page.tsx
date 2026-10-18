@@ -53,11 +53,13 @@ import {
   SlidersHorizontal,
   Filter,
   X,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { ContactForm } from '@/components/contacts/contact-form';
 import { IdentitySuggestions } from '@/components/contacts/identity-suggestions';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
 import { ImportModal } from '@/components/contacts/import-modal';
+import { ManagementReportDialog } from '@/components/contacts/management-report-dialog';
 import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager';
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
@@ -77,6 +79,9 @@ export default function ContactsPage() {
   const supabase = createClient();
   const canEdit = useCan('send-messages');
   const canEditSettings = useCan('edit-settings');
+  // Informe de gestión de asesores: solo admin u owner (la ruta lo exige).
+  const canDownloadReport = useCan('manage-members');
+  const [reportOpen, setReportOpen] = useState(false);
   // El asesor solo ve los contactos con una conversación asignada a él
   // (RLS de la migración 520). Un contacto que acabe de crear no tendría
   // ninguna, así que se le desaparecería al guardar — y el `.select()`
@@ -416,7 +421,17 @@ export default function ContactsPage() {
               : t('subtitleZero')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canDownloadReport && (
+            <Button
+              variant="outline"
+              onClick={() => setReportOpen(true)}
+              className="border-border text-muted-foreground hover:bg-muted"
+            >
+              <FileSpreadsheet className="size-4" />
+              {t('managementReportBtn')}
+            </Button>
+          )}
           {canEditSettings && (
             <Button
               variant="outline"
@@ -865,6 +880,10 @@ export default function ContactsPage() {
         contactId={detailContactId}
         onUpdated={fetchContacts}
       />
+
+      {canDownloadReport && (
+        <ManagementReportDialog open={reportOpen} onOpenChange={setReportOpen} />
+      )}
 
       {/* Import Modal */}
       <ImportModal

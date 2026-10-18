@@ -278,7 +278,9 @@
       "unknownAgent": "Unknown agent",
       "noConversations": "No conversations found",
       "noMessagesYet": "No messages yet",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "filterAwaiting": "Awaiting reply",
+      "awaitingSince": "Waiting · {time}"
     },
     "messageThread": {
       "backToConversations": "Back to conversations",
@@ -311,7 +313,9 @@
       "yesterday": "Yesterday",
       "openContactDetails": "View contact details",
       "contactDetails": "Contact details",
-      "unassigned": "Unassigned"
+      "unassigned": "Unassigned",
+      "markAttended": "Mark as attended",
+      "markAttendedFailed": "Couldn't mark as attended. Try again."
     },
     "sessionTimer": {
       "expired": "Expired",
@@ -522,7 +526,8 @@
       "toastFailedDelete": "Failed to delete contact",
       "toastDeleted": "Contact deleted",
       "toastBulkFailedDelete": "Failed to delete contacts",
-      "toastBulkDeleted": "{count} contacts deleted"
+      "toastBulkDeleted": "{count} contacts deleted",
+      "managementReportBtn": "Management report"
     },
     "form": {
       "addTitle": "Add Contact",
@@ -698,6 +703,21 @@
       "dismiss": "Dismiss",
       "linked": "Contacts linked",
       "linkFailed": "They could not be linked"
+    },
+    "managementReport": {
+      "title": "Management report",
+      "description": "Download every client as Excel with their agent, arrival date, pipeline stage, tags and an activity summary.",
+      "from": "Arrived from",
+      "to": "To",
+      "rangeHint": "Dates the clients arrived, inclusive.",
+      "agent": "Agent",
+      "agentAll": "All agents",
+      "agentUnassigned": "Unassigned",
+      "invalidRange": "The \"from\" date can't be after the \"to\" date.",
+      "cancel": "Cancel",
+      "download": "Download Excel",
+      "generating": "Generating…",
+      "downloadFailed": "Couldn't generate the report. Try again."
     }
   },
   "Pipelines": {

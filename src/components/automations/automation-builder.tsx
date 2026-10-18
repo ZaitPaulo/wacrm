@@ -74,6 +74,7 @@ import {
   type StepPath,
 } from "@/lib/automations/builder-tree"
 import { cn } from "@/lib/utils"
+import { isAssignableRole } from "@/lib/auth/roles"
 
 // ------------------------------------------------------------
 // Types (builder-local — mirror the flattened rows we POST)
@@ -449,7 +450,9 @@ function AgentSelect({
       className={SELECT_CLASS}
     >
       <option value="">{t("agents.select")}</option>
-      {members.map((m) => (
+      {members
+        .filter((m) => isAssignableRole(m.role) || m.user_id === value)
+        .map((m) => (
         <option key={m.user_id} value={m.user_id}>
           {m.full_name || m.email || m.user_id}
         </option>

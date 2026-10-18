@@ -12,6 +12,7 @@ import {
   canViewOnly,
   hasMinRole,
   isAccountRole,
+  isAssignableRole,
   roleRank,
 } from "./roles";
 
@@ -146,5 +147,16 @@ describe("capability predicates", () => {
     expect(canTransferOwnership("admin")).toBe(false);
     expect(canTransferOwnership("agent")).toBe(false);
     expect(canTransferOwnership("viewer")).toBe(false);
+  });
+});
+
+describe("isAssignableRole", () => {
+  it("solo admin y agent salen en las listas de asesores", () => {
+    expect(isAssignableRole("admin")).toBe(true);
+    expect(isAssignableRole("agent")).toBe(true);
+    expect(isAssignableRole("owner")).toBe(false);
+    expect(isAssignableRole("viewer")).toBe(false);
+    expect(isAssignableRole(null)).toBe(false);
+    expect(isAssignableRole(undefined)).toBe(false);
   });
 });

@@ -89,3 +89,42 @@ export function matchesAssigneeFilter(
   if (filter === "unassigned") return assignee === null;
   return assignee === filter;
 }
+
+/**
+ * Si la conversación espera respuesta de un asesor humano (migración
+ * 551). Leer el chat no la cambia: solo responder o "Marcar como
+ * atendido".
+ */
+export function isAwaitingReply(conversation: Conversation): boolean {
+  return conversation.awaiting_reply_since != null;
+}
+
+/** Color de la espera: verde < 15 min, ámbar < 1 h, rojo desde 1 h. */
+export type WaitTone = "fresh" | "warning" | "overdue";
+
+const WARNING_AFTER_MS = 15 * 60_000;
+const OVERDUE_AFTER_MS = 60 * 60_000;
+
+/** Clasifica cuánto lleva esperando el cliente desde `since` hasta `now`. */
+export function waitTone(since: string, now: Date): WaitTone {
+  const waited = now.getTime() - new Date(since).getTime();
+  if (waited >= OVERDUE_AFTER_MS) return "overdue";
+  if (waited >= WARNING_AFTER_MS) return "warning";
+  return "fresh";
+}
+
+/**
+ * Orden del filtro "Por responder": la que más lleva esperando primero.
+ * Las que no esperan van al final, por si llega alguna mezclada.
+ */
+export function compareByAwaitingReply(
+  a: Conversation,
+  b: Conversation,
+): number {
+  const sa = a.awaiting_reply_since;
+  const sb = b.awaiting_reply_since;
+  if (sa == null && sb == null) return 0;
+  if (sa == null) return 1;
+  if (sb == null) return -1;
+  return new Date(sa).getTime() - new Date(sb).getTime();
+}

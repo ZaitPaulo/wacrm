@@ -4,18 +4,23 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   CONVERSATION_SELECT,
+  compareByAwaitingReply,
+  isAwaitingReply,
   matchesAssigneeFilter,
   matchesContactFilters,
   normalizeConversations,
+  waitTone,
   type AssigneeFilter,
+  type WaitTone,
 } from '@/lib/inbox/conversations';
 import { useCan } from '@/hooks/use-can';
+import { isAssignableRole } from '@/lib/auth/roles';
 import { cn } from '@/lib/utils';
 import type { Conversation, ConversationStatus, Profile, Tag } from '@/types';
 import type { MessageChannel } from '@/lib/contacts/channel-identity';
 import { ChannelBadge } from './channel-badge';
-import { Search, ChevronDown, X, UserRound } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { Search, ChevronDown, X, UserRound, Hourglass } from 'lucide-react';
+import { formatDistance, formatDistanceToNow } from 'date-fns';
 import { dateLocale } from '@/lib/date-locale';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
@@ -48,7 +53,13 @@ const STATUS_COLORS: Record<ConversationStatus, string> = {
   closed: 'bg-muted-foreground',
 };
 
-type InboxFilter = ConversationStatus | 'all' | 'unread';
+const WAIT_TONE_COLORS: Record<WaitTone, string> = {
+  fresh: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  warning: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  overdue: 'bg-red-500/15 text-red-700 dark:text-red-400',
+};
+
+type InboxFilter = ConversationStatus | 'all' | 'unread' | 'awaiting';
 
 export function ConversationList({
   activeConversationId,
@@ -63,6 +74,7 @@ export function ConversationList({
     () => [
       { label: t('filterAll'), value: 'all' },
       { label: t('filterUnread'), value: 'unread' },
+      { label: t('filterAwaiting'), value: 'awaiting' },
       { label: t('filterOpen'), value: 'open' },
       { label: t('filterPending'), value: 'pending' },
       { label: t('filterClosed'), value: 'closed' },
@@ -88,6 +100,13 @@ export function ConversationList({
   const canViewAll = useCan('view-all-conversations');
   const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>('all');
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  // Reloj de la etiqueta "Esperando · hace X": un tic por minuto basta
+  // para que el texto y el color cambien sin recargar.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Keep the latest callback in a ref so the fetch effect below can
   // have a stable, empty-dep identity. Previously the fetch useCallback
@@ -199,6 +218,15 @@ export function ConversationList({
     return { byAgent: m, unassigned };
   }, [conversations]);
 
+  // Pendientes dentro del alcance del filtro de asesor activo.
+  const awaitingCount = useMemo(
+    () =>
+      conversations.filter(
+        (c) => isAwaitingReply(c) && matchesAssigneeFilter(c, assigneeFilter)
+      ).length,
+    [conversations, assigneeFilter]
+  );
+
   // Company options are derived from the loaded conversations — there's no
   // separate companies table, and only companies with a live conversation
   // are worth offering as an inbox filter.
@@ -249,6 +277,8 @@ export function ConversationList({
 
     if (filter === 'unread') {
       result = result.filter((c) => c.unread_count > 0);
+    } else if (filter === 'awaiting') {
+      result = result.filter(isAwaitingReply);
     } else if (filter !== 'all') {
       result = result.filter((c) => c.status === filter);
     }
@@ -271,6 +301,12 @@ export function ConversationList({
         const lastMsg = c.last_message_text?.toLowerCase() ?? '';
         return name.includes(q) || phone.includes(q) || lastMsg.includes(q);
       });
+    }
+
+    // Por responder: la espera más larga primero. Los demás filtros
+    // conservan el orden por último mensaje.
+    if (filter === 'awaiting') {
+      result = [...result].sort(compareByAwaitingReply);
     }
 
     return result;
@@ -352,6 +388,9 @@ export function ConversationList({
           <DropdownMenu>
             <DropdownMenuTrigger className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex h-7 items-center justify-center gap-1 rounded-md px-2 text-xs">
               {activeFilter?.label ?? t('filterAll')}
+              {filter === 'awaiting' && (
+                <span className="tabular-nums">({awaitingCount})</span>
+              )}
               <ChevronDown className="h-3 w-3" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -369,7 +408,16 @@ export function ConversationList({
                       : 'text-popover-foreground'
                   )}
                 >
-                  {opt.label}
+                  {opt.value === 'awaiting' ? (
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span>{opt.label}</span>
+                      <span className="text-muted-foreground text-xs tabular-nums">
+                        {awaitingCount}
+                      </span>
+                    </span>
+                  ) : (
+                    opt.label
+                  )}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -405,7 +453,13 @@ export function ConversationList({
                   selected={assigneeFilter === 'unassigned'}
                   onSelect={() => setAssigneeFilter('unassigned')}
                 />
-                {profiles.map((p) => (
+                {profiles
+                  .filter(
+                    (p) =>
+                      isAssignableRole(p.account_role) ||
+                      p.user_id === assigneeFilter
+                  )
+                  .map((p) => (
                   <AssigneeOption
                     key={p.user_id}
                     label={p.full_name}
@@ -618,6 +672,7 @@ export function ConversationList({
                 isActive={conv.id === activeConversationId}
                 onSelect={handleSelect}
                 assignee={assigneeLabel(conv)}
+                now={now}
                 t={t}
               />
             ))}
@@ -662,6 +717,8 @@ interface ConversationItemProps {
   onSelect: (conversation: Conversation) => void;
   /** Nombre del asesor asignado; null cuando no se muestra. */
   assignee: string | null;
+  /** Reloj compartido de la lista, para la etiqueta de espera. */
+  now: Date;
   t: ReturnType<typeof useTranslations>;
 }
 
@@ -670,6 +727,7 @@ function ConversationItem({
   isActive,
   onSelect,
   assignee,
+  now,
   t,
 }: ConversationItemProps) {
   const contact = conversation.contact;
@@ -738,6 +796,25 @@ function ConversationItem({
             />
           </div>
         </div>
+        {conversation.awaiting_reply_since && (
+          <p
+            className={cn(
+              'mt-1 inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+              WAIT_TONE_COLORS[waitTone(conversation.awaiting_reply_since, now)]
+            )}
+          >
+            <Hourglass className="h-3 w-3 shrink-0" />
+            <span className="truncate">
+              {t('awaitingSince', {
+                time: formatDistance(
+                  new Date(conversation.awaiting_reply_since),
+                  now,
+                  { locale: dateLocale() }
+                ),
+              })}
+            </span>
+          </p>
+        )}
         {assignee && (
           <p
             className={cn(

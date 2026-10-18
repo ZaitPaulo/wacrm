@@ -271,7 +271,9 @@
       "unknownAgent": "Asesor desconocido",
       "noConversations": "No se encontraron conversaciones",
       "noMessagesYet": "Todavía no hay mensajes",
-      "unknown": "Desconocido"
+      "unknown": "Desconocido",
+      "filterAwaiting": "Por responder",
+      "awaitingSince": "Esperando · hace {time}"
     },
     "messageThread": {
       "backToConversations": "Volver a las conversaciones",
@@ -304,7 +306,9 @@
       "yesterday": "Ayer",
       "openContactDetails": "Ver la ficha del contacto",
       "contactDetails": "Ficha del contacto",
-      "unassigned": "Sin asignar"
+      "unassigned": "Sin asignar",
+      "markAttended": "Marcar como atendido",
+      "markAttendedFailed": "No se pudo marcar como atendido. Inténtalo de nuevo."
     },
     "sessionTimer": {
       "expired": "Vencida",
@@ -515,7 +519,8 @@
       "toastFailedDelete": "No se pudo eliminar el contacto",
       "toastDeleted": "Contacto eliminado",
       "toastBulkFailedDelete": "No se pudieron eliminar los contactos",
-      "toastBulkDeleted": "{count} contactos eliminados"
+      "toastBulkDeleted": "{count} contactos eliminados",
+      "managementReportBtn": "Informe de gestión"
     },
     "form": {
       "addTitle": "Agregar contacto",
@@ -691,6 +696,21 @@
       "dismiss": "Descartar",
       "linked": "Fichas unidas",
       "linkFailed": "No se pudieron unir"
+    },
+    "managementReport": {
+      "title": "Informe de gestión",
+      "description": "Descarga en Excel todos los clientes con su asesor, fecha de llegada, etapa del embudo, etiquetas y un resumen de la gestión.",
+      "from": "Llegaron desde",
+      "to": "Hasta",
+      "rangeHint": "Fechas en que llegaron los clientes, inclusive.",
+      "agent": "Asesor",
+      "agentAll": "Todos los asesores",
+      "agentUnassigned": "Sin asignar",
+      "invalidRange": "La fecha \"desde\" no puede ser posterior a la fecha \"hasta\".",
+      "cancel": "Cancelar",
+      "download": "Descargar Excel",
+      "generating": "Generando…",
+      "downloadFailed": "No se pudo generar el informe. Inténtalo de nuevo."
     }
   },
   "Pipelines": {

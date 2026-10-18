@@ -207,6 +207,9 @@ export interface Conversation {
   ai_waiting_agent_since?: string | null;
   handoff_reminded_at?: string | null;
   handoff_escalated_at?: string | null;
+  /** Desde cuándo el cliente espera respuesta de un asesor humano; la
+   *  mantiene un trigger sobre `messages` (migración 551). */
+  awaiting_reply_since?: string | null;
   ai_reply_count?: number;
   ai_handoff_summary?: string | null;
   ai_handoff_attempts?: number;

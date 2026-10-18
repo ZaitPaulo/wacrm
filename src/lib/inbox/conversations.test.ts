@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
+  compareByAwaitingReply,
+  isAwaitingReply,
   matchesAssigneeFilter,
   matchesContactFilters,
   normalizeConversation,
+  waitTone,
 } from "./conversations";
 import type { Conversation } from "@/types";
 
@@ -166,5 +169,46 @@ describe("matchesAssigneeFilter", () => {
     expect(matchesAssigneeFilter(deBrayan, "u-brayan")).toBe(true);
     expect(matchesAssigneeFilter(deBrayan, "u-juan")).toBe(false);
     expect(matchesAssigneeFilter(sinAsesor, "u-juan")).toBe(false);
+  });
+});
+
+describe("awaiting reply", () => {
+  const now = new Date("2026-10-17T15:00:00.000Z");
+  const minutesAgo = (m: number) =>
+    new Date(now.getTime() - m * 60_000).toISOString();
+  const withWait = (since: string | null, id = "c1"): Conversation => ({
+    ...makeConversation(null),
+    id,
+    awaiting_reply_since: since,
+  });
+
+  it("isAwaitingReply depende solo de awaiting_reply_since", () => {
+    expect(isAwaitingReply(withWait(minutesAgo(5)))).toBe(true);
+    expect(isAwaitingReply(withWait(null))).toBe(false);
+    expect(isAwaitingReply(makeConversation(null))).toBe(false);
+  });
+
+  it("waitTone respeta los límites de 15 min y 1 h", () => {
+    expect(waitTone(minutesAgo(0), now)).toBe("fresh");
+    expect(waitTone(minutesAgo(14.99), now)).toBe("fresh");
+    expect(waitTone(minutesAgo(15), now)).toBe("warning");
+    expect(waitTone(minutesAgo(59.99), now)).toBe("warning");
+    expect(waitTone(minutesAgo(60), now)).toBe("overdue");
+    expect(waitTone(minutesAgo(600), now)).toBe("overdue");
+  });
+
+  it("ordena de la espera más antigua a la más reciente, sin espera al final", () => {
+    const list = [
+      withWait(minutesAgo(5), "nuevo"),
+      withWait(null, "sin"),
+      withWait(minutesAgo(90), "viejo"),
+      withWait(minutesAgo(30), "medio"),
+    ];
+    expect([...list].sort(compareByAwaitingReply).map((c) => c.id)).toEqual([
+      "viejo",
+      "medio",
+      "nuevo",
+      "sin",
+    ]);
   });
 });

@@ -588,6 +588,24 @@ function InboxPageInner() {
     [activeConversation]
   );
 
+  const handleAwaitingReplyChange = useCallback(
+    (conversationId: string, awaitingReplySince: string | null) => {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId
+            ? { ...c, awaiting_reply_since: awaitingReplySince }
+            : c
+        )
+      );
+      if (activeConversation?.id === conversationId) {
+        setActiveConversation((prev) =>
+          prev ? { ...prev, awaiting_reply_since: awaitingReplySince } : prev
+        );
+      }
+    },
+    [activeConversation]
+  );
+
   const handleAssignChange = useCallback(
     (conversationId: string, assignedAgentId: string | null) => {
       setConversations((prev) =>
@@ -672,6 +690,7 @@ function InboxPageInner() {
             onUpdateMessage={handleUpdateMessage}
             onStatusChange={handleStatusChange}
             onAssignChange={handleAssignChange}
+            onAwaitingReplyChange={handleAwaitingReplyChange}
             onBack={handleCloseConversation}
             resyncToken={resyncToken}
             onRefresh={handleManualRefresh}

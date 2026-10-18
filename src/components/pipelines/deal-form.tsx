@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { isAssignableRole } from "@/lib/auth/roles";
 import { CURRENCIES } from "@/lib/currency";
 import { dealErrorKey } from "@/lib/pipelines/deal-errors";
 import { newDealFields } from "@/lib/pipelines/deal-payload";
@@ -637,7 +638,11 @@ export function DealForm({
                 className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary"
               >
                 <option value="">{t("unassigned")}</option>
-                {profiles.map((p) => (
+                {profiles
+                  .filter(
+                    (p) => isAssignableRole(p.account_role) || p.id === assignedTo
+                  )
+                  .map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.full_name || p.email}
                   </option>
