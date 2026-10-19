@@ -31,11 +31,18 @@ El asesor elegido SHALL ser un miembro vigente de la cuenta (rol `owner`, `admin
 
 ### Requirement: El traspaso por venta o permuta va al asesor configurado
 
-Cuando la IA traspasa una conversación con motivo `vende_su_carro` o `permuta`, y la cuenta tiene un asesor para ventas y permutas que sigue siendo miembro vigente, `ai_handoff_assign` SHALL asignarle la conversación **antes** de aplicar el orden normal (conservar → continuidad → porcentajes). Esto SHALL cumplirse aunque la conversación ya tenga otro asesor vigente.
+Cuando la IA traspasa una conversación con motivo `vende_su_carro` o `permuta`, `ai_handoff_assign` SHALL elegir al asesor en este orden:
 
-La asignación SHALL registrarse en el historial con `source = 'reason'` y origen `ai_handoff`, y NO SHALL contar para la cuota del reparto por porcentajes.
+1. **Conservar:** si la conversación tiene un asesor vigente, se queda con él.
+2. **Continuidad:** si el contacto tiene asesor de continuidad (`contact_continuity_agent`), va a ese asesor.
+3. **Ventas y permutas:** si la cuenta tiene un asesor para ventas y permutas que sigue siendo miembro vigente, va a ese asesor.
+4. **Porcentajes:** el reparto normal.
 
-Con cualquier otro motivo, sin asesor configurado o con uno que ya no es miembro vigente, el traspaso SHALL seguir el orden normal sin cambios.
+El asesor de ventas y permutas NUNCA SHALL reemplazar a un asesor vigente ni al de continuidad del contacto. Un cliente que ya tiene asesor solo puede pasar a otro a mano, por un owner o admin.
+
+La asignación del paso 3 SHALL registrarse en el historial con `source = 'reason'` y origen `ai_handoff`, y NO SHALL contar para la cuota del reparto por porcentajes.
+
+Con cualquier otro motivo, sin asesor configurado o con uno que ya no es miembro vigente, el traspaso SHALL seguir el orden normal sin el paso 3.
 
 #### Scenario: Cliente nuevo que quiere vender su carro
 
@@ -46,18 +53,18 @@ Con cualquier otro motivo, sin asesor configurado o con uno que ya no es miembro
 #### Scenario: Cliente que ya tenía asesor pide una permuta
 
 - **WHEN** la IA traspasa con motivo `permuta` una conversación asignada a Juan (rol `agent`), y el ajuste tiene a Angélica
-- **THEN** la conversación pasa a Angélica
-- **AND** el historial registra el cambio de Juan a Angélica con `source = 'reason'`
+- **THEN** la conversación sigue con Juan, con resultado `kept`
+- **AND** Juan recibe el aviso de "Tu cliente pidió un asesor"
 
-#### Scenario: Ya estaba con Angélica
+#### Scenario: El contacto ya tiene asesor por otro canal
 
-- **WHEN** la IA traspasa con motivo `permuta` una conversación que ya tiene asignada a Angélica
-- **THEN** el resultado es `kept` y Angélica recibe el aviso de "Tu cliente pidió un asesor"
+- **WHEN** la IA traspasa con motivo `vende_su_carro` la conversación de Instagram de un contacto cuya conversación de WhatsApp atendió Brayan, y el ajuste tiene a Angélica
+- **THEN** la conversación se asigna a Brayan con `source = 'continuity'`
 
 #### Scenario: Motivo de compra normal
 
-- **WHEN** la IA traspasa con motivo `credito` una conversación de un contacto cuyo último asesor fue Angélica por una permuta anterior
-- **THEN** se aplica el orden normal
+- **WHEN** la IA traspasa con motivo `credito` la conversación de un contacto sin historial
+- **THEN** se aplica el reparto por porcentajes
 
 #### Scenario: Ajuste desactivado
 
@@ -73,41 +80,4 @@ Con cualquier otro motivo, sin asesor configurado o con uno que ya no es miembro
 
 - **WHEN** Angélica recibe tres traspasos por venta o permuta
 - **THEN** el siguiente reparto por porcentajes se calcula como si esos tres no hubieran existido
-
-### Requirement: El asesor anterior se entera de que perdió la conversación
-
-Cuando un traspaso por venta o permuta le quita la conversación a un asesor vigente para dársela al asesor configurado, el sistema SHALL insertarle al asesor anterior una notificación de tipo `conversation_assigned` con el título "Tu cliente pasó a <primer nombre del asesor configurado>" y un cuerpo que nombre al contacto y el motivo ("quiere vender su carro" o "permuta"). La notificación SHALL escribirse dentro de la misma transacción del traspaso, y su fallo NO SHALL impedir la asignación.
-
-Si la conversación no tenía asesor, o ya la tenía el asesor configurado, NO SHALL enviarse este aviso.
-
-#### Scenario: Juan pierde una permuta
-
-- **WHEN** un traspaso por `permuta` le pasa a Angélica una conversación de Juan
-- **THEN** Juan recibe la notificación "Tu cliente pasó a Angélica", con el nombre del contacto y el motivo "permuta"
-
-#### Scenario: Lead nuevo
-
-- **WHEN** un traspaso por `vende_su_carro` le llega a Angélica y la conversación no tenía asesor
-- **THEN** solo Angélica recibe aviso
-
-### Requirement: El negocio abierto sigue a quien atiende la venta o permuta
-
-Cuando un traspaso por venta o permuta le asigna la conversación al asesor configurado, los negocios abiertos del contacto que estaban asignados al asesor anterior SHALL pasar al asesor configurado. Si el contacto no tenía negocio abierto, SHALL crearse con el título del traspaso, como en cualquier traspaso.
-
-Un fallo al mover o crear el negocio NO SHALL impedir la asignación de la conversación.
-
-#### Scenario: El negocio de Juan pasa a Angélica
-
-- **WHEN** un traspaso por permuta le quita la conversación a Juan, y el contacto tiene un negocio abierto asignado a Juan
-- **THEN** ese negocio queda asignado a Angélica
-
-#### Scenario: Negocio de otro asesor
-
-- **WHEN** el contacto tiene un negocio abierto asignado a Brayan, que no era el asesor de la conversación
-- **THEN** ese negocio no cambia
-
-#### Scenario: Sin negocio abierto
-
-- **WHEN** un traspaso por `vende_su_carro` le llega a Angélica y el contacto no tiene negocio abierto
-- **THEN** se crea un negocio asignado a Angélica con el título "Nombre — datos del carro"
 

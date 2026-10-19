@@ -5,13 +5,11 @@ TBD - created by archiving change sticky-weighted-assignment. Update Purpose aft
 ## Requirements
 ### Requirement: El asesor vigente de una conversación no lo cambia ningún camino automático
 
-Un asesor es **vigente** mientras sea miembro de la cuenta con rol `owner`, `admin` o `agent`. Cuando una conversación tiene un asesor vigente, ningún camino automático —traspaso de la IA, motor de automatizaciones, motor de flujos, job de conversaciones olvidadas, API con service-role ni SQL a mano— SHALL cambiarlo ni dejarlo en NULL.
-
-La única excepción SHALL ser el traspaso de la IA por venta o permuta hacia el asesor para ventas y permutas de la cuenta (`handoff-reason-routing`). Ese traspaso SHALL pasar la guarda de forma explícita, con `crm.assignment_override = 'on'` dentro de la transacción de `ai_handoff_assign`, y solo para esa escritura.
+Un asesor es **vigente** mientras sea miembro de la cuenta con rol `owner`, `admin` o `agent`. Cuando una conversación tiene un asesor vigente, ningún camino automático —traspaso de la IA (con cualquier motivo, incluidos venta y permuta), motor de automatizaciones, motor de flujos, job de conversaciones olvidadas, API con service-role ni SQL a mano— SHALL cambiarlo ni dejarlo en NULL. Solo un owner o admin SHALL poder cambiarlo, a mano.
 
 La garantía SHALL vivir en la base de datos además de en el código: un trigger `BEFORE UPDATE OF assigned_agent_id` sobre `conversations` SHALL conservar el asesor anterior cuando la escritura no trae sesión de usuario (`auth.uid()` NULL) y el asesor anterior es vigente. No SHALL abortar la sentencia: el resto de la fila (estado, pausa del bot, nota) se escribe igual.
 
-Un operador que necesite corregir a mano por SQL SHALL poder saltarse la guarda de forma explícita con `SET LOCAL crm.assignment_override = 'on'`.
+Un operador que necesite corregir a mano por SQL SHALL poder saltarse la guarda de forma explícita con `SET LOCAL crm.assignment_override = 'on'`. Ningún camino automático SHALL usar ese escape.
 
 #### Scenario: Una automatización intenta reasignar un hilo con asesor
 
@@ -33,15 +31,10 @@ Un operador que necesite corregir a mano por SQL SHALL poder saltarse la guarda 
 - **WHEN** un operador ejecuta la misma sentencia con `crm.assignment_override = 'on'` en la transacción
 - **THEN** el cambio se aplica
 
-#### Scenario: Traspaso por permuta a la asesora de ventas y permutas
+#### Scenario: Traspaso por permuta de un cliente con asesor
 
 - **WHEN** la IA traspasa con motivo `permuta` una conversación asignada a Juan, y la cuenta tiene a Angélica como asesora de ventas y permutas
-- **THEN** la conversación pasa a Angélica
-
-#### Scenario: El override no se filtra fuera del traspaso
-
-- **WHEN** dentro de la misma sesión de base, después de un traspaso por permuta, una automatización intenta reasignar otra conversación con asesor vigente
-- **THEN** esa conversación conserva a su asesor
+- **THEN** la conversación sigue con Juan
 
 ### Requirement: Solo owner o admin cambian el asesor a mano
 
