@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { CalendarDays } from 'lucide-react';
@@ -23,6 +23,7 @@ export function ContactAppointments({ contactId }: { contactId: string }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   // Momento de referencia para "próxima": el de cuando se montó la ficha.
   const [now] = useState(() => Date.now());
+  const instanceId = useId();
 
   useEffect(() => {
     let cancelled = false;
@@ -39,8 +40,12 @@ export function ContactAppointments({ contactId }: { contactId: string }) {
           setRows((data ?? []) as Row[]);
         });
     load();
+    // El nombre del canal lleva `instanceId`: en el teléfono la ficha
+    // vive dos veces a la vez (el panel de escritorio, oculto por CSS
+    // pero montado, y la hoja de móvil). Con el mismo nombre, supabase
+    // devuelve el canal ya suscrito y `.on()` lanza, tumbando la página.
     const channel = supabase
-      .channel(`contact-appointments-${contactId}`)
+      .channel(`contact-appointments-${contactId}-${instanceId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'appointments', filter: `contact_id=eq.${contactId}` },
@@ -51,7 +56,7 @@ export function ContactAppointments({ contactId }: { contactId: string }) {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [contactId, supabase]);
+  }, [contactId, instanceId, supabase]);
 
   if (!rows || rows.length === 0) return null;
 
