@@ -40,6 +40,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ContactPicker } from '@/components/contacts/contact-picker';
+import { ContactProfileLink } from '@/components/contacts/contact-profile-link';
+import { SaleClosingFields } from '@/components/inventory/sale-closing-fields';
 import type { PickableContact } from '@/lib/contacts/filter-contacts';
 import {
   Car,
@@ -186,6 +188,10 @@ interface VehicleDraft {
   sold_to_contact_id: string;
   // Propietario (525) — quien pone el vehículo en venta. '' = nadie.
   owner_contact_id: string;
+  // Vendedor (554) — a quién se le compró o de quién se recibió en
+  // retoma. '' = sin registrar. Lo edita el equipo, no solo admin.
+  seller_contact_id: string;
+  acquisition_kind: '' | 'purchase' | 'trade_in';
 }
 
 const EMPTY_DRAFT: VehicleDraft = {
@@ -219,6 +225,8 @@ const EMPTY_DRAFT: VehicleDraft = {
   sold_at: '',
   sold_to_contact_id: '',
   owner_contact_id: '',
+  seller_contact_id: '',
+  acquisition_kind: '',
 };
 
 /**
@@ -457,6 +465,8 @@ function draftFromVehicle(v: InventoryVehicle): VehicleDraft {
     sold_at: v.sold_at ? v.sold_at.slice(0, 10) : '',
     sold_to_contact_id: v.sold_to_contact_id ?? '',
     owner_contact_id: v.owner_contact_id ?? '',
+    seller_contact_id: v.seller_contact_id ?? '',
+    acquisition_kind: v.acquisition_kind ?? '',
   };
 }
 
@@ -662,6 +672,21 @@ export default function InventoryPage() {
     setDialogOpen(true);
   }
 
+  // "Registrar compra" desde la ficha del contacto llega con
+  // `?nuevo=1&vendedor=<id>`: se abre el alta con el vendedor puesto. Se
+  // lee una sola vez y se limpia la URL, para que recargar no reabra el
+  // formulario.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sellerId = params.get('vendedor');
+    if (params.get('nuevo') !== '1') return;
+    window.history.replaceState(null, '', window.location.pathname);
+    setEditing(null);
+    setErrorField(null);
+    setDraft({ ...EMPTY_DRAFT, seller_contact_id: sellerId ?? '', acquisition_kind: sellerId ? 'purchase' : '' });
+    setDialogOpen(true);
+  }, []);
+
   function openEdit(v: InventoryVehicle) {
     setEditing(v);
     setErrorField(null);
@@ -716,6 +741,8 @@ export default function InventoryPage() {
         images: draft.images,
         internal_notes: draft.internal_notes.trim() || null,
         owner_contact_id: draft.owner_contact_id || null,
+        seller_contact_id: draft.seller_contact_id || null,
+        acquisition_kind: draft.acquisition_kind || null,
         // Sólo se mandan si el vehículo queda vendido; al revertir, el
         // backend los limpia solo (applySoldCoherence).
         ...(draft.status === 'sold'
@@ -1162,80 +1189,16 @@ export default function InventoryPage() {
             )}
 
             {/* Cierre de venta — aparece al elegir 'vendido'. Es lo que
-                convierte un cambio de estado en una venta medible. */}
+                convierte un cambio de estado en una venta medible. El mismo
+                bloque lo usa "Registrar venta" de la ficha del contacto. */}
             {draft.status === 'sold' && (
-              <div className="space-y-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 sm:col-span-2">
-                <div>
-                  <p className="text-foreground text-sm font-medium">
-                    {t('sale.title')}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    {t('sale.hint')}
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="sold_price">{t('sale.price')}</Label>
-                    <Input
-                      id="sold_price"
-                      aria-invalid={errorField === 'sold_price'}
-                      type="number"
-                      value={draft.sold_price}
-                      // Se propone el precio de lista para no teclearlo de
-                      // nuevo cuando se vendió sin descuento.
-                      placeholder={draft.price || undefined}
-                      onChange={(e) =>
-                        setDraft({ ...draft, sold_price: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sold_at">{t('sale.date')}</Label>
-                    <Input
-                      id="sold_at"
-                      aria-invalid={errorField === 'sold_at'}
-                      type="date"
-                      min={DATE_MIN}
-                      max={DATE_MAX}
-                      value={draft.sold_at || today()}
-                      onChange={(e) =>
-                        setDraft({ ...draft, sold_at: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sold_to_contact_id">
-                      {t('sale.buyer')}
-                    </Label>
-                    <Select
-                      value={draft.sold_to_contact_id || 'none'}
-                      onValueChange={(value) =>
-                        setDraft({
-                          ...draft,
-                          // 'none' es el centinela de "sin comprador"; el
-                          // Select puede entregar null al deseleccionar.
-                          sold_to_contact_id:
-                            !value || value === 'none' ? '' : value,
-                        })
-                      }
-                    >
-                      <SelectTrigger id="sold_to_contact_id" aria-invalid={errorField === 'sold_to_contact_id'}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          {t('sale.noBuyer')}
-                        </SelectItem>
-                        {contacts.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
+              <SaleClosingFields
+                value={draft}
+                onChange={(patch) => setDraft({ ...draft, ...patch })}
+                contacts={contacts}
+                listPrice={draft.price}
+                errorField={errorField}
+              />
             )}
             <div className="space-y-2">
               <Label htmlFor="license_plate">{t('fields.plate')}</Label>
@@ -1266,6 +1229,50 @@ export default function InventoryPage() {
                 }}
               />
               <p className="text-muted-foreground text-xs">{t('owner.hint')}</p>
+              <ContactProfileLink contactId={draft.owner_contact_id} label={t('contactLink')} />
+            </div>
+            {/* Vendedor (554): a quién se le compró o de quién se recibió
+                en retoma. El costo va aparte y es solo de admin. */}
+            <div className="space-y-2">
+              <Label htmlFor="seller_contact_id">{t('seller.label')}</Label>
+              <ContactPicker
+                id="seller_contact_id"
+                aria-invalid={errorField === 'seller_contact_id'}
+                contacts={contacts}
+                value={draft.seller_contact_id}
+                onChange={(id) => setDraft({ ...draft, seller_contact_id: id })}
+                labels={{
+                  none: t('seller.none'),
+                  search: t('owner.search'),
+                  empty: t('owner.empty'),
+                  more: (count) => t('owner.more', { count }),
+                }}
+              />
+              <ContactProfileLink contactId={draft.seller_contact_id} label={t('contactLink')} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="acquisition_kind">{t('seller.kind')}</Label>
+              <Select
+                value={draft.acquisition_kind || 'none'}
+                onValueChange={(v) =>
+                  setDraft({
+                    ...draft,
+                    acquisition_kind: v === 'purchase' || v === 'trade_in' ? v : '',
+                  })
+                }
+              >
+                <SelectTrigger id="acquisition_kind" aria-invalid={errorField === 'acquisition_kind'}>
+                  <SelectValue>
+                    {(v: string) => (v === 'purchase' || v === 'trade_in' ? t(`seller.kinds.${v}`) : t('seller.kindNone'))}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t('seller.kindNone')}</SelectItem>
+                  <SelectItem value="purchase">{t('seller.kinds.purchase')}</SelectItem>
+                  <SelectItem value="trade_in">{t('seller.kinds.trade_in')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">{t('seller.hint')}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="transmission">{t('fields.transmission')}</Label>

@@ -41,6 +41,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { useTranslations } from "next-intl";
+import { ContactProfileLink } from '@/components/contacts/contact-profile-link';
 
 interface ContactSidebarProps {
   contact: Contact | null;
@@ -350,6 +351,11 @@ export function ContactSidebar({ contact, className }: ContactSidebarProps) {
             {contact.company && (
               <p className="text-xs text-muted-foreground">{contact.company}</p>
             )}
+            <ContactProfileLink
+              contactId={contact.id}
+              label={tSidebar("viewProfile")}
+              className="mt-2"
+            />
           </div>
 
           {/* Phone */}

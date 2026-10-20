@@ -31,6 +31,7 @@ import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { PushNotificationsCard } from "@/components/notifications/push-notifications-card";
 import { notificationHref } from "@/lib/push/payload";
+import { ContactProfileLink } from '@/components/contacts/contact-profile-link';
 
 // Icono por tipo de aviso: asignación, mensaje nuevo de un cliente, o un
 // traspaso del bot sin atender (recordatorio al asesor / aviso a admins).
@@ -308,6 +309,12 @@ export default function NotificationsPage() {
                     </p>
                   </div>
                 </button>
+                {/* El aviso nombra a un cliente: su hoja de vida a un clic. */}
+                <ContactProfileLink
+                  contactId={n.contact_id}
+                  label={t('viewProfile')}
+                  className="mt-1 ml-4"
+                />
               </li>
             );
           })}

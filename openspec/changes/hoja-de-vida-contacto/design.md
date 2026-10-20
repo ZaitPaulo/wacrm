@@ -159,9 +159,10 @@ El cierre de venta vive hoy dentro de `src/app/(dashboard)/inventory/page.tsx`. 
 ## Migration Plan
 
 1. Migraciones, verificando antes que nadie más tomó estos números:
-   - `553_contact_visibility_business.sql` (D1).
-   - `554_contact_timeline.sql` (D2, D3, D5 e índices).
-   - `555_contact_interactions_vehicle_seller.sql` (D6, D7).
+   - `553_contact_visibility_business.sql` (D1 y `get_contact_assignees`).
+   - `554_contact_history_tables.sql` (D5, D6, D7 e índices: todas las tablas y columnas nuevas).
+   - `555_contact_timeline_functions.sql` (D2 y D3: las tres funciones de la hoja de vida).
+   - *Cambio respecto del plan original:* las tablas van todas en la 554 y las funciones en la 555, para escribir `get_contact_timeline` una sola vez con todas sus fuentes, en vez de crearla en una migración y reemplazarla en la siguiente. Las tres se despliegan juntas.
 2. En el VPS, confirmar que está en la 552 y aplicar 553 a 555 en orden. No hay backfill: el historial de etapas y el vendedor arrancan vacíos.
 3. Desplegar el front: un solo despliegue cuando el usuario lo indique, desde `develop` → `main`.
 4. **Reversión:**
@@ -175,3 +176,45 @@ El cierre de venta vive hoy dentro de `src/app/(dashboard)/inventory/page.tsx`. 
 - Si los dueños quieren que el asesor vea el **precio de venta** en la hoja de vida. Hoy ya lo puede leer (`vehicle-sales-recording`), así que se muestra salvo que digan otra cosa.
 - Si una retoma se vincula con la venta que la originó ("recibimos el Spark como parte de pago del CX-30"). Queda fuera; con `seller_contact_id` y `sold_to_contact_id` en el mismo contacto y la misma fecha se ve en la línea de tiempo.
 - Si el rol `viewer` registra interacciones. Por ahora no: se mantiene la regla de que `viewer` no escribe.
+
+## Notas de implementación
+
+**1.1 — Rutas dinámicas en Next 16.2.** Sin diferencias con lo supuesto: `params` llega como `Promise`. En páginas cliente se usa `useParams()` (patrón de `broadcasts/[id]` y `flows/[id]`), y en rutas de API `{ params }: { params: Promise<{ id: string }> }` con `await params` (patrón de `api/ai/knowledge/[id]`).
+
+**1.2 — Números de migración.** Ni `develop`, ni `origin/main`, ni `upstream/main` tienen 553–555. El VPS no se pudo leer por ssh desde esta sesión; según el despliegue del 2026-10-17 está en la 552. Se revalida antes de aplicar.
+
+**1.3 — Lecturas que cambian de alcance para el `agent` con la 553.**
+
+| Lectura | Cambio | ¿Deseado? |
+|---|---|---|
+| Lista de Contactos (`contacts/page.tsx`) | ve todos los contactos | Sí |
+| Documentos (`documents/page.tsx`) | ve todos los documentos y su buscador de contactos | Sí (los documentos cuelgan del contacto) |
+| `identity-links` (vínculos de identidad) | ve todos | Sí |
+| Selector de propietario del Inventario y `lib/inventory/owner.ts` | ya era `admin`+ (ruta solo admin) | Sin cambio |
+| Panel e informes (`lib/dashboard/queries.ts`), Difusiones | rutas solo admin | Sin cambio |
+| Selector de contacto de `appointment-dialog.tsx` | ofrecería contactos ajenos, pero el `INSERT` de `appointments` los rechaza | **No**: se limita al `agent` a los contactos que atiende |
+| `POST /api/whatsapp/send` con `contact_id` | dejaría abrir una conversación con un contacto ajeno | **No**: se exige `contact_visible` |
+| Automatizaciones, bot, webhooks, cron, API v1 | service-role | Sin cambio |
+
+**1.4 — Proxy de medios.** `GET /api/whatsapp/media/[mediaId]` solo exige sesión y pertenencia a la cuenta (lee `whatsapp_config` de la cuenta); no consulta la conversación. Los adjuntos de un hilo ajeno cargan sin cambios. Los adjuntos salientes son URLs públicas de Storage. No hace falta ampliar nada.
+
+**Cursor de la hoja de vida.** `get_contact_timeline` recibe un quinto parámetro, `p_before_key`: el `sort_key` (`kind:source_id`) de la última fila recibida. El cursor es el par `(p_before, p_before_key)`, así que eventos con la misma fecha no se repiten ni se saltan (probado con tres notas empatadas).
+
+**`get_contact_summary.can_edit`.** El resumen trae `can_edit` (`agent`+ y `contact_visible`), que es exactamente lo que exige `contacts_update`. La ficha lo usa para ofrecer la edición y "Agendar visita" sin repetir la regla en TypeScript.
+
+**`get_contact_assignees` (553).** Con la 553, el asesor ve todos los contactos pero no las conversaciones ajenas por tabla, y la columna "Asesor" de la lista le saldría vacía. Esta función devuelve solo (contacto, asesor, último mensaje), de la cuenta de quien consulta.
+
+**3.3 — No regresión, medida.** Sobre los datos locales, conteo por usuario (4 `agent`, 2 `admin`, 1 `viewer`) de `conversations`, `conversations` abiertas, `messages`, `deals`, `appointments`, `appointment_events`, `conversation_assignments` y `notifications`, antes y después de 553–555: idénticos. El panel (`lib/dashboard/queries.ts`) es solo de admin, que ya veía todo.
+
+**4.11 — Rendimiento medido (stack local, volumen sintético).** Un contacto con 3 hilos (WhatsApp, Instagram, Messenger) y 2.400 mensajes, 40 notas, y 60.000 mensajes de ruido en otras 200 conversaciones de la cuenta, con `ANALYZE`, como `agent` que no lo atiende:
+- `get_contact_timeline(…, 30)`: 22 ms en frío, 11 ms en caliente; filtrado a `conversation`: 5 ms.
+- `get_contact_summary`: 3 ms. `get_contact_conversation_messages` (50 mensajes): 2 ms.
+El conteo por hilo usa `idx_messages_conversation_created`. No hizo falta más índice que los de la 554. Conviene repetirlo con la copia del VPS si algún contacto real supera los 10.000 mensajes.
+
+**Desvíos de la implementación respecto del diseño:**
+- *D8 — el cierre de venta no era un diálogo.* En el Inventario la venta son campos del formulario del vehículo (estado vendido → precio, fecha y comprador). Se extrajeron a `src/components/inventory/sale-closing-fields.tsx`, que usan el formulario del Inventario (sin cambio de comportamiento) y el nuevo `sell-vehicle-dialog.tsx` de la ficha. Ambos escriben por `PATCH /api/inventory/[id]`.
+- *"Registrar compra" solo para admin+.* `/inventory` está en `ADMIN_ONLY_ROUTES`, así que el botón que lleva al alta con el vendedor puesto (`/inventory?nuevo=1&vendedor=<id>`) solo se ofrece a quien puede abrir esa pantalla. La API sigue aceptando el vendedor desde `agent`.
+- *Sin bloque de negocios aparte.* Los negocios aparecen en la hoja de vida (`deal_created`, `deal_stage`, `deal_closed`) y su conteo en el resumen; no se extrajo la lista de negocios del panel viejo.
+- *La ficha se hizo directamente con la hoja de vida final* (2.2 pedía una versión intermedia con las pestañas viejas).
+- *Ruta extra:* `GET /api/contacts/[id]/messages?conversation_id=…` para el visor de hilo. Verifica que la conversación sea del contacto antes de leerla.
+- *Ajustes de 1.3 hechos:* el selector de contactos de la cita ofrece al `agent` solo los que atiende; `POST /api/whatsapp/send` con `contact_id` exige `contact_visible` (403 si no); la lista de Contactos muestra la columna "Asesor" a todos (vía `get_contact_assignees`) y oculta editar/borrar en los contactos que el asesor no atiende; los documentos de un contacto ajeno se muestran sin subir ni borrar.

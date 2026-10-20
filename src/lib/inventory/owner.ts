@@ -20,7 +20,32 @@ export async function ownerContactError(
   accountId: string,
   contactId: string | null | undefined,
 ): Promise<string | null> {
-  if (!contactId) return null
+  return (await isAccountContact(supabase, accountId, contactId))
+    ? null
+    : 'El propietario no es un contacto de esta cuenta'
+}
+
+/**
+ * Lo mismo para el vendedor (554). La base también lo rechaza con un
+ * trigger; esto devuelve el 400 con el campo antes de llegar a ella.
+ */
+export async function sellerContactError(
+  supabase: SupabaseClient,
+  accountId: string,
+  contactId: string | null | undefined,
+): Promise<string | null> {
+  return (await isAccountContact(supabase, accountId, contactId))
+    ? null
+    : 'El vendedor no es un contacto de esta cuenta'
+}
+
+/** Sin contacto (`null` / `undefined`) cuenta como válido. */
+async function isAccountContact(
+  supabase: SupabaseClient,
+  accountId: string,
+  contactId: string | null | undefined,
+): Promise<boolean> {
+  if (!contactId) return true
   const { data, error } = await supabase
     .from('contacts')
     .select('id')
@@ -28,5 +53,5 @@ export async function ownerContactError(
     .eq('id', contactId)
     .maybeSingle()
   if (error) throw error
-  return data ? null : 'El propietario no es un contacto de esta cuenta'
+  return !!data
 }

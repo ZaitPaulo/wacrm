@@ -29,6 +29,7 @@ import {
 } from '@/lib/appointments/status';
 import type { AppointmentEvent } from '@/lib/appointments/types';
 import { StatusBadge } from './appointment-card';
+import { ContactProfileLink } from '@/components/contacts/contact-profile-link';
 
 interface AppointmentSheetProps {
   appointment: AgendaAppointment | null;
@@ -99,6 +100,7 @@ export function AppointmentSheet({ appointment: a, agentName, onClose, onEdit, o
           <>
             <SheetHeader>
               <SheetTitle>{contactLabel(a)}</SheetTitle>
+              <ContactProfileLink contactId={a.contact_id} label={t('sheet.viewProfile')} />
               <SheetDescription className="flex items-center gap-2">
                 <StatusBadge status={a.status} />
                 {formatAppointmentWhen(a.starts_at)}

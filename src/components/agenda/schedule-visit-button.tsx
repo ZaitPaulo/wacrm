@@ -50,16 +50,22 @@ export function ScheduleVisitButton({ conversation, contact }: ScheduleVisitButt
   );
 }
 
-function ScheduleVisitDialog({
+/**
+ * El formulario de cita con el cliente puesto. Lo usan este botón y la
+ * ficha del contacto; `onSaved` avisa que la cita quedó guardada.
+ */
+export function ScheduleVisitDialog({
   conversationId,
   agentId,
   contactId,
   onClose,
+  onSaved,
 }: {
-  conversationId: string;
+  conversationId: string | null;
   agentId: string | null;
   contactId: string;
   onClose: () => void;
+  onSaved?: () => void;
 }) {
   const base = useAgendaBase();
   const [prefill] = useState(() => ({ contactId, conversationId, agentId, startsAt: null }));
@@ -70,7 +76,10 @@ function ScheduleVisitDialog({
       onOpenChange={(o) => !o && onClose()}
       base={base}
       prefill={prefill}
-      onSaved={onClose}
+      onSaved={() => {
+        onSaved?.();
+        onClose();
+      }}
     />
   );
 }

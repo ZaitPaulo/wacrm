@@ -4,7 +4,7 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit
 import { buildVehiclePayload } from '@/lib/inventory/payload'
 import { describeDbError } from '@/lib/inventory/db-error'
 import { persistAcquisition } from '@/lib/inventory/acquisitions'
-import { ownerContactError } from '@/lib/inventory/owner'
+import { ownerContactError, sellerContactError } from '@/lib/inventory/owner'
 import {
   syncVehicleKnowledge,
   deleteVehicleKnowledge,
@@ -44,6 +44,17 @@ export async function PATCH(request: Request, { params }: Params) {
     if (ownerError) {
       return NextResponse.json(
         { error: ownerError, field: 'owner_contact_id' },
+        { status: 400 },
+      )
+    }
+    const sellerError = await sellerContactError(
+      supabase,
+      accountId,
+      parsed.value.seller_contact_id,
+    )
+    if (sellerError) {
+      return NextResponse.json(
+        { error: sellerError, field: 'seller_contact_id' },
         { status: 400 },
       )
     }

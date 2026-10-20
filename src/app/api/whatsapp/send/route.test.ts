@@ -21,6 +21,9 @@ let callerRole: string = 'admin'
 // the shared send core re-loads the conversation (with its contact) from
 // just the id, so the mock must model insert-then-select-by-id.
 let createdConversation: Record<string, unknown> | null = null
+// `contact_visible` (520): si quien envía atiende al contacto. Desde la
+// 553 todos ven el contacto, pero solo quien lo atiende le escribe.
+let canAttendContact = true
 
 const CONTACT = {
   id: 'contact-1',
@@ -123,6 +126,11 @@ function makeSupabaseMock() {
       })),
     },
     from: vi.fn((table: string) => builder(table)),
+    rpc: vi.fn(async (fn: string) =>
+      fn === 'contact_visible'
+        ? { data: canAttendContact, error: null }
+        : { data: null, error: null },
+    ),
   }
 }
 
@@ -188,12 +196,23 @@ describe('POST /api/whatsapp/send — contact_id template path', () => {
     createdConversation = null
     contactRow = CONTACT
     callerRole = 'admin'
+    canAttendContact = true
     supabaseMock = makeSupabaseMock()
     sendTemplateMessage.mockClear()
   })
 
   afterEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('403s when the caller does not attend the contact', async () => {
+    canAttendContact = false
+
+    const res = await postContactTemplate()
+
+    expect(res.status).toBe(403)
+    expect(conversationInserts).toHaveLength(0)
+    expect(sendTemplateMessage).not.toHaveBeenCalled()
   })
 
   it('creates a conversation for a contact with none, then sends the template', async () => {
@@ -282,6 +301,7 @@ describe('POST /api/whatsapp/send — role enforcement', () => {
     createdConversation = null
     contactRow = CONTACT
     callerRole = 'admin'
+    canAttendContact = true
     supabaseMock = makeSupabaseMock()
     sendTemplateMessage.mockClear()
   })

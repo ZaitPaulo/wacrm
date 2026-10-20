@@ -848,6 +848,15 @@ export interface InventoryVehicle {
   owner_contact_id: string | null;
 
   /**
+   * Vendedor: a quién se le compró el vehículo o de quién se recibió en
+   * retoma. Distinto del propietario y del comprador. El costo sigue en
+   * `vehicle_acquisitions`, solo admin. Migración 554.
+   */
+  seller_contact_id?: string | null;
+  /** 'purchase' (compra) o 'trade_in' (retoma); null sin registrar. */
+  acquisition_kind?: 'purchase' | 'trade_in' | null;
+
+  /**
    * Código corto y opaco que identifica al vehículo en el mensaje de
    * WhatsApp que abre la vitrina. Lo genera la base (DEFAULT), no la
    * aplicación. No deriva de VIN ni placa.

@@ -156,6 +156,22 @@ export function AppointmentDialog({
           .eq('id', id)
           .maybeSingle();
         if (!cancelled) setFixedContact((data as PickableContact | null) ?? null);
+      } else if (accountRole === 'agent') {
+        // Desde la 553 el asesor VE todos los contactos, pero solo puede
+        // agendarle a los que atiende (`appointments_insert` sigue con
+        // `contact_visible`): se le ofrecen solo esos.
+        const { data } = await supabase
+          .from('conversations')
+          .select('contact:contacts(id, name, phone)')
+          .eq('assigned_agent_id', user?.id ?? '');
+        const seen = new Map<string, PickableContact>();
+        for (const row of (data ?? []) as unknown as { contact: PickableContact | null }[]) {
+          if (row.contact) seen.set(row.contact.id, row.contact);
+        }
+        const list = [...seen.values()].sort((a, b) =>
+          (a.name ?? '').localeCompare(b.name ?? '')
+        );
+        if (!cancelled) setContacts(list);
       } else {
         const { data } = await supabase.from('contacts').select('id, name, phone').order('name');
         if (!cancelled) setContacts((data ?? []) as PickableContact[]);
@@ -164,7 +180,7 @@ export function AppointmentDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, contactFixed, appointment?.contact_id, prefill?.contactId, supabase]);
+  }, [open, contactFixed, appointment?.contact_id, prefill?.contactId, supabase, accountRole, user?.id]);
 
   // Al elegir contacto desde el calendario, su conversación más reciente:
   // la confirmación sale por ahí.

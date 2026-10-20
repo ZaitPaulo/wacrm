@@ -456,7 +456,8 @@
       "stageUpdated": "Deal moved to {stage}",
       "stageUpdateFailed": "Could not change the stage",
       "createDeal": "Create deal",
-      "addDeal": "Create a deal for this contact"
+      "addDeal": "Create a deal for this contact",
+      "viewProfile": "View history"
     },
     "aiBanner": {
       "pausedTitle": "AI assistant is paused here",
@@ -718,6 +719,158 @@
       "download": "Download Excel",
       "generating": "Generating…",
       "downloadFailed": "Couldn't generate the report. Try again."
+    },
+    "profile": {
+      "backToContacts": "Contacts",
+      "notFound": "Contact not found",
+      "notFoundHint": "It does not exist or does not belong to your account.",
+      "noConversations": "No conversations",
+      "unassigned": "Unassigned",
+      "readOnlyNotice": "Another agent handles this customer: you can see their whole history, add notes and log interactions, but not edit their details.",
+      "actions": {
+        "logInteraction": "Log interaction",
+        "scheduleVisit": "Schedule visit",
+        "recordSale": "Record sale",
+        "recordPurchase": "Record purchase"
+      },
+      "stats": {
+        "since": "Customer since",
+        "appointments": "Appointments",
+        "appointmentsValue": "{total} ({attended} attended)",
+        "bought": "Bought from us",
+        "purchased": "We bought",
+        "tradedIn": "Trade-ins",
+        "consignments": "On consignment",
+        "openDeals": "Open deals"
+      },
+      "tabs": {
+        "timeline": "History",
+        "documents": "Documents"
+      }
+    },
+    "timeline": {
+      "loadFailed": "Could not load the history",
+      "empty": "Nothing in the history yet. Add a note or log an interaction.",
+      "emptyFiltered": "No events of this type.",
+      "loadMore": "Load more",
+      "deleted": "Deleted",
+      "deleteFailed": "Could not delete",
+      "unassigned": "unassigned",
+      "filters": {
+        "all": "All",
+        "appointments": "Appointments",
+        "interactions": "Calls and interactions",
+        "conversations": "Conversations",
+        "deals": "Deals",
+        "vehicles": "Vehicles",
+        "documents": "Documents",
+        "notes": "Notes"
+      },
+      "events": {
+        "firstContact": "First contact via {channel}",
+        "firstContactAd": "Came from the ad “{ad}” ({channel})",
+        "conversation": "Conversation via {channel} · {count, plural, one {# message} other {# messages}}",
+        "assignmentFromBot": "The bot handed it to {to}",
+        "assignmentTransfer": "Moved from {from} to {to}",
+        "assignmentToBot": "{from} returned it to the bot",
+        "appointment": "Appointment: {purpose} · {status}",
+        "appointmentCreated": "Scheduled an appointment: {purpose}",
+        "appointmentRescheduled": "Rescheduled the appointment ({purpose})",
+        "appointmentReassigned": "Reassigned the appointment from {from} to {to}",
+        "appointmentStatus": "Appointment marked as “{status}”",
+        "appointmentCustomerConfirmed": "The customer confirmed the appointment",
+        "appointmentCustomerChange": "The customer asked to change the appointment",
+        "dealCreated": "Deal created: {title} ({stage})",
+        "dealStage": "{title}: {from} → {to}",
+        "dealWon": "Deal won: {title}",
+        "dealLost": "Deal lost: {title}",
+        "inquiry": "Asked about {vehicle}",
+        "sale": "We sold them {vehicle}",
+        "consignment": "Left {vehicle} with us on consignment",
+        "acquisitionPurchase": "We bought {vehicle} from them",
+        "acquisitionTradeIn": "Traded in {vehicle}",
+        "document": "Document: {name}",
+        "note": "Note",
+        "interaction": "{kind}"
+      },
+      "details": {
+        "conversationRange": "{from} – {to}",
+        "attendedBy": "Handled by: {name}",
+        "botOnly": "Bot only",
+        "price": "Price: {price}",
+        "cost": "Cost: {price}",
+        "minutes": "{count, plural, one {# minute} other {# minutes}}"
+      },
+      "interactionKinds": {
+        "call_outbound": "Outbound call",
+        "call_inbound": "Inbound call",
+        "walk_in": "Walk-in visit",
+        "other": "Other interaction"
+      },
+      "outcomes": {
+        "answered": "Answered",
+        "no_answer": "No answer",
+        "voicemail": "Voicemail",
+        "wrong_number": "Wrong number"
+      },
+      "actions": {
+        "viewThread": "View conversation",
+        "openAppointment": "Open in Agenda",
+        "openDocuments": "View documents",
+        "edit": "Edit",
+        "delete": "Delete"
+      }
+    },
+    "thread": {
+      "title": "Conversation",
+      "attendedBy": "Handled by: {name}",
+      "notAssigned": "No agent assigned",
+      "readOnly": "Read only",
+      "openInInbox": "Open in inbox",
+      "loadOlder": "Load earlier messages",
+      "empty": "No messages",
+      "loadFailed": "Could not load the conversation"
+    },
+    "interactions": {
+      "title": "Log interaction",
+      "editTitle": "Edit interaction",
+      "description": "Calls, walk-in visits and other contact with the customer. Future visits are scheduled in the Agenda.",
+      "fields": {
+        "kind": "Type",
+        "when": "Date and time",
+        "outcome": "Outcome",
+        "outcomePlaceholder": "No outcome",
+        "minutes": "Duration (minutes)",
+        "note": "Note",
+        "notePlaceholder": "What was discussed…"
+      },
+      "errors": {
+        "invalid_date": "The date is not valid",
+        "future_date": "The date cannot be in the future: future visits are scheduled in the Agenda",
+        "invalid_duration": "The duration must be a whole number of minutes",
+        "outcome_not_call": "The outcome only applies to calls",
+        "saveFailed": "Could not save the interaction"
+      },
+      "saved": "Interaction logged",
+      "updated": "Interaction updated",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "sell": {
+      "title": "Record sale",
+      "description": "Pick the vehicle sold to this customer and the closing details.",
+      "vehicle": "Vehicle",
+      "vehiclePlaceholder": "Pick a vehicle",
+      "vehicleNone": "None",
+      "vehicleSearch": "Search by make, model or plate…",
+      "vehicleEmpty": "No available vehicle matches.",
+      "vehicleSuggested": "Asked about by the customer",
+      "vehicleInventory": "Inventory",
+      "vehicleReserved": "Reserved",
+      "vehicleRequired": "Pick the vehicle sold",
+      "sold": "Sale recorded",
+      "cancel": "Cancel",
+      "confirm": "Record sale"
     }
   },
   "Pipelines": {
@@ -2676,7 +2829,19 @@
       "empty": "No contact matches.",
       "more": "And {count} more: type to narrow down."
     },
-    "confirmRevertSale": "This vehicle is marked as sold. Changing its status will clear the price, date and buyer. Continue?"
+    "confirmRevertSale": "This vehicle is marked as sold. Changing its status will clear the price, date and buyer. Continue?",
+    "contactLink": "View history",
+    "seller": {
+      "label": "Seller",
+      "none": "No seller",
+      "kind": "Acquisition type",
+      "kindNone": "Not recorded",
+      "kinds": {
+        "purchase": "Purchase",
+        "trade_in": "Trade-in"
+      },
+      "hint": "Who we bought the vehicle from, or who traded it in. It shows up in their history."
+    }
   },
   "PhotoOrder": {
     "dragHandle": "Drag to reorder",
@@ -2875,7 +3040,8 @@
     },
     "inApp": {
       "open": "Open"
-    }
+    },
+    "viewProfile": "View customer history"
   },
   "SignupPage": {
     "titleInvite": "Create account & join",
@@ -3227,7 +3393,8 @@
       "when": "When",
       "conversation": "Conversation",
       "openConversation": "Open in inbox",
-      "history": "History"
+      "history": "History",
+      "viewProfile": "View history"
     },
     "actions": {
       "confirm": "Confirm",

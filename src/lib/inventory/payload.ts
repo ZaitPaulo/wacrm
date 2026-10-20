@@ -21,6 +21,10 @@ export const VEHICLE_STATUSES = [
 ] as const
 export type VehicleStatusValue = (typeof VEHICLE_STATUSES)[number]
 
+/** Cómo entró el vehículo al inventario (554): compra o retoma. */
+export const ACQUISITION_KINDS = ['purchase', 'trade_in'] as const
+export type AcquisitionKindValue = (typeof ACQUISITION_KINDS)[number]
+
 export interface VehiclePayload {
   brand?: string
   model?: string
@@ -56,6 +60,10 @@ export interface VehiclePayload {
   // Propietario (525). Que el contacto sea de la cuenta lo valida la ruta
   // con `ownerContactError`: acá solo se normaliza la forma.
   owner_contact_id?: string | null
+  // Vendedor y tipo de adquisición (554): a quién se le compró o de quién
+  // se recibió en retoma. Lo ve y lo edita el equipo; el costo no.
+  seller_contact_id?: string | null
+  acquisition_kind?: AcquisitionKindValue | null
 }
 
 /**
@@ -152,6 +160,8 @@ const LABELS = {
   sold_price: 'Precio de venta',
   sold_to_contact_id: 'Comprador',
   owner_contact_id: 'Propietario',
+  seller_contact_id: 'Vendedor',
+  acquisition_kind: 'Tipo de adquisición',
   purchase_cost: 'Costo de compra',
   has_lien: 'Tiene prenda',
   on_display: 'En vitrina física',
@@ -401,6 +411,25 @@ export function buildVehiclePayload(
     const s = str(b.owner_contact_id)
     if (!s) return fieldError('owner_contact_id', 'el contacto elegido no es válido')
     out.owner_contact_id = s
+  }
+
+  // --- Vendedor y tipo de adquisición (554) ------------------
+  // Tampoco dependen del estado: venderlo no cambia a quién se le compró.
+  if (b.seller_contact_id === null || b.seller_contact_id === '') {
+    out.seller_contact_id = null
+  } else if (b.seller_contact_id !== undefined) {
+    const s = str(b.seller_contact_id)
+    if (!s) return fieldError('seller_contact_id', 'el contacto elegido no es válido')
+    out.seller_contact_id = s
+  }
+
+  if (b.acquisition_kind === null || b.acquisition_kind === '') {
+    out.acquisition_kind = null
+  } else if (b.acquisition_kind !== undefined) {
+    if (!(ACQUISITION_KINDS as readonly unknown[]).includes(b.acquisition_kind)) {
+      return fieldError('acquisition_kind', 'debe ser compra o retoma')
+    }
+    out.acquisition_kind = b.acquisition_kind as AcquisitionKindValue
   }
 
   const coherence = applySoldCoherence(out)

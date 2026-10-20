@@ -129,6 +129,21 @@ export async function POST(request: Request) {
         );
       }
 
+      // Desde la 553 todo el equipo VE cualquier contacto, pero escribirle
+      // sigue siendo de quien lo atiende (`contact_visible`, 520). Sin esto
+      // un asesor abriría desde la ficha una conversación nueva con el
+      // cliente de un compañero.
+      const { data: canAttend } = await supabase.rpc('contact_visible', {
+        p_account_id: accountId,
+        p_contact_id: contact_id,
+      });
+      if (canAttend !== true) {
+        return NextResponse.json(
+          { error: 'Contact not assigned to you' },
+          { status: 403 }
+        );
+      }
+
       const resolved = await findOrCreateConversation(
         supabase,
         accountId,

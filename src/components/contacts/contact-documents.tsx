@@ -42,6 +42,11 @@ type VehicleOption = Pick<InventoryVehicle, 'id' | 'brand' | 'model' | 'year'>;
 interface ContactDocumentsProps {
   contactId: string | null;
   accountId: string | null;
+  /**
+   * Quien mira no atiende al contacto: desde la 553 ve sus documentos,
+   * pero subir y borrar siguen exigiendo `contact_visible`.
+   */
+  readOnly?: boolean;
 }
 
 function formatSize(bytes: number | null): string {
@@ -66,10 +71,10 @@ function vehicleLabel(v: { brand: string; model: string; year: number }): string
  * @param contactId Lead dueño de los documentos (null mientras carga).
  * @param accountId Cuenta activa; requerido para subir (path account-scoped).
  */
-export function ContactDocuments({ contactId, accountId }: ContactDocumentsProps) {
+export function ContactDocuments({ contactId, accountId, readOnly = false }: ContactDocumentsProps) {
   const t = useTranslations('Documents');
   const supabase = createClient();
-  const canEdit = useCan('send-messages');
+  const canEdit = useCan('send-messages') && !readOnly;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);

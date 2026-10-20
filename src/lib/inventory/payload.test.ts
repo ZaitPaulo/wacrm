@@ -156,6 +156,48 @@ describe("buildVehiclePayload — propietario", () => {
   });
 });
 
+describe("buildVehiclePayload — vendedor y tipo de adquisición (554)", () => {
+  const SELLER = "00000000-0000-4000-8000-0000000c0001";
+
+  it("acepta vendedor y retoma", () => {
+    const v = ok(
+      buildVehiclePayload({ seller_contact_id: SELLER, acquisition_kind: "trade_in" }, { partial: true }),
+    );
+    expect(v.seller_contact_id).toBe(SELLER);
+    expect(v.acquisition_kind).toBe("trade_in");
+  });
+
+  it("vacío o null los quita", () => {
+    const v = ok(buildVehiclePayload({ seller_contact_id: "", acquisition_kind: null }, { partial: true }));
+    expect(v.seller_contact_id).toBeNull();
+    expect(v.acquisition_kind).toBeNull();
+  });
+
+  it("un patch sin los campos no los toca", () => {
+    const v = ok(buildVehiclePayload({ mileage: 1000 }, { partial: true }));
+    expect("seller_contact_id" in v).toBe(false);
+    expect("acquisition_kind" in v).toBe(false);
+  });
+
+  it("no se limpian al vender", () => {
+    const v = ok(
+      buildVehiclePayload(
+        { status: "sold", sold_price: 1, seller_contact_id: SELLER, acquisition_kind: "purchase" },
+        { partial: true },
+      ),
+    );
+    expect(v.seller_contact_id).toBe(SELLER);
+    expect(v.acquisition_kind).toBe("purchase");
+  });
+
+  it("rechaza un tipo desconocido", () => {
+    expect(buildVehiclePayload({ acquisition_kind: "regalo" }, { partial: true })).toEqual({
+      error: "Revisa «Tipo de adquisición»: debe ser compra o retoma",
+      field: "acquisition_kind",
+    });
+  });
+});
+
 describe("buildAcquisitionPayload", () => {
   it("devuelve null cuando no hay datos de compra", () => {
     const r = buildAcquisitionPayload({ brand: "Toyota" });

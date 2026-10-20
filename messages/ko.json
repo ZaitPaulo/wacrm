@@ -456,7 +456,8 @@
       "stageUpdated": "거래를 {stage}(으)로 이동했습니다",
       "stageUpdateFailed": "단계를 변경하지 못했습니다",
       "createDeal": "거래 만들기",
-      "addDeal": "이 연락처의 거래 만들기"
+      "addDeal": "이 연락처의 거래 만들기",
+      "viewProfile": "이력 보기"
     },
     "aiBanner": {
       "pausedTitle": "이 대화에서 AI 어시스턴트가 일시 중지됨",
@@ -718,6 +719,158 @@
       "download": "Excel 다운로드",
       "generating": "생성 중…",
       "downloadFailed": "보고서를 생성하지 못했습니다. 다시 시도하세요."
+    },
+    "profile": {
+      "backToContacts": "연락처",
+      "notFound": "연락처를 찾을 수 없습니다",
+      "notFoundHint": "존재하지 않거나 이 계정의 연락처가 아닙니다.",
+      "noConversations": "대화 없음",
+      "unassigned": "담당자 없음",
+      "readOnlyNotice": "다른 상담원이 담당하는 고객입니다. 전체 이력을 보고 메모와 상호작용을 남길 수 있지만 정보는 수정할 수 없습니다.",
+      "actions": {
+        "logInteraction": "상호작용 기록",
+        "scheduleVisit": "방문 예약",
+        "recordSale": "판매 기록",
+        "recordPurchase": "매입 기록"
+      },
+      "stats": {
+        "since": "고객 등록일",
+        "appointments": "예약",
+        "appointmentsValue": "{total} ({attended} 방문)",
+        "bought": "구매",
+        "purchased": "매입",
+        "tradedIn": "보상 판매",
+        "consignments": "위탁",
+        "openDeals": "진행 중인 거래"
+      },
+      "tabs": {
+        "timeline": "이력",
+        "documents": "문서"
+      }
+    },
+    "timeline": {
+      "loadFailed": "이력을 불러올 수 없습니다",
+      "empty": "아직 이력이 없습니다. 메모를 남기거나 상호작용을 기록하세요.",
+      "emptyFiltered": "이 유형의 이벤트가 없습니다.",
+      "loadMore": "더 보기",
+      "deleted": "삭제됨",
+      "deleteFailed": "삭제할 수 없습니다",
+      "unassigned": "담당자 없음",
+      "filters": {
+        "all": "전체",
+        "appointments": "예약",
+        "interactions": "통화 및 상호작용",
+        "conversations": "대화",
+        "deals": "거래",
+        "vehicles": "차량",
+        "documents": "문서",
+        "notes": "메모"
+      },
+      "events": {
+        "firstContact": "{channel}(으)로 첫 연락",
+        "firstContactAd": "광고 “{ad}”(으)로 유입 ({channel})",
+        "conversation": "{channel} 대화 · 메시지 {count}개",
+        "assignmentFromBot": "봇이 {to}에게 넘김",
+        "assignmentTransfer": "{from}에서 {to}(으)로 이관",
+        "assignmentToBot": "{from}이(가) 봇에게 되돌림",
+        "appointment": "예약: {purpose} · {status}",
+        "appointmentCreated": "예약 생성: {purpose}",
+        "appointmentRescheduled": "예약 변경 ({purpose})",
+        "appointmentReassigned": "예약 담당자 변경: {from} → {to}",
+        "appointmentStatus": "예약 상태: “{status}”",
+        "appointmentCustomerConfirmed": "고객이 예약을 확인함",
+        "appointmentCustomerChange": "고객이 예약 변경을 요청함",
+        "dealCreated": "거래 생성: {title} ({stage})",
+        "dealStage": "{title}: {from} → {to}",
+        "dealWon": "거래 성사: {title}",
+        "dealLost": "거래 실패: {title}",
+        "inquiry": "{vehicle} 문의",
+        "sale": "{vehicle} 판매",
+        "consignment": "{vehicle} 위탁",
+        "acquisitionPurchase": "{vehicle} 매입",
+        "acquisitionTradeIn": "{vehicle} 보상 판매로 인수",
+        "document": "문서: {name}",
+        "note": "메모",
+        "interaction": "{kind}"
+      },
+      "details": {
+        "conversationRange": "{from} – {to}",
+        "attendedBy": "담당: {name}",
+        "botOnly": "봇만",
+        "price": "가격: {price}",
+        "cost": "원가: {price}",
+        "minutes": "{count}분"
+      },
+      "interactionKinds": {
+        "call_outbound": "발신 통화",
+        "call_inbound": "수신 통화",
+        "walk_in": "예약 없는 방문",
+        "other": "기타 상호작용"
+      },
+      "outcomes": {
+        "answered": "통화됨",
+        "no_answer": "부재중",
+        "voicemail": "음성 사서함",
+        "wrong_number": "잘못된 번호"
+      },
+      "actions": {
+        "viewThread": "대화 보기",
+        "openAppointment": "일정에서 열기",
+        "openDocuments": "문서 보기",
+        "edit": "수정",
+        "delete": "삭제"
+      }
+    },
+    "thread": {
+      "title": "대화",
+      "attendedBy": "담당: {name}",
+      "notAssigned": "담당자 없음",
+      "readOnly": "읽기 전용",
+      "openInInbox": "받은편지함에서 열기",
+      "loadOlder": "이전 메시지 불러오기",
+      "empty": "메시지 없음",
+      "loadFailed": "대화를 불러올 수 없습니다"
+    },
+    "interactions": {
+      "title": "상호작용 기록",
+      "editTitle": "상호작용 수정",
+      "description": "통화, 예약 없는 방문 및 기타 고객 접촉. 향후 방문은 일정에서 예약하세요.",
+      "fields": {
+        "kind": "유형",
+        "when": "날짜 및 시간",
+        "outcome": "결과",
+        "outcomePlaceholder": "결과 없음",
+        "minutes": "통화 시간(분)",
+        "note": "메모",
+        "notePlaceholder": "나눈 이야기…"
+      },
+      "errors": {
+        "invalid_date": "날짜가 올바르지 않습니다",
+        "future_date": "미래 날짜는 사용할 수 없습니다. 향후 방문은 일정에서 예약하세요",
+        "invalid_duration": "시간은 분 단위 정수여야 합니다",
+        "outcome_not_call": "결과는 통화에만 해당됩니다",
+        "saveFailed": "상호작용을 저장할 수 없습니다"
+      },
+      "saved": "상호작용이 기록되었습니다",
+      "updated": "상호작용이 수정되었습니다",
+      "cancel": "취소",
+      "save": "저장"
+    },
+    "sell": {
+      "title": "판매 기록",
+      "description": "이 고객에게 판매한 차량과 거래 정보를 선택하세요.",
+      "vehicle": "차량",
+      "vehiclePlaceholder": "차량 선택",
+      "vehicleNone": "없음",
+      "vehicleSearch": "제조사, 모델 또는 번호판으로 검색…",
+      "vehicleEmpty": "일치하는 차량이 없습니다.",
+      "vehicleSuggested": "고객 문의 차량",
+      "vehicleInventory": "재고",
+      "vehicleReserved": "예약됨",
+      "vehicleRequired": "판매한 차량을 선택하세요",
+      "sold": "판매가 기록되었습니다",
+      "cancel": "취소",
+      "confirm": "판매 기록"
     }
   },
   "Pipelines": {
@@ -2676,7 +2829,19 @@
       "empty": "일치하는 연락처가 없습니다.",
       "more": "{count}개 더 있음: 입력해서 좁혀 보세요."
     },
-    "confirmRevertSale": "판매 완료로 등록된 차량입니다. 상태를 변경하면 판매가, 판매일, 구매자 정보가 삭제됩니다. 계속하시겠습니까?"
+    "confirmRevertSale": "판매 완료로 등록된 차량입니다. 상태를 변경하면 판매가, 판매일, 구매자 정보가 삭제됩니다. 계속하시겠습니까?",
+    "contactLink": "이력 보기",
+    "seller": {
+      "label": "판매자",
+      "none": "판매자 없음",
+      "kind": "인수 유형",
+      "kindNone": "미기록",
+      "kinds": {
+        "purchase": "매입",
+        "trade_in": "보상 판매"
+      },
+      "hint": "차량을 매입했거나 보상 판매로 받은 상대입니다. 해당 고객의 이력에 표시됩니다."
+    }
   },
   "PhotoOrder": {
     "dragHandle": "드래그하여 순서 변경",
@@ -2875,7 +3040,8 @@
     },
     "inApp": {
       "open": "열기"
-    }
+    },
+    "viewProfile": "고객 이력 보기"
   },
   "SignupPage": {
     "titleInvite": "계정 만들고 참여하기",
@@ -3227,7 +3393,8 @@
       "when": "When",
       "conversation": "Conversation",
       "openConversation": "Open in inbox",
-      "history": "History"
+      "history": "History",
+      "viewProfile": "이력 보기"
     },
     "actions": {
       "confirm": "Confirm",

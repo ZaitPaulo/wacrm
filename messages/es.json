@@ -432,7 +432,8 @@
       "stageUpdated": "Negocio movido a {stage}",
       "stageUpdateFailed": "No se pudo cambiar la etapa",
       "createDeal": "Crear negocio",
-      "addDeal": "Crear un negocio para este contacto"
+      "addDeal": "Crear un negocio para este contacto",
+      "viewProfile": "Ver hoja de vida"
     },
     "aiBanner": {
       "pausedTitle": "El asistente de IA está pausado acá",
@@ -711,6 +712,158 @@
       "download": "Descargar Excel",
       "generating": "Generando…",
       "downloadFailed": "No se pudo generar el informe. Inténtalo de nuevo."
+    },
+    "profile": {
+      "backToContacts": "Contactos",
+      "notFound": "Contacto no encontrado",
+      "notFoundHint": "No existe o no pertenece a tu cuenta.",
+      "noConversations": "Sin conversaciones",
+      "unassigned": "Sin asesor",
+      "readOnlyNotice": "Este cliente lo atiende otro asesor: puedes ver toda su historia, dejar notas y registrar interacciones, pero no editar sus datos.",
+      "actions": {
+        "logInteraction": "Registrar interacción",
+        "scheduleVisit": "Agendar visita",
+        "recordSale": "Registrar venta",
+        "recordPurchase": "Registrar compra"
+      },
+      "stats": {
+        "since": "Cliente desde",
+        "appointments": "Citas",
+        "appointmentsValue": "{total} ({attended} asistidas)",
+        "bought": "Nos compró",
+        "purchased": "Le compramos",
+        "tradedIn": "Retomas",
+        "consignments": "En consignación",
+        "openDeals": "Negocios abiertos"
+      },
+      "tabs": {
+        "timeline": "Hoja de vida",
+        "documents": "Documentos"
+      }
+    },
+    "timeline": {
+      "loadFailed": "No se pudo cargar la hoja de vida",
+      "empty": "Todavía no hay nada en la hoja de vida. Deja una nota o registra una interacción.",
+      "emptyFiltered": "No hay eventos de este tipo.",
+      "loadMore": "Cargar más",
+      "deleted": "Eliminado",
+      "deleteFailed": "No se pudo eliminar",
+      "unassigned": "sin asesor",
+      "filters": {
+        "all": "Todo",
+        "appointments": "Citas",
+        "interactions": "Llamadas e interacciones",
+        "conversations": "Conversaciones",
+        "deals": "Negocios",
+        "vehicles": "Vehículos",
+        "documents": "Documentos",
+        "notes": "Notas"
+      },
+      "events": {
+        "firstContact": "Primer contacto por {channel}",
+        "firstContactAd": "Llegó por el anuncio «{ad}» ({channel})",
+        "conversation": "Conversación por {channel} · {count, plural, one {# mensaje} other {# mensajes}}",
+        "assignmentFromBot": "El bot se lo pasó a {to}",
+        "assignmentTransfer": "Pasó de {from} a {to}",
+        "assignmentToBot": "{from} lo devolvió al bot",
+        "appointment": "Cita: {purpose} · {status}",
+        "appointmentCreated": "Agendó una cita: {purpose}",
+        "appointmentRescheduled": "Movió la cita ({purpose})",
+        "appointmentReassigned": "Reasignó la cita de {from} a {to}",
+        "appointmentStatus": "Cita marcada como «{status}»",
+        "appointmentCustomerConfirmed": "El cliente confirmó la cita",
+        "appointmentCustomerChange": "El cliente pidió cambiar la cita",
+        "dealCreated": "Negocio creado: {title} ({stage})",
+        "dealStage": "{title}: {from} → {to}",
+        "dealWon": "Negocio ganado: {title}",
+        "dealLost": "Negocio perdido: {title}",
+        "inquiry": "Preguntó por {vehicle}",
+        "sale": "Le vendimos {vehicle}",
+        "consignment": "Nos dejó en venta {vehicle}",
+        "acquisitionPurchase": "Le compramos {vehicle}",
+        "acquisitionTradeIn": "Nos entregó en retoma {vehicle}",
+        "document": "Documento: {name}",
+        "note": "Nota",
+        "interaction": "{kind}"
+      },
+      "details": {
+        "conversationRange": "{from} – {to}",
+        "attendedBy": "Atiende: {name}",
+        "botOnly": "Solo el bot",
+        "price": "Precio: {price}",
+        "cost": "Costo: {price}",
+        "minutes": "{count, plural, one {# minuto} other {# minutos}}"
+      },
+      "interactionKinds": {
+        "call_outbound": "Llamada saliente",
+        "call_inbound": "Llamada entrante",
+        "walk_in": "Visita sin cita",
+        "other": "Otra interacción"
+      },
+      "outcomes": {
+        "answered": "Contestó",
+        "no_answer": "No contestó",
+        "voicemail": "Buzón de voz",
+        "wrong_number": "Número equivocado"
+      },
+      "actions": {
+        "viewThread": "Ver conversación",
+        "openAppointment": "Abrir en la Agenda",
+        "openDocuments": "Ver documentos",
+        "edit": "Corregir",
+        "delete": "Eliminar"
+      }
+    },
+    "thread": {
+      "title": "Conversación",
+      "attendedBy": "Atiende: {name}",
+      "notAssigned": "Sin asesor asignado",
+      "readOnly": "Solo lectura",
+      "openInInbox": "Abrir en la bandeja",
+      "loadOlder": "Cargar mensajes anteriores",
+      "empty": "Sin mensajes",
+      "loadFailed": "No se pudo cargar la conversación"
+    },
+    "interactions": {
+      "title": "Registrar interacción",
+      "editTitle": "Corregir interacción",
+      "description": "Llamadas, visitas sin cita y otros contactos con el cliente. Las visitas futuras se agendan en la Agenda.",
+      "fields": {
+        "kind": "Tipo",
+        "when": "Fecha y hora",
+        "outcome": "Resultado",
+        "outcomePlaceholder": "Sin resultado",
+        "minutes": "Duración (minutos)",
+        "note": "Nota",
+        "notePlaceholder": "Qué se habló…"
+      },
+      "errors": {
+        "invalid_date": "La fecha no es válida",
+        "future_date": "La fecha no puede ser futura: las visitas futuras se agendan en la Agenda",
+        "invalid_duration": "La duración debe ser un número entero de minutos",
+        "outcome_not_call": "El resultado solo aplica a llamadas",
+        "saveFailed": "No se pudo guardar la interacción"
+      },
+      "saved": "Interacción registrada",
+      "updated": "Interacción corregida",
+      "cancel": "Cancelar",
+      "save": "Guardar"
+    },
+    "sell": {
+      "title": "Registrar venta",
+      "description": "Elige el vehículo que se le vendió a este cliente y los datos del cierre.",
+      "vehicle": "Vehículo",
+      "vehiclePlaceholder": "Elige un vehículo",
+      "vehicleNone": "Ninguno",
+      "vehicleSearch": "Buscar por marca, modelo o placa…",
+      "vehicleEmpty": "Ningún vehículo disponible coincide.",
+      "vehicleSuggested": "Consultados por el cliente",
+      "vehicleInventory": "Inventario",
+      "vehicleReserved": "Reservado",
+      "vehicleRequired": "Elige el vehículo vendido",
+      "sold": "Venta registrada",
+      "cancel": "Cancelar",
+      "confirm": "Registrar venta"
     }
   },
   "Pipelines": {
@@ -2669,7 +2822,19 @@
       "empty": "Ningún contacto coincide.",
       "more": "Y {count} más: escribe para acotar."
     },
-    "confirmRevertSale": "Este vehículo figura como vendido. Si cambias el estado se borrarán el precio, la fecha y el comprador. ¿Continuar?"
+    "confirmRevertSale": "Este vehículo figura como vendido. Si cambias el estado se borrarán el precio, la fecha y el comprador. ¿Continuar?",
+    "contactLink": "Ver hoja de vida",
+    "seller": {
+      "label": "Vendedor",
+      "none": "Sin vendedor",
+      "kind": "Tipo de adquisición",
+      "kindNone": "Sin registrar",
+      "kinds": {
+        "purchase": "Compra",
+        "trade_in": "Retoma"
+      },
+      "hint": "A quién se le compró el vehículo o de quién se recibió en retoma. Aparece en su hoja de vida."
+    }
   },
   "PhotoOrder": {
     "dragHandle": "Arrastrar para reordenar",
@@ -2868,7 +3033,8 @@
     },
     "inApp": {
       "open": "Abrir"
-    }
+    },
+    "viewProfile": "Ver hoja de vida del cliente"
   },
   "SignupPage": {
     "titleInvite": "Crear cuenta y unirse",
@@ -3227,7 +3393,8 @@
       "when": "Cuándo",
       "conversation": "Conversación",
       "openConversation": "Abrir en la bandeja",
-      "history": "Historial"
+      "history": "Historial",
+      "viewProfile": "Ver hoja de vida"
     },
     "actions": {
       "confirm": "Confirmar",

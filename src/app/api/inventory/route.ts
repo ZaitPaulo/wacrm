@@ -8,7 +8,7 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit
 import { buildVehiclePayload } from '@/lib/inventory/payload'
 import { describeDbError } from '@/lib/inventory/db-error'
 import { persistAcquisition } from '@/lib/inventory/acquisitions'
-import { ownerContactError } from '@/lib/inventory/owner'
+import { ownerContactError, sellerContactError } from '@/lib/inventory/owner'
 import { syncVehicleKnowledge } from '@/lib/inventory/knowledge-sync'
 import { syncVehiclePost } from '@/lib/social/queue'
 
@@ -23,7 +23,7 @@ import { syncVehiclePost } from '@/lib/social/queue'
 // que nunca se agregaron a esta lista. Al sumar columnas nuevas hay que
 // añadirlas aquí en el mismo cambio.
 const VEHICLE_COLUMNS =
-  'id, brand, model, year, license_plate, vin, price, mileage, status, features, images, internal_notes, kb_document_id, created_at, updated_at, sold_price, sold_at, sold_to_contact_id, owner_contact_id, public_ref, transmission, fuel_type, body_type, color, condition, doors, engine_displacement, plate_city, warranty_price, soat_expires_at, tecnomecanica_expires_at, has_lien, on_display, accepts_trade_in'
+  'id, brand, model, year, license_plate, vin, price, mileage, status, features, images, internal_notes, kb_document_id, created_at, updated_at, sold_price, sold_at, sold_to_contact_id, owner_contact_id, seller_contact_id, acquisition_kind, public_ref, transmission, fuel_type, body_type, color, condition, doors, engine_displacement, plate_city, warranty_price, soat_expires_at, tecnomecanica_expires_at, has_lien, on_display, accepts_trade_in'
 
 // El costo de compra se pide como tabla embebida, no como columna. Para
 // un 'agent' o un 'viewer' la RLS de vehicle_acquisitions (migración 508)
@@ -97,6 +97,17 @@ export async function POST(request: Request) {
     if (ownerError) {
       return NextResponse.json(
         { error: ownerError, field: 'owner_contact_id' },
+        { status: 400 },
+      )
+    }
+    const sellerError = await sellerContactError(
+      supabase,
+      accountId,
+      parsed.value.seller_contact_id,
+    )
+    if (sellerError) {
+      return NextResponse.json(
+        { error: sellerError, field: 'seller_contact_id' },
         { status: 400 },
       )
     }

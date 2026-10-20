@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
@@ -57,7 +58,8 @@ import {
 } from 'lucide-react';
 import { ContactForm } from '@/components/contacts/contact-form';
 import { IdentitySuggestions } from '@/components/contacts/identity-suggestions';
-import { ContactDetailView } from '@/components/contacts/contact-detail-view';
+import { contactProfileHref } from '@/components/contacts/contact-profile-link';
+import { useAuth } from '@/hooks/use-auth';
 import { ImportModal } from '@/components/contacts/import-modal';
 import { ManagementReportDialog } from '@/components/contacts/management-report-dialog';
 import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager';
@@ -77,22 +79,32 @@ interface ContactWithTags extends Contact {
 export default function ContactsPage() {
   const t = useTranslations('Contacts.page');
   const supabase = createClient();
+  const router = useRouter();
+  const { user } = useAuth();
   const canEdit = useCan('send-messages');
   const canEditSettings = useCan('edit-settings');
   // Informe de gestión de asesores: solo admin u owner (la ruta lo exige).
   const canDownloadReport = useCan('manage-members');
   const [reportOpen, setReportOpen] = useState(false);
-  // El asesor solo ve los contactos con una conversación asignada a él
-  // (RLS de la migración 520). Un contacto que acabe de crear no tendría
-  // ninguna, así que se le desaparecería al guardar — y el `.select()`
-  // que sigue al insert ni siquiera puede devolvérselo. Antes que
-  // ofrecerle una trampa, no se le ofrece: dar de alta contactos es del
-  // admin. Esto es cosmético; lo que manda es la RLS.
+  // El asesor solo EDITA los contactos con una conversación asignada a él
+  // (`contact_visible`, migración 520; desde la 553 los ve todos). Un
+  // contacto que acabe de crear no tendría ninguna, así que no podría ni
+  // corregirlo después de guardarlo. Antes que ofrecerle una trampa, no se
+  // le ofrece: dar de alta contactos es del admin. Esto es cosmético; lo
+  // que manda es la RLS.
   const isRestrictedAgent = !useCan('view-all-conversations');
-  // Columna "Asesor": solo para quien ve todas las conversaciones. Un
-  // asesor solo ve sus propios contactos, así que siempre diría su nombre.
-  const showAssignee = !isRestrictedAgent;
-  const columnCount = showAssignee ? 9 : 8;
+  // Columna "Asesor": desde la 553 todos ven todos los contactos, así que
+  // también el asesor necesita saber quién atiende cada uno. La lee de
+  // `get_contact_assignees`, porque las conversaciones ajenas no las ve.
+  const columnCount = 9;
+  /**
+   * ¿Puede editar o borrar este contacto? Admin y owner, todos; el asesor,
+   * solo los que atiende (`contacts_update` sigue con `contact_visible`).
+   * Cosmético: lo que manda es la RLS.
+   */
+  const canTouch = (contact: ContactWithTags) =>
+    canEdit &&
+    (!isRestrictedAgent || (!!user && !!contact.assignees?.agentIds.includes(user.id)));
   const [agentNames, setAgentNames] = useState<Map<string, string>>(
     () => new Map()
   );
@@ -109,8 +121,6 @@ export default function ContactsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [editContactTags, setEditContactTags] = useState<ContactTag[]>([]);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailContactId, setDetailContactId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [customFieldsOpen, setCustomFieldsOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -233,15 +243,11 @@ export default function ContactsPage() {
 
     // Quién atiende a cada contacto: la asignación vive en sus
     // conversaciones. Una sola consulta para la página entera.
-    let assignees = new Map<string, ContactAssignees>();
-    if (showAssignee) {
-      const { data: convs } = await supabase
-        .from('conversations')
-        .select('contact_id, assigned_agent_id, last_message_at')
-        .in('contact_id', contactIds);
-      if (seq !== fetchSeq.current) return; // superseded by a newer fetch
-      assignees = assigneesByContact(convs ?? []);
-    }
+    const { data: convs } = await supabase.rpc('get_contact_assignees', {
+      p_contact_ids: contactIds,
+    });
+    if (seq !== fetchSeq.current) return; // superseded by a newer fetch
+    const assignees: Map<string, ContactAssignees> = assigneesByContact(convs ?? []);
 
     const enriched: ContactWithTags[] = contactRows.map((c) => ({
       ...c,
@@ -253,7 +259,7 @@ export default function ContactsPage() {
 
     setContacts(enriched);
     setLoading(false);
-  }, [supabase, page, search, selectedTagIds, tagsMap, t, showAssignee]);
+  }, [supabase, page, search, selectedTagIds, tagsMap, t]);
 
   // Load-once-on-mount-ish data fetches. Each setter inside runs
   // inside an async promise completion (Supabase await), not
@@ -271,7 +277,6 @@ export default function ContactsPage() {
 
   // Nombres de los asesores para la columna "Asesor".
   useEffect(() => {
-    if (!showAssignee) return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -290,7 +295,7 @@ export default function ContactsPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase, showAssignee]);
+  }, [supabase]);
 
   function openAddForm() {
     setEditContact(null);
@@ -308,9 +313,9 @@ export default function ContactsPage() {
     setFormOpen(true);
   }
 
+  /** La ficha completa del contacto (`/contacts/[id]`). */
   function openDetail(contactId: string) {
-    setDetailContactId(contactId);
-    setDetailOpen(true);
+    router.push(contactProfileHref(contactId));
   }
 
   function confirmDelete(contact: Contact) {
@@ -644,11 +649,9 @@ export default function ContactsPage() {
               <TableHead className="text-muted-foreground hidden lg:table-cell">
                 {t('tableColumns.company')}
               </TableHead>
-              {showAssignee && (
-                <TableHead className="text-muted-foreground hidden md:table-cell">
-                  {t('tableColumns.assignee')}
-                </TableHead>
-              )}
+              <TableHead className="text-muted-foreground hidden md:table-cell">
+                {t('tableColumns.assignee')}
+              </TableHead>
               <TableHead className="text-muted-foreground hidden md:table-cell">
                 {t('tableColumns.tags')}
               </TableHead>
@@ -730,16 +733,14 @@ export default function ContactsPage() {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  {showAssignee && (
-                    <TableCell className="hidden text-sm md:table-cell">
-                      <AssigneeCell
-                        assignees={contact.assignees}
-                        names={agentNames}
-                        unassignedLabel={t('unassigned')}
-                        unknownLabel={t('unknownAgent')}
-                      />
-                    </TableCell>
-                  )}
+                  <TableCell className="hidden text-sm md:table-cell">
+                    <AssigneeCell
+                      assignees={contact.assignees}
+                      names={agentNames}
+                      unassignedLabel={t('unassigned')}
+                      unknownLabel={t('unknownAgent')}
+                    />
+                  </TableCell>
                   <TableCell className="hidden md:table-cell">
                     <div className="flex flex-wrap gap-1">
                       {contact.tags && contact.tags.length > 0 ? (
@@ -773,6 +774,7 @@ export default function ContactsPage() {
                     })}
                   </TableCell>
                   <TableCell>
+                    {canTouch(contact) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         render={
@@ -813,6 +815,7 @@ export default function ContactsPage() {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -871,14 +874,6 @@ export default function ContactsPage() {
           setFormOpen(false);
           openDetail(id);
         }}
-      />
-
-      {/* Contact Detail Sheet */}
-      <ContactDetailView
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        contactId={detailContactId}
-        onUpdated={fetchContacts}
       />
 
       {canDownloadReport && (
