@@ -47,5 +47,5 @@
 
 - [x] 7.1 Correr toda la suite de pruebas, el chequeo de tipos y el linter sin errores (2026-10-20: 195 archivos, 2.580 pruebas; `tsc` limpio; eslint 0 errores, 1 aviso previo en `ai-config.tsx`)
 - [ ] 7.2 Probar en local una conversación completa en horario y otra fuera de horario contra el stack local
-- [ ] 7.3 Dejar listo el commit en `develop`; desplegar una sola vez cuando el usuario lo indique, aplicar la 557 en el VPS y encender el presupuesto para LoraMotors (N = 3)
+- [x] 7.3 Dejar listo el commit en `develop`; desplegar una sola vez cuando el usuario lo indique, aplicar la 557 en el VPS y encender el presupuesto para LoraMotors (N = 3) (2026-10-20: main `e3fef67`, respaldo `/opt/crm-backups/20261020-213944`, app arriba 21:43, presupuesto encendido N = 3)
 - [ ] 7.4 A los 7 días: medir en `ai_usage_log` tokens por llamada, `cached_tokens` y llamadas en horario frente a la línea base del 08–16/10, y revisar 20 conversaciones reales (razonamiento bajo e historial de 12)
