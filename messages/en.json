@@ -2319,6 +2319,10 @@
       "autoReplyDesc": "The bot answers new inbound messages automatically (only when no flow handles them and no agent is assigned). Hands off to a human when it can’t help.",
       "maxAutoReplies": "Max auto-replies per conversation",
       "maxAutoRepliesDesc": "After this many bot replies in one thread, the bot goes quiet.",
+      "businessHoursBudget": "Save during business hours",
+      "businessHoursBudgetDesc": "During business hours, after a number of replies the bot stops showing options, collects the handoff data and passes the customer to an agent; while the customer waits for the agent, the bot stays quiet. Outside business hours and on holidays it works as usual.",
+      "businessHoursBudgetReplies": "Replies before closing",
+      "businessHoursBudgetRepliesDesc": "How many replies the bot gives during business hours before closing toward the handoff (1–20).",
       "remove": "Remove",
       "save": "Save",
       "missingModel": "Enter a model name.",
@@ -3209,6 +3213,10 @@
       "5": "Friday",
       "6": "Saturday"
     }
+  },
+  "AiBillingAlert": {
+    "title": "The bot ran out of Gemini credits",
+    "body": "Automatic replies are failing and customers go straight to an agent. Top up the balance in Google AI Studio so the bot can reply again."
   },
   "HandoffSla": {
     "reminderTitle": "Customer waiting: {client}",

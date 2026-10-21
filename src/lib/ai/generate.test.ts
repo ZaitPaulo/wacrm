@@ -470,6 +470,101 @@ describe('generateReply — Gemini', () => {
     expect(body.max_tokens).toBeGreaterThan(0)
     expect(body.max_completion_tokens).toBeUndefined()
   })
+
+  describe('reasoning_effort', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
+    async function geminiBody(): Promise<Record<string, unknown>> {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(okResponse({ choices: [{ message: { content: 'ok' } }] }))
+      vi.stubGlobal('fetch', fetchMock)
+      await generateReply({
+        config: config({ provider: 'gemini' }),
+        systemPrompt: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+      })
+      return JSON.parse(fetchMock.mock.calls[0][1].body)
+    }
+
+    it('pide razonamiento bajo por defecto', async () => {
+      vi.stubEnv('AI_REASONING_EFFORT', '')
+      expect((await geminiBody()).reasoning_effort).toBe('low')
+    })
+
+    it('respeta AI_REASONING_EFFORT', async () => {
+      vi.stubEnv('AI_REASONING_EFFORT', 'medium')
+      expect((await geminiBody()).reasoning_effort).toBe('medium')
+    })
+
+    it('con none no envía el parámetro', async () => {
+      vi.stubEnv('AI_REASONING_EFFORT', 'none')
+      expect(await geminiBody()).not.toHaveProperty('reasoning_effort')
+    })
+
+    it('un valor desconocido cae al defecto', async () => {
+      vi.stubEnv('AI_REASONING_EFFORT', 'altisimo')
+      expect((await geminiBody()).reasoning_effort).toBe('low')
+    })
+  })
+
+  it('lee los tokens servidos desde el caché', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        okResponse({
+          choices: [{ message: { content: 'ok' } }],
+          usage: {
+            prompt_tokens: 18000,
+            completion_tokens: 90,
+            total_tokens: 18090,
+            prompt_tokens_details: { cached_tokens: 12000 },
+          },
+        }),
+      ),
+    )
+    const res = await generateReply({
+      config: config({ provider: 'gemini' }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })
+    expect(res.usage).toEqual({
+      promptTokens: 18000,
+      completionTokens: 90,
+      totalTokens: 18090,
+      cachedTokens: 12000,
+    })
+  })
+})
+
+describe('generateReply — otros proveedores sin reasoning_effort', () => {
+  it('OpenAI no lo envía', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okResponse({ choices: [{ message: { content: 'ok' } }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await generateReply({
+      config: config({ provider: 'openai' }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty('reasoning_effort')
+  })
+
+  it('OpenRouter no lo envía', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okResponse({ choices: [{ message: { content: 'ok' } }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await generateReply({
+      config: config({ provider: 'openrouter', model: 'google/gemini-2.5-flash' }),
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty('reasoning_effort')
+  })
 })
 
 describe('generateReply — fotos en el formato compatible con OpenAI', () => {
@@ -533,6 +628,8 @@ describe('generateReply — fotos en el formato compatible con OpenAI', () => {
         { role: 'user', content: 'Busco un Onix' },
       ],
       max_tokens: MAX_OUTPUT_TOKENS,
+      // reducir-consumo-gemini: razonamiento acotado en toda llamada a Gemini.
+      reasoning_effort: 'low',
     })
   })
 

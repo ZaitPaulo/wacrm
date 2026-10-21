@@ -7,6 +7,7 @@ import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { generateReply } from '@/lib/ai/generate'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
 import { buildInventoryIndex } from '@/lib/ai/inventory-index'
+import { expandVehicleLinks } from '@/lib/ai/vehicle-links'
 import { attachPhotos, loadNewCustomerPhotos, type NewPhotos } from '@/lib/ai/photos'
 import { latestUserMessage } from '@/lib/ai/query'
 import { logAiUsage } from '@/lib/ai/usage'
@@ -127,7 +128,11 @@ export async function POST(request: Request) {
       hasPhotos: messages.some((m) => m.images?.length),
     })
 
-    const { text, usage } = await generateReply({ config, systemPrompt, messages })
+    const generated = await generateReply({ config, systemPrompt, messages })
+    const { usage } = generated
+    // El inventario trae referencias: `[[FOTOS <ref>]]` se vuelve enlace
+    // antes de que el asesor vea el borrador.
+    const text = inventory ? expandVehicleLinks(generated.text, inventory.entries) : generated.text
 
     // Record spend on the account's BYO key. Best-effort + via the
     // service role (the log has no `authenticated` INSERT policy). This

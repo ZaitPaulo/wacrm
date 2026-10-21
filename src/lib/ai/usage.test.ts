@@ -29,7 +29,23 @@ describe('logAiUsage', () => {
       prompt_tokens: 30,
       completion_tokens: 6,
       total_tokens: 36,
+      cached_tokens: 0,
     })
+  })
+
+  it('guarda los tokens servidos desde el caché del proveedor', async () => {
+    const { db, insert } = fakeDb()
+    await logAiUsage(db, {
+      accountId: 'acct-1',
+      conversationId: 'conv-1',
+      mode: 'auto_reply',
+      provider: 'gemini',
+      model: 'gemini-x',
+      usage: { promptTokens: 18000, completionTokens: 90, totalTokens: 18090, cachedTokens: 12000 },
+    })
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt_tokens: 18000, cached_tokens: 12000 }),
+    )
   })
 
   it('is a no-op when the provider reported no usage', async () => {

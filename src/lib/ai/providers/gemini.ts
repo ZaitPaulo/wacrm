@@ -1,4 +1,5 @@
 import { type ProviderResult } from '../types'
+import { aiReasoningEffort } from '../defaults'
 import { generateOpenAiCompatible } from './openai-compatible'
 import { type ProviderArgs } from './shared'
 
@@ -15,6 +16,7 @@ const GEMINI_URL =
  * no vendor prefix — that form belongs to OpenRouter.
  */
 export async function generateGemini(args: ProviderArgs): Promise<ProviderResult> {
+  const effort = aiReasoningEffort()
   return generateOpenAiCompatible(args, {
     url: GEMINI_URL,
     label: 'Gemini',
@@ -22,5 +24,8 @@ export async function generateGemini(args: ProviderArgs): Promise<ProviderResult
     // silently dropped, so sending OpenAI's newer name would uncap the
     // response length instead of erroring.
     maxTokensField: 'max_tokens',
+    // Razonamiento acotado: se cobra como salida y no aparece en el uso
+    // que devuelve la API (ver `aiReasoningEffort`).
+    ...(effort ? { extraBody: { reasoning_effort: effort } } : {}),
   })
 }

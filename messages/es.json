@@ -2312,6 +2312,10 @@
       "autoReplyDesc": "El bot contesta solo los mensajes nuevos (únicamente cuando ningún flujo los atiende y no hay un agente asignado). Deriva a una persona cuando no puede ayudar.",
       "maxAutoReplies": "Máximo de respuestas automáticas por conversación",
       "maxAutoRepliesDesc": "Después de esa cantidad de respuestas del bot en un mismo hilo, el bot se calla.",
+      "businessHoursBudget": "Ahorro en horario laboral",
+      "businessHoursBudgetDesc": "En el horario de atención, desde cierta respuesta el bot deja de mostrar opciones, completa los datos del traspaso y pasa al asesor; mientras el cliente espera al asesor, el bot no responde. Fuera de horario y en festivos atiende como siempre.",
+      "businessHoursBudgetReplies": "Respuestas antes de cerrar",
+      "businessHoursBudgetRepliesDesc": "Cuántas respuestas da el bot en horario antes de cerrar hacia el traspaso (1–20).",
       "remove": "Quitar",
       "save": "Guardar",
       "missingModel": "Escribe el nombre de un modelo.",
@@ -3209,6 +3213,10 @@
       "5": "viernes",
       "6": "sábado"
     }
+  },
+  "AiBillingAlert": {
+    "title": "El bot se quedó sin saldo en Gemini",
+    "body": "Las respuestas automáticas están fallando y los clientes pasan directo a un asesor. Recarga el saldo en Google AI Studio para que el bot vuelva a responder."
   },
   "HandoffSla": {
     "reminderTitle": "Cliente esperando: {client}",

@@ -46,6 +46,9 @@ export interface InventoryEntry {
   model: string
   year: number
   price: number
+  /** Referencia pública (`public_ref`): con ella el modelo escribe el
+   *  marcador `[[FOTOS <ref>]]` que `expandVehicleLinks` vuelve enlace. */
+  ref: string | null
   /** Null cuando no hay URL pública configurada. */
   url: string | null
 }
@@ -130,7 +133,10 @@ function linea(v: VehicleRow, url: string | null, creditMaxAgeYears: number | nu
     credito ? CREDIT_LABEL[credito] : null,
     // El enlace de la ficha: sin él, el modelo nombraba carros del
     // índice sin poder mandarlo, porque solo lo traían los extractos.
-    url,
+    // Con referencia no se imprime: el modelo escribe `[[FOTOS <ref>]]`
+    // y el código pone la URL. Son ~25 tokens menos por línea en cada
+    // llamada (reducir-consumo-gemini). Sin referencia, va la URL.
+    v.public_ref?.trim() ? null : url,
   ]
   return partes.filter(Boolean).join(' · ')
 }
@@ -175,6 +181,7 @@ export async function buildInventoryIndex(
       model: v.model,
       year: v.year,
       price: v.price,
+      ref: v.public_ref?.trim() || null,
       url: base ? `${base}/vehiculo/${v.id}` : null,
     }))
     value = {

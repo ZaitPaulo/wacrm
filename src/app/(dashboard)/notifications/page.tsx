@@ -22,6 +22,7 @@ import {
   Loader2,
   MessageCircle,
   UserPlus,
+  WalletCards,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { dateLocale } from "@/lib/date-locale";
@@ -50,6 +51,7 @@ const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
   appointment_unassigned: CalendarX,
   appointment_attendance_pending: ClipboardCheck,
   appointment_no_show: UserX,
+  ai_billing_exhausted: WalletCards,
 };
 
 export default function NotificationsPage() {

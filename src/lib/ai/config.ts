@@ -17,10 +17,12 @@ interface AiConfigRow {
   handoff_agent_id: string | null
   embeddings_api_key: string | null
   credit_max_vehicle_age_years?: number | null
+  business_hours_reply_budget_enabled?: boolean | null
+  business_hours_reply_budget?: number | null
 }
 
 const CONFIG_COLUMNS =
-  'provider, model, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key, credit_max_vehicle_age_years'
+  'provider, model, api_key, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, embeddings_api_key, credit_max_vehicle_age_years, business_hours_reply_budget_enabled, business_hours_reply_budget'
 
 /**
  * Load and decrypt the account's AI config for *use* (draft or
@@ -93,6 +95,9 @@ export async function loadAiConfig(
     embeddingsApiKey,
     embeddingsProvider,
     creditMaxVehicleAgeYears: row.credit_max_vehicle_age_years ?? null,
+    businessHoursReplyBudget: row.business_hours_reply_budget_enabled
+      ? { replies: row.business_hours_reply_budget ?? 3 }
+      : null,
   }
 }
 

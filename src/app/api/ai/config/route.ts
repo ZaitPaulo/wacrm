@@ -31,7 +31,7 @@ export async function GET() {
       // `api_key` is selected only to derive `has_key` — it is stripped
       // out below and never returned to the client.
       .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key',
+        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key, business_hours_reply_budget_enabled, business_hours_reply_budget',
       )
       .eq('account_id', accountId)
       .maybeSingle()
@@ -95,6 +95,23 @@ export async function POST(request: Request) {
     let maxPer = Number(body.auto_reply_max_per_conversation)
     if (!Number.isFinite(maxPer)) maxPer = 3
     maxPer = Math.min(20, Math.max(1, Math.floor(maxPer)))
+
+    // Presupuesto de respuestas en horario laboral (migración 557). Solo
+    // se toca si el formulario lo manda, como el destino del traspaso. N
+    // fuera de rango se rechaza en vez de recortarse: el admin escribió un
+    // número y tiene que saber que no se guardó.
+    const budgetShared: Record<string, unknown> = {}
+    if ('business_hours_reply_budget_enabled' in body) {
+      budgetShared.business_hours_reply_budget_enabled =
+        body.business_hours_reply_budget_enabled === true
+    }
+    if ('business_hours_reply_budget' in body) {
+      const n = Number(body.business_hours_reply_budget)
+      if (!Number.isInteger(n) || n < 1 || n > 20) {
+        return bad('business_hours_reply_budget must be an integer between 1 and 20')
+      }
+      budgetShared.business_hours_reply_budget = n
+    }
 
     // Handoff routing target for auto-reply. A non-empty string must be a
     // member of this account (else the conversation would be assigned to a
@@ -211,6 +228,7 @@ export async function POST(request: Request) {
       is_active: isActive,
       auto_reply_enabled: autoReplyEnabled,
       auto_reply_max_per_conversation: maxPer,
+      ...budgetShared,
     }
     // Only touch the handoff target when the form actually sent the field,
     // so a partial save (e.g. flipping a toggle) doesn't wipe it.

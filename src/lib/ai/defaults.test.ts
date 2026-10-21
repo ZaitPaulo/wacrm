@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import {
+  aiContextMessageLimit,
   aiProviderRetryDelayMs,
   aiReplyDebounceMs,
   aiVisionDownloadTimeoutMs,
@@ -232,7 +233,7 @@ describe('buildSystemPrompt — inventario', () => {
 
   it('pide mandar el enlace de la ficha de cada vehículo que nombra', () => {
     const prompt = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', inventory: index })
-    expect(prompt).toContain('include its photos link from this list')
+    expect(prompt).toContain('include its photos link by writing [[FOTOS <reference>]]')
   })
 
   it('también llega en modo borrador', () => {
@@ -339,12 +340,15 @@ describe('buildSystemPrompt — espera del asesor', () => {
     expect(p).not.toContain('ALREADY HANDED OFF')
   })
 
-  it('en espera: no enseña el traspaso, nombra al asesor y dice cuándo', () => {
+  it('en espera: la instrucción de espera anula el traspaso, nombra al asesor y dice cuándo', () => {
     const p = buildSystemPrompt({
       ...base,
       waiting: { agentName: 'Juan', when: 'Te escribe mañana desde las 8:00 a. m.' },
     })
-    expect(p).not.toContain('[[HANDOFF nombre=')
+    // El protocolo sigue en el prefijo estable (reducir-consumo-gemini);
+    // la instrucción de espera va después y lo deja sin efecto.
+    expect(p.indexOf('ALREADY HANDED OFF')).toBeGreaterThan(p.indexOf('[[HANDOFF nombre='))
+    expect(p).toContain('never write a [[HANDOFF]] marker')
     expect(p).toContain('ALREADY HANDED OFF to an advisor named Juan')
     expect(p).toContain('Te escribe mañana desde las 8:00 a. m.')
     expect(p).toContain('[[NO_REPLY]]')
@@ -389,5 +393,91 @@ describe('buildSystemPrompt — crédito por antigüedad', () => {
   it('sin regla no la menciona', () => {
     const p = buildSystemPrompt({ userPrompt: null, mode: 'auto_reply', inventory })
     expect(p).not.toContain('since their registration')
+  })
+})
+
+// reducir-consumo-gemini: Gemini sirve desde su caché el comienzo de una
+// petición que coincide con una reciente. El prompt sin nada propio de la
+// conversación ES el prefijo estable; cualquier otro estado debe empezar
+// exactamente por él.
+describe('buildSystemPrompt — prefijo estable', () => {
+  const stable = {
+    userPrompt: 'Somos LoraMotors. Pide nombre y presupuesto.',
+    mode: 'auto_reply' as const,
+    inventory: {
+      text: 'ABC · RENAULT SANDERO GT 2010 · $22M · 179k kms · mecánica · hatchback',
+      total: 1,
+      truncated: false,
+    },
+    creditRule: { maxAgeYears: 10 },
+  }
+  const prefix = buildSystemPrompt(stable)
+
+  it.each([
+    ['en espera del asesor', { waiting: { agentName: 'Juan', when: 'Te escribe a las 8:00 a. m.' } }],
+    ['con anuncio', { adContext: { headline: 'Mazda 3 2019', body: 'Financiado' } }],
+    ['con fotos', { hasPhotos: true }],
+    ['con extractos', { knowledge: ['Horario: L–V 8–18'] }],
+    ['con el cierre por presupuesto', { closing: { replies: 3 } }],
+    [
+      'con todo a la vez',
+      {
+        waiting: { agentName: 'Juan', when: null },
+        adContext: { headline: 'Mazda' },
+        hasPhotos: true,
+        knowledge: ['x'],
+        closing: { replies: 4 },
+      },
+    ],
+  ])('%s empieza por el mismo prefijo', (_, extra) => {
+    const p = buildSystemPrompt({ ...stable, ...extra })
+    expect(p.startsWith(prefix)).toBe(true)
+    expect(p.length).toBeGreaterThan(prefix.length)
+  })
+
+  it('el prefijo lleva el protocolo, el prompt de la cuenta, el inventario y la regla de crédito, en ese orden', () => {
+    const order = [
+      '[[HANDOFF nombre=',
+      'Business context and instructions:',
+      'Current inventory',
+      'Bank vehicle financing only applies',
+      'Some turns start with a tag',
+    ].map((s) => prefix.indexOf(s))
+    expect(order.every((i) => i >= 0)).toBe(true)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+  })
+})
+
+describe('buildSystemPrompt — cierre por presupuesto en horario', () => {
+  const base = { userPrompt: null, mode: 'auto_reply' as const }
+
+  it('pide cerrar hacia el traspaso sin relajar los requisitos', () => {
+    const p = buildSystemPrompt({ ...base, closing: { replies: 3 } })
+    expect(p).toContain('You have already sent 3 replies')
+    expect(p).toContain('hand off with the marker as soon as it is complete')
+    expect(p).toContain('All the handoff requirements above still apply')
+  })
+
+  it('sin cierre no dice nada', () => {
+    expect(buildSystemPrompt(base)).not.toContain('replies in this conversation during business hours')
+  })
+
+  it('no aplica en espera ni en borrador', () => {
+    const waiting = buildSystemPrompt({ ...base, closing: { replies: 3 }, waiting: { agentName: null, when: null } })
+    const draft = buildSystemPrompt({ userPrompt: null, mode: 'draft', closing: { replies: 3 } })
+    expect(waiting).not.toContain('replies in this conversation during business hours')
+    expect(draft).not.toContain('replies in this conversation during business hours')
+  })
+})
+
+describe('aiContextMessageLimit', () => {
+  it('manda 12 mensajes por defecto', () => {
+    vi.stubEnv('AI_CONTEXT_MESSAGE_LIMIT', '')
+    expect(aiContextMessageLimit()).toBe(12)
+  })
+
+  it('la variable lo puede volver a 20', () => {
+    vi.stubEnv('AI_CONTEXT_MESSAGE_LIMIT', '20')
+    expect(aiContextMessageLimit()).toBe(20)
   })
 })

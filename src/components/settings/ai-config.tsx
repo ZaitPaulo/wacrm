@@ -88,6 +88,9 @@ export function AiConfig() {
   const [isActive, setIsActive] = useState(false);
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
   const [maxPerConversation, setMaxPerConversation] = useState(3);
+  // Presupuesto en horario laboral (migración 557, reducir-consumo-gemini).
+  const [budgetEnabled, setBudgetEnabled] = useState(false);
+  const [budgetReplies, setBudgetReplies] = useState(3);
 
   // Guard keyed on the account (not a bare boolean) so an in-place
   // account switch — ownership transfer, multi-account membership —
@@ -112,6 +115,8 @@ export function AiConfig() {
         setIsActive(data.is_active);
         setAutoReplyEnabled(data.auto_reply_enabled);
         setMaxPerConversation(data.auto_reply_max_per_conversation ?? 3);
+        setBudgetEnabled(data.business_hours_reply_budget_enabled === true);
+        setBudgetReplies(data.business_hours_reply_budget ?? 3);
         setHasStoredKey(Boolean(data.has_key));
         setApiKey(data.has_key ? MASKED_KEY : '');
         setKeyEdited(false);
@@ -158,6 +163,8 @@ export function AiConfig() {
     is_active: isActive,
     auto_reply_enabled: autoReplyEnabled,
     auto_reply_max_per_conversation: maxPerConversation,
+    business_hours_reply_budget_enabled: budgetEnabled,
+    business_hours_reply_budget: budgetReplies,
     // `handoff_agent_id` ya no se manda: el "asesor fijo" quedó sin
     // efecto con el reparto por porcentajes (Ajustes → Asignación de
     // asesores; un asesor fijo es 100 % a una persona). Omitirlo deja la
@@ -475,6 +482,44 @@ export function AiConfig() {
                 disabled={disabled || !autoReplyEnabled}
                 className="w-20"
               />
+            </div>
+
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {t('businessHoursBudget')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('businessHoursBudgetDesc')}
+                  </p>
+                </div>
+                <Switch
+                  checked={budgetEnabled}
+                  onCheckedChange={setBudgetEnabled}
+                  disabled={disabled || !autoReplyEnabled}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="ai-budget">{t('businessHoursBudgetReplies')}</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t('businessHoursBudgetRepliesDesc')}
+                  </p>
+                </div>
+                <Input
+                  id="ai-budget"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={budgetReplies}
+                  onChange={(e) =>
+                    setBudgetReplies(Math.min(20, Math.max(1, Number(e.target.value) || 1)))
+                  }
+                  disabled={disabled || !autoReplyEnabled || !budgetEnabled}
+                  className="w-20"
+                />
+              </div>
             </div>
 
             {/* El selector "Derivar a" (asesor fijo) se retiró: a quién

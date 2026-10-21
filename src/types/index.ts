@@ -238,7 +238,9 @@ export type NotificationType =
   | 'appointment_updated'
   | 'appointment_unassigned'
   | 'appointment_attendance_pending'
-  | 'appointment_no_show';
+  | 'appointment_no_show'
+  // Saldo del proveedor de IA agotado (migración 557): aviso a owner/admin.
+  | 'ai_billing_exhausted';
 
 export interface Notification {
   id: string;

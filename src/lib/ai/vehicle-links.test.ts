@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ensureVehicleLinks } from './vehicle-links'
+import { ensureVehicleLinks, expandVehicleLinks } from './vehicle-links'
 import type { InventoryEntry } from './inventory-index'
 
 const BASE = 'https://loramotors.co/vehiculo'
@@ -10,6 +10,7 @@ function entry(overrides: Partial<InventoryEntry> & { id: string }): InventoryEn
     model: 'SORENTO RADICAL',
     year: 2015,
     price: 64_000_000,
+    ref: null,
     url: `${BASE}/${overrides.id}`,
     ...overrides,
   }
@@ -131,5 +132,43 @@ describe('ensureVehicleLinks', () => {
   it('ignora los vehículos sin URL', () => {
     const text = 'Una Kia Sorento Radical 2015.'
     expect(ensureVehicleLinks(text, [{ ...SORENTO, url: null }])).toBe(text)
+  })
+})
+
+describe('expandVehicleLinks', () => {
+  const MAZDA = entry({ id: 'mazda', brand: 'MAZDA', model: '3', year: 2019, ref: 'LM123' })
+  const SIN_URL = entry({ id: 'sinurl', ref: 'LM999', url: null })
+
+  it('cambia el marcador por la URL de la ficha', () => {
+    expect(expandVehicleLinks('El Mazda 3 2019 está en $62M: [[FOTOS LM123]]', [MAZDA])).toBe(
+      `El Mazda 3 2019 está en $62M: ${BASE}/mazda`,
+    )
+  })
+
+  it('tolera espacios y mayúsculas', () => {
+    expect(expandVehicleLinks('Mira: [[ fotos lm123 ]]', [MAZDA])).toBe(`Mira: ${BASE}/mazda`)
+  })
+
+  it('quita una referencia que no está en el inventario sin dejar texto roto', () => {
+    expect(expandVehicleLinks('El Mazda 3 2019: [[FOTOS NOEXISTE]]\n¿Te sirve?', [MAZDA])).toBe(
+      'El Mazda 3 2019\n¿Te sirve?',
+    )
+  })
+
+  it('quita el marcador de un vehículo sin URL pública', () => {
+    expect(expandVehicleLinks('Ese: [[FOTOS LM999]]', [SIN_URL])).toBe('Ese')
+  })
+
+  it('no toca un texto sin marcadores', () => {
+    const text = 'Hola, ¿qué buscas?'
+    expect(expandVehicleLinks(text, [MAZDA])).toBe(text)
+  })
+
+  it('ningún marcador sobrevive, y el respaldo agrega el enlace del que no lo trajo', () => {
+    const text = 'El Mazda 3 2019 [[FOTOS LM123]] y la Kia Sorento Radical 2015 [[FOTOS OTRA]]'
+    const out = ensureVehicleLinks(expandVehicleLinks(text, [MAZDA, SORENTO]), [MAZDA, SORENTO])
+    expect(out).not.toContain('[[FOTOS')
+    expect(out).toContain(`${BASE}/mazda`)
+    expect(out).toContain(`${BASE}/sorento`)
   })
 })

@@ -6,6 +6,7 @@ import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { generateReply } from '@/lib/ai/generate'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
 import { buildInventoryIndex } from '@/lib/ai/inventory-index'
+import { expandVehicleLinks } from '@/lib/ai/vehicle-links'
 import { latestUserMessage } from '@/lib/ai/query'
 import { AiError, type ChatMessage } from '@/lib/ai/types'
 
@@ -79,20 +80,23 @@ export async function POST(request: Request) {
       config,
       latestUserMessage(messages),
     )
+    const inventory = await buildInventoryIndex(supabase, accountId, {
+      creditMaxAgeYears: config.creditMaxVehicleAgeYears,
+    })
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
-      inventory: await buildInventoryIndex(supabase, accountId, {
-        creditMaxAgeYears: config.creditMaxVehicleAgeYears,
-      }),
+      inventory,
       creditRule: config.creditMaxVehicleAgeYears
         ? { maxAgeYears: config.creditMaxVehicleAgeYears }
         : null,
     })
 
     const { text, handoff } = await generateReply({ config, systemPrompt, messages })
-    return NextResponse.json({ reply: text, handoff })
+    // Igual que el bot: el marcador de enlace se ve como el cliente lo vería.
+    const reply = inventory ? expandVehicleLinks(text, inventory.entries) : text
+    return NextResponse.json({ reply, handoff })
   } catch (err) {
     if (err instanceof AiError) {
       return NextResponse.json(

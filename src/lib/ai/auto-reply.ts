@@ -18,14 +18,17 @@ import { aiHandoffAssign } from '@/lib/assignment/auto-assign'
 import { AiError, type GenerateResult, type HandoffRequest } from './types'
 import { detectLeak, LEAK_RETRY_INSTRUCTION, safeFallbackText } from './output-guard'
 import { buildInventoryIndex, type InventoryIndex } from './inventory-index'
-import { ensureVehicleLinks } from './vehicle-links'
+import { ensureVehicleLinks, expandVehicleLinks } from './vehicle-links'
 import { loadAdContext } from './ad-context'
 import { logAiUsage } from './usage'
+import { notifyBillingExhausted } from './billing-alert'
 import { latestUserMessage } from './query'
 import { attachPhotos, loadNewCustomerPhotos, type NewPhotos } from './photos'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { handoffWhenSentence, notifyCustomerOfHandoff } from '@/lib/handoff/notify-customer'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { leerHorarioCuenta } from '@/lib/outbound/gate'
+import { dentroDeHorario } from '@/lib/outbound/business-hours'
 
 /** Lo que se lee de la conversacion antes de decidir si contestar. */
 interface ConversationState {
@@ -142,6 +145,20 @@ export async function dispatchInboundToAiReply(
     // acompaña en modo espera. Pausada por cualquier otra razón: silencio.
     const waiting = conv.ai_autoreply_disabled && !!conv.ai_waiting_agent_since
     if (conv.ai_autoreply_disabled && !waiting) return // handed off / turned off here
+    // Presupuesto en horario laboral (migración 557, reducir-consumo-gemini).
+    // En horario hay asesores: el bot no acompaña la espera —el cliente
+    // espera a su asesor, y los avisos de plazo siguen corriendo— y,
+    // pasadas N respuestas, deja de explorar y cierra hacia el traspaso.
+    // Fuera de horario, todo como siempre. El horario solo se lee con el
+    // presupuesto encendido.
+    const budget = config.businessHoursReplyBudget ?? null
+    const inHours = budget ? await enHorarioLaboral(db, accountId) : false
+    if (waiting && inHours) return
+    const closing =
+      budget && inHours && !waiting && conv.ai_reply_count >= budget.replies
+        ? { replies: conv.ai_reply_count }
+        : null
+
     const maxReplies = waiting
       ? Math.min(config.autoReplyMaxPerConversation, WAITING_MAX_REPLIES)
       : config.autoReplyMaxPerConversation
@@ -261,6 +278,7 @@ export async function dispatchInboundToAiReply(
       creditRule: config.creditMaxVehicleAgeYears
         ? { maxAgeYears: config.creditMaxVehicleAgeYears }
         : null,
+      closing,
     })
 
     // Record token spend on the account's BYO key. Fire-and-forget so it
@@ -281,6 +299,7 @@ export async function dispatchInboundToAiReply(
           model: config.model,
           usage,
         }),
+      inventory,
     }
 
     const { text, handoff, silent } = await generateSafeReply(
@@ -458,6 +477,12 @@ export async function dispatchInboundToAiReply(
 
     console.error('[ai auto-reply] dispatch failed:', err)
 
+    // Sin saldo en el proveedor: avisa a owner/admin (uno cada 6 h). Va
+    // antes y aparte del traspaso, porque también falla en espera, donde
+    // no hay a quién traspasar. No lanza.
+    const billing = err instanceof AiError && err.code === 'billing_exhausted'
+    if (billing && dbCtx) await notifyBillingExhausted(dbCtx, accountId)
+
     // EL SILENCIO ES LA PEOR RESPUESTA. Si la generacion revienta —el
     // proveedor sin cuota, una caida, un timeout— hasta aqui el cliente
     // se quedaba esperando y la conversacion seguia sin asignar y con el
@@ -482,7 +507,9 @@ export async function dispatchInboundToAiReply(
           contactId,
           configOwnerUserId,
           summary:
-            '⚠️ La IA no pudo responder (fallo del proveedor). El último mensaje del cliente quedó sin leer por el bot.' +
+            (billing
+              ? '⚠️ La IA no pudo responder: se agotó el saldo de Gemini. El último mensaje del cliente quedó sin leer por el bot.'
+              : '⚠️ La IA no pudo responder (fallo del proveedor). El último mensaje del cliente quedó sin leer por el bot.') +
             (messagesCtx.length > 0
               ? ' ' + buildHandoffSummary({ messages: messagesCtx, replyCount: convCtx.ai_reply_count ?? 0 })
               : ''),
@@ -493,6 +520,25 @@ export async function dispatchInboundToAiReply(
         console.error('[ai auto-reply] emergency handoff failed:', handoffErr)
       }
     }
+  }
+}
+
+/**
+ * ¿La cuenta está ahora en su horario de atención (festivos incluidos)?
+ * Sin horario configurado, o si no se puede leer, responde `false`: el
+ * presupuesto en horario no aplica y el bot atiende como siempre. Un
+ * fallo de lectura nunca debe callar al bot. No lanza.
+ */
+async function enHorarioLaboral(
+  db: ReturnType<typeof supabaseAdmin>,
+  accountId: string,
+): Promise<boolean> {
+  try {
+    const config = await leerHorarioCuenta(db, accountId)
+    return config ? dentroDeHorario(config.hours, new Date(), config.holidayCalendar) : false
+  } catch (err) {
+    console.warn('[ai auto-reply] no se pudo leer el horario; se atiende como fuera de horario:', err)
+    return false
   }
 }
 
@@ -569,6 +615,8 @@ interface SafeReplyContext {
   conversationId: string
   inbound: { id: string; createdAt: string }
   onUsage: (usage: GenerateResult['usage']) => void
+  /** Para cambiar `[[FOTOS <ref>]]` por el enlace antes del filtro de fugas. */
+  inventory: InventoryIndex | null
 }
 
 /**
@@ -632,7 +680,11 @@ async function generateWithRetry(
     result = await generateReply(args)
   }
   ctx.onUsage(result.usage)
-  return result
+  // Antes de `detectLeak`, que marca cualquier `[[`: el marcador de
+  // enlace es legítimo, igual que `[[NO_REPLY]]` (reducir-consumo-gemini).
+  return ctx.inventory
+    ? { ...result, text: expandVehicleLinks(result.text, ctx.inventory.entries) }
+    : result
 }
 
 /** El texto con el enlace de cada vehículo que nombra y no lo trae. Sin

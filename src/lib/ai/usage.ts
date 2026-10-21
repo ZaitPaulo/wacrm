@@ -46,6 +46,8 @@ export async function logAiUsage(
       prompt_tokens: args.usage.promptTokens,
       completion_tokens: args.usage.completionTokens,
       total_tokens: args.usage.totalTokens,
+      // Migración 557: cuánto de la entrada vino del caché del proveedor.
+      cached_tokens: args.usage.cachedTokens ?? 0,
     })
     if (error) {
       console.error('[ai usage] log insert failed:', error)

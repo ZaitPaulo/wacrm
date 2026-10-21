@@ -142,3 +142,41 @@ export function ensureVehicleLinks(text: string, entries: readonly InventoryEntr
     .map((e) => `${titleCase(e.brand)} ${titleCase(e.model)} ${e.year}: ${e.url}`)
   return `${text.trimEnd()}\n\n${lines.join('\n')}`
 }
+
+/** `[[FOTOS ABC]]`, tolerante a espacios y mayúsculas. Global: se usa
+ *  solo con `replace`, que reinicia el índice en cada llamada. */
+const PHOTOS_MARKER = /\[\[\s*fotos\s+([^\]\s]+)\s*\]\]/gi
+
+/**
+ * Cambia cada `[[FOTOS <ref>]]` por la URL de la ficha de ese vehículo
+ * (reducir-consumo-gemini). El inventario que ve el modelo trae la
+ * referencia y no la URL, que costaba ~25 tokens por línea en cada
+ * llamada; validar la referencia aquí además impide un enlace mal copiado.
+ *
+ * Una referencia que no está en el inventario —o un vehículo sin URL
+ * pública— se quita sin dejar rastro: un marcador que llega al cliente
+ * delata al bot, y el filtro de fugas lo tomaría por una. Corre ANTES de
+ * ese filtro y antes de `ensureVehicleLinks`, que sigue de respaldo para
+ * el vehículo nombrado sin marcador.
+ */
+export function expandVehicleLinks(text: string, entries: readonly InventoryEntry[]): string {
+  if (!text.includes('[[')) return text
+  const byRef = new Map<string, string | null>()
+  for (const e of entries) {
+    if (e.ref) byRef.set(e.ref.toLowerCase(), e.url)
+  }
+  let removed = false
+  const expanded = text.replace(PHOTOS_MARKER, (_, ref: string) => {
+    const url = byRef.get(ref.toLowerCase())
+    if (url) return url
+    removed = true
+    return ''
+  })
+  if (!removed) return expanded
+  // Lo que deja un marcador quitado: "Mazda 3: " al final, dos espacios.
+  return expanded
+    .split('\n')
+    .map((line) => line.replace(/[ \t]{2,}/g, ' ').replace(/\s*:\s*$/, '').trimEnd())
+    .join('\n')
+    .trim()
+}

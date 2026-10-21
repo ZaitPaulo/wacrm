@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { AiError, type AiConfig, type HandoffRequest } from './types'
 
 // Shared, hoisted mock state so the module mocks can close over it.
@@ -31,6 +31,16 @@ const h = vi.hoisted(() => ({
   },
 }))
 
+const billing = vi.hoisted(() => ({ notify: vi.fn() }))
+vi.mock('./billing-alert', () => ({ notifyBillingExhausted: billing.notify }))
+// El horario de la cuenta. Por defecto el lector real (que lee el doble de
+// la base); las pruebas del presupuesto en horario lo fijan.
+const horario = vi.hoisted(() => ({ leer: vi.fn() }))
+vi.mock('@/lib/outbound/gate', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/outbound/gate')>()
+  horario.leer.mockImplementation(real.leerHorarioCuenta)
+  return { ...real, leerHorarioCuenta: (...a: Parameters<typeof real.leerHorarioCuenta>) => horario.leer(...a) }
+})
 vi.mock('./config', () => ({ loadAiConfig: h.loadAiConfig }))
 vi.mock('./context', () => ({ buildConversationContext: h.buildConversationContext }))
 vi.mock('./knowledge', () => ({ retrieveKnowledge: h.retrieveKnowledge }))
@@ -907,6 +917,24 @@ describe('dispatchInboundToAiReply — inventario en el prompt', () => {
     vi.unstubAllEnvs()
   })
 
+  // reducir-consumo-gemini: el modelo escribe la referencia y el código
+  // pone la URL, antes del filtro de fugas que marca cualquier `[[`.
+  it('cambia [[FOTOS <ref>]] por el enlace sin tomarlo por una fuga', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://loramotors.co')
+    h.state.inventory = [{ ...h.state.inventory[0], id: 'veh-1' }]
+    h.generateReply.mockResolvedValue({
+      text: 'Tengo un Renault Sandero GT 2010 en $22.000.000: [[FOTOS XGCW8S]]',
+      handoff: null,
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(1)
+    const sent = h.engineSendText.mock.calls[0][0].text as string
+    expect(sent).toBe('Tengo un Renault Sandero GT 2010 en $22.000.000: https://loramotors.co/vehiculo/veh-1')
+    vi.unstubAllEnvs()
+  })
+
   it('también agrega el enlace en la respuesta de un traspaso rechazado', async () => {
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://loramotors.co')
     h.state.inventory = [{ ...h.state.inventory[0], id: 'veh-1' }]
@@ -1147,6 +1175,29 @@ describe('dispatchInboundToAiReply — reintento ante fallo del proveedor', () =
     expect(h.state.updatePayload?.ai_handoff_summary).toContain('no pudo responder')
   })
 
+  it('sin saldo: no reintenta, avisa a owner/admin y traspasa nombrando el saldo', async () => {
+    billing.notify.mockClear()
+    h.generateReply.mockRejectedValue(
+      new AiError('Gemini credits are depleted', { code: 'billing_exhausted' }),
+    )
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalledTimes(1)
+    expect(billing.notify).toHaveBeenCalledTimes(1)
+    expect(billing.notify.mock.calls[0][1]).toBe(ARGS.accountId)
+    expect(h.state.updatePayload?.ai_handoff_summary).toContain('se agotó el saldo de Gemini')
+  })
+
+  it('un fallo que no es de saldo no avisa', async () => {
+    billing.notify.mockClear()
+    h.generateReply.mockRejectedValue(new AiError('red', { code: 'network_error' }))
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(billing.notify).not.toHaveBeenCalled()
+  })
+
   it('si el cliente escribió durante la espera, no responde ni traspasa', async () => {
     h.hasNewerCustomerMessage
       .mockResolvedValueOnce(false) // tras la ventana de agrupación
@@ -1258,7 +1309,8 @@ describe('dispatchInboundToAiReply — en espera del asesor', () => {
     expect(prompt).toContain('ALREADY HANDED OFF to an advisor named Juan')
     // El nombre completo, para cuando invite al cliente a ir al concesionario.
     expect(prompt).toContain('recuerda preguntar por tu asesor Juan Marino Arias')
-    expect(prompt).not.toContain('[[HANDOFF nombre=')
+    // El protocolo queda en el prefijo estable; la espera va después y lo anula.
+    expect(prompt.indexOf('ALREADY HANDED OFF')).toBeGreaterThan(prompt.indexOf('[[HANDOFF nombre='))
     expect(h.engineSendText).toHaveBeenCalledTimes(1)
     expect(h.engineSendText.mock.calls[0][0].text).toBe('Sí, ese Aveo tiene aire.')
   })
@@ -1333,5 +1385,177 @@ describe('dispatchInboundToAiReply — nombre del perfil de WhatsApp', () => {
     h.generateReply.mockResolvedValue({ text: '', handoff: handoffRequest() })
     await dispatchInboundToAiReply(ARGS)
     expect(h.state.contactReads).toBe(0)
+  })
+})
+
+// reducir-consumo-gemini, fase 3. El horario se fija con el lector simulado:
+// abierto todo el día o cerrado todo el día, así la prueba no depende de la
+// hora en que corre.
+describe('dispatchInboundToAiReply — presupuesto en horario laboral', () => {
+  const ABIERTO = {
+    enabled: true,
+    hours: {
+      sun: ['00:00', '23:59'],
+      mon: ['00:00', '23:59'],
+      tue: ['00:00', '23:59'],
+      wed: ['00:00', '23:59'],
+      thu: ['00:00', '23:59'],
+      fri: ['00:00', '23:59'],
+      sat: ['00:00', '23:59'],
+    },
+    holidayCalendar: null,
+  }
+  const CERRADO = {
+    enabled: true,
+    hours: { sun: null, mon: null, tue: null, wed: null, thu: null, fri: null, sat: null },
+    holidayCalendar: null,
+  }
+  const prompt = () => h.generateReply.mock.calls[0][0].systemPrompt as string
+  const CIERRE = 'replies in this conversation during business hours'
+
+  function conBudget(replies = 3) {
+    h.loadAiConfig.mockResolvedValue(
+      aiConfig({ autoReplyMaxPerConversation: 30, businessHoursReplyBudget: { replies } }),
+    )
+  }
+
+  beforeEach(() => {
+    h.generateReply.mockResolvedValue({ text: '¿Qué presupuesto tienes?', handoff: null })
+  })
+
+  afterEach(() => {
+    horario.leer.mockReset()
+    vi.useRealTimers()
+  })
+
+  it('en horario, desde la tercera respuesta, pide cerrar hacia el traspaso', async () => {
+    conBudget()
+    horario.leer.mockResolvedValue(ABIERTO)
+    h.state.conv = { ...h.state.conv, ai_reply_count: 3 }
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(prompt()).toContain(CIERRE)
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+  })
+
+  it('en horario, antes del tope, atiende sin cierre', async () => {
+    conBudget()
+    horario.leer.mockResolvedValue(ABIERTO)
+    h.state.conv = { ...h.state.conv, ai_reply_count: 2 }
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(prompt()).not.toContain(CIERRE)
+  })
+
+  it('fuera de horario atiende normalmente aunque lleve muchas respuestas', async () => {
+    conBudget()
+    horario.leer.mockResolvedValue(CERRADO)
+    h.state.conv = { ...h.state.conv, ai_reply_count: 8 }
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(prompt()).not.toContain(CIERRE)
+  })
+
+  it('con el cierre, un traspaso con datos incompletos se sigue rechazando', async () => {
+    conBudget()
+    horario.leer.mockResolvedValue(ABIERTO)
+    h.state.conv = { ...h.state.conv, ai_reply_count: 3 }
+    h.generateReply.mockResolvedValue({
+      text: '¿Con qué presupuesto cuentas?',
+      handoff: handoffRequest({ presupuesto: null }),
+    })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.handoffArgs).toBeNull()
+  })
+
+  it('con el cierre, un traspaso con datos completos pasa al asesor', async () => {
+    conBudget()
+    horario.leer.mockResolvedValue(ABIERTO)
+    h.state.conv = { ...h.state.conv, ai_reply_count: 3 }
+    h.generateReply.mockResolvedValue({ text: 'Te paso con un asesor.', handoff: handoffRequest() })
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.handoffArgs).not.toBeNull()
+  })
+
+  it('presupuesto apagado: no lee el horario ni cambia el prompt', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyMaxPerConversation: 30 }))
+    h.state.conv = { ...h.state.conv, ai_reply_count: 8 }
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(horario.leer).not.toHaveBeenCalled()
+    expect(prompt()).not.toContain(CIERRE)
+  })
+
+  it('si el horario no se puede leer, atiende como fuera de horario', async () => {
+    conBudget()
+    horario.leer.mockRejectedValue(new Error('base caída'))
+    h.state.conv = { ...h.state.conv, ai_reply_count: 8 }
+
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(prompt()).not.toContain(CIERRE)
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+  })
+
+  describe('en espera del asesor', () => {
+    beforeEach(() => {
+      h.state.conv = {
+        assigned_agent_id: 'u-juan',
+        ai_autoreply_disabled: true,
+        ai_waiting_agent_since: '2026-09-08T23:00:00.000Z',
+        ai_reply_count: 0,
+        ai_handoff_attempts: 0,
+      }
+    })
+
+    it('en horario se calla: ni cupo ni tokens', async () => {
+      conBudget()
+      horario.leer.mockResolvedValue(ABIERTO)
+
+      await dispatchInboundToAiReply(ARGS)
+
+      expect(h.generateReply).not.toHaveBeenCalled()
+      expect(h.state.rpcCalls).toEqual([])
+      expect(h.engineSendText).not.toHaveBeenCalled()
+    })
+
+    it('fuera de horario acompaña como siempre', async () => {
+      conBudget()
+      horario.leer.mockResolvedValue(CERRADO)
+
+      await dispatchInboundToAiReply(ARGS)
+
+      expect(prompt()).toContain('ALREADY HANDED OFF')
+      expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    })
+
+    it('un festivo cuenta como fuera de horario', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      // Lunes 12 de octubre de 2026, 10:00 en Bogotá: Día de la Raza.
+      vi.setSystemTime(new Date('2026-10-12T15:00:00.000Z'))
+      conBudget()
+      horario.leer.mockResolvedValue({ ...ABIERTO, holidayCalendar: 'CO' })
+
+      await dispatchInboundToAiReply(ARGS)
+
+      expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    })
+
+    it('con el presupuesto apagado acompaña también en horario', async () => {
+      h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyMaxPerConversation: 30 }))
+      horario.leer.mockResolvedValue(ABIERTO)
+
+      await dispatchInboundToAiReply(ARGS)
+
+      expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    })
   })
 })

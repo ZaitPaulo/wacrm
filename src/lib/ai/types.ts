@@ -63,6 +63,10 @@ export interface AiConfig {
   /** Años máximos para crédito vehicular (migración 547); null o ausente
    *  = sin regla. Opcional para no obligar a tocar cada fixture. */
   creditMaxVehicleAgeYears?: number | null
+  /** Presupuesto de respuestas en horario laboral (migración 557): desde
+   *  la respuesta `replies` el bot cierra hacia el traspaso, y en espera
+   *  del asesor no responde. Null o ausente = apagado. */
+  businessHoursReplyBudget?: { replies: number } | null
 }
 
 /** A photo attached to a turn, already downloaded and reduced
@@ -92,6 +96,9 @@ export interface AiUsage {
   promptTokens: number
   completionTokens: number
   totalTokens: number
+  /** Entrada servida desde el caché del proveedor, incluida en
+   *  `promptTokens`. Ausente cuando el proveedor no lo informa. */
+  cachedTokens?: number
 }
 
 /** Raw text + usage a provider adapter returns before handoff parsing. */

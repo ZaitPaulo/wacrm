@@ -118,11 +118,19 @@ describe('buildInventoryIndex — formato', () => {
 // enlace: solo los extractos del RAG lo traían, y esos carros los había
 // sacado del índice.
 describe('buildInventoryIndex — enlace de la ficha', () => {
-  it('agrega el enlace de la ficha al final de cada línea', async () => {
+  // reducir-consumo-gemini: con referencia la línea no lleva la URL; el
+  // modelo escribe [[FOTOS ABC123]] y el código pone el enlace.
+  it('con referencia, la línea no lleva la URL', async () => {
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://loramotors.co/')
     const idx = await buildInventoryIndex(db([vehiculo()]), 'acct-1')
+    expect(idx?.text).toBe('ABC123 · RENAULT SANDERO GT 2010 · $22M · 179k kms · mecánica · hatchback')
+  })
+
+  it('sin referencia, la línea lleva la URL al final', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://loramotors.co/')
+    const idx = await buildInventoryIndex(db([vehiculo({ id: 'veh-sin-ref', public_ref: null })]), 'acct-sin-ref')
     expect(idx?.text).toBe(
-      'ABC123 · RENAULT SANDERO GT 2010 · $22M · 179k kms · mecánica · hatchback · https://loramotors.co/vehiculo/veh-1',
+      'RENAULT SANDERO GT 2010 · $22M · 179k kms · mecánica · hatchback · https://loramotors.co/vehiculo/veh-sin-ref',
     )
   })
 
@@ -143,6 +151,7 @@ describe('buildInventoryIndex — enlace de la ficha', () => {
         model: 'SANDERO GT',
         year: 2010,
         price: 22_000_000,
+        ref: 'ABC123',
         url: 'https://loramotors.co/vehiculo/veh-1',
       },
     ])

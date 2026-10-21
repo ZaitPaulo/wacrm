@@ -23,6 +23,8 @@ export function normalizeUsage(raw: {
   prompt?: unknown
   completion?: unknown
   total?: unknown
+  /** Entrada servida desde el caché (`prompt_tokens_details.cached_tokens`). */
+  cached?: unknown
 }): AiUsage | null {
   const num = (v: unknown): number =>
     typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0
@@ -33,7 +35,10 @@ export function normalizeUsage(raw: {
   if (promptTokens === 0 && completionTokens === 0 && totalTokens === 0) {
     return null
   }
-  return { promptTokens, completionTokens, totalTokens }
+  const cachedTokens = num(raw.cached)
+  return cachedTokens > 0
+    ? { promptTokens, completionTokens, totalTokens, cachedTokens }
+    : { promptTokens, completionTokens, totalTokens }
 }
 
 /** Map a fetch rejection (timeout / DNS / offline) to a typed AiError. */
@@ -50,6 +55,9 @@ export function toNetworkError(err: unknown): AiError {
     status: 502,
   })
 }
+
+/** Mensajes de error que significan "sin saldo", sea cual sea el status. */
+const BILLING_MESSAGE = /prepayment credits|credits are depleted|billing (is )?(not enabled|required)|insufficient (credits|balance|quota)/i
 
 /** Build a typed AiError from a non-2xx provider response, pulling the
  *  provider's own error message out of the JSON body when present. */
@@ -69,18 +77,25 @@ export async function providerHttpError(
   }
 
   const { status } = res
-  const code =
-    status === 401 || status === 403
+  // Saldo prepago agotado (Gemini responde 402 "Your prepayment credits
+  // are depleted"). No es pasajero: reintentar solo suma espera, y hay
+  // que avisar a quien puede recargar (ver `billing-alert.ts`).
+  const billing = status === 402 || BILLING_MESSAGE.test(detail)
+  const code = billing
+    ? 'billing_exhausted'
+    : status === 401 || status === 403
       ? 'invalid_key'
       : status === 429
         ? 'rate_limited'
         : 'provider_error'
   const base =
-    code === 'invalid_key'
-      ? `${provider} rejected the API key`
-      : code === 'rate_limited'
-        ? `${provider} rate limit reached`
-        : `${provider} API error (${status})`
+    code === 'billing_exhausted'
+      ? `${provider} credits are depleted`
+      : code === 'invalid_key'
+        ? `${provider} rejected the API key`
+        : code === 'rate_limited'
+          ? `${provider} rate limit reached`
+          : `${provider} API error (${status})`
 
   return new AiError(detail ? `${base}: ${detail}` : base, {
     code,

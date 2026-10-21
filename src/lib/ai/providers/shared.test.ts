@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mergeConsecutive } from './shared'
+import { mergeConsecutive, providerHttpError } from './shared'
 import type { ChatMessage } from '../types'
 
 const A = { mimeType: 'image/jpeg', base64: 'AAAA' }
@@ -50,5 +50,31 @@ describe('mergeConsecutive', () => {
       { role: 'user', content: 'a', images: [A] },
       { role: 'user', content: 'b', images: [B] },
     ])
+  })
+})
+
+describe('providerHttpError — saldo agotado', () => {
+  function res(status: number, message: string): Response {
+    return { status, json: async () => ({ error: { message } }) } as unknown as Response
+  }
+
+  it('un 402 es billing_exhausted', async () => {
+    const err = await providerHttpError('Gemini', res(402, 'Your prepayment credits are depleted'))
+    expect(err.code).toBe('billing_exhausted')
+  })
+
+  it('el mensaje de créditos agotados lo es aunque el status sea otro', async () => {
+    const err = await providerHttpError('Gemini', res(429, 'Your prepayment credits are depleted.'))
+    expect(err.code).toBe('billing_exhausted')
+  })
+
+  it('un 500 sigue siendo provider_error', async () => {
+    const err = await providerHttpError('Gemini', res(500, 'Internal error'))
+    expect(err.code).toBe('provider_error')
+  })
+
+  it('un 429 normal sigue siendo rate_limited', async () => {
+    const err = await providerHttpError('Gemini', res(429, 'Resource exhausted'))
+    expect(err.code).toBe('rate_limited')
   })
 })

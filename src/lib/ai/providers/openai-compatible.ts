@@ -33,6 +33,9 @@ export interface OpenAiCompatibleOptions {
   maxTokensField: 'max_tokens' | 'max_completion_tokens'
   /** Extra headers merged into the request (OpenRouter attribution). */
   headers?: Record<string, string>
+  /** Campos extra del cuerpo, propios de un proveedor (`reasoning_effort`
+   *  de Gemini). Van antes de los comunes: no pueden pisarlos. */
+  extraBody?: Record<string, unknown>
 }
 
 /**
@@ -62,6 +65,7 @@ interface OpenAiResponse {
     prompt_tokens?: number
     completion_tokens?: number
     total_tokens?: number
+    prompt_tokens_details?: { cached_tokens?: number }
   }
 }
 
@@ -75,7 +79,7 @@ export async function generateOpenAiCompatible(
   opts: OpenAiCompatibleOptions,
 ): Promise<ProviderResult> {
   const { apiKey, model, systemPrompt, messages, timeoutMs } = args
-  const { url, label, maxTokensField, headers } = opts
+  const { url, label, maxTokensField, headers, extraBody } = opts
 
   let res: Response
   try {
@@ -87,6 +91,7 @@ export async function generateOpenAiCompatible(
         ...headers,
       },
       body: JSON.stringify({
+        ...extraBody,
         model,
         messages: [
           { role: 'system', content: systemPrompt },
@@ -115,6 +120,7 @@ export async function generateOpenAiCompatible(
     prompt: data?.usage?.prompt_tokens,
     completion: data?.usage?.completion_tokens,
     total: data?.usage?.total_tokens,
+    cached: data?.usage?.prompt_tokens_details?.cached_tokens,
   })
   return { text, usage }
 }
