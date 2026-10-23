@@ -1,9 +1,16 @@
 # syntax=docker/dockerfile:1
 
+# Versión exacta de Node, compartida por las tres etapas. Va fijada y no
+# como `22-alpine`: con una etiqueta móvil, Docker reutiliza la imagen que
+# ya tenga en caché y el servidor puede quedarse en una versión vulnerable
+# sin que nadie lo note. 22.23.4 trae los parches de seguridad del
+# 2026-10-21 (Brotli, TLS, DNS); Node 20 ya no recibe parches.
+ARG NODE_IMAGE=node:22.23.4-alpine
+
 # ---------------------------------------------------------------
 # Stage 1 — install dependencies (cached until package*.json change)
 # ---------------------------------------------------------------
-FROM node:20-alpine AS deps
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -17,7 +24,7 @@ RUN npm ci
 # key, ENCRYPTION_KEY, META_APP_SECRET, ...) are read at runtime and
 # must NOT be baked into the image.
 # ---------------------------------------------------------------
-FROM node:20-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -37,7 +44,7 @@ RUN npm run build
 # ---------------------------------------------------------------
 # Stage 3 — minimal runtime (standalone output)
 # ---------------------------------------------------------------
-FROM node:20-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
