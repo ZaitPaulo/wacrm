@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ComponentType } from 'react';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
@@ -37,6 +37,7 @@ import {
   TIMELINE_PAGE_SIZE,
   durationMinutes,
   eventText,
+  groupTimelineByDay,
   kindsForFilters,
   nextPageParams,
   vehicleLabel,
@@ -44,6 +45,35 @@ import {
   type TimelineFilter,
   type TimelineKind,
 } from '@/lib/contacts/timeline';
+
+/** Un color por familia de evento, para leer la historia de un vistazo. */
+const TONES = {
+  message: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+  appointment: 'bg-orange-50 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300',
+  call: 'bg-teal-50 text-teal-800 dark:bg-teal-500/15 dark:text-teal-300',
+  deal: 'bg-primary/10 text-primary',
+  vehicle: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
+  note: 'bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
+  document: 'bg-muted text-muted-foreground',
+} as const;
+
+const TONE_OF: Record<TimelineKind, keyof typeof TONES> = {
+  first_contact: 'message',
+  conversation: 'message',
+  assignment: 'message',
+  appointment: 'appointment',
+  appointment_event: 'appointment',
+  interaction: 'call',
+  deal_created: 'deal',
+  deal_stage: 'deal',
+  deal_closed: 'deal',
+  inquiry: 'vehicle',
+  sale: 'vehicle',
+  consignment: 'vehicle',
+  acquisition: 'vehicle',
+  note: 'note',
+  document: 'document',
+};
 
 const ICONS: Record<TimelineKind, ComponentType<{ className?: string }>> = {
   first_contact: Sparkles,
@@ -75,7 +105,8 @@ interface ContactTimelineProps {
 
 /**
  * La hoja de vida: todo lo que pasó con el contacto, de lo más reciente
- * a lo más antiguo, con filtros por tipo y "Cargar más". Los datos los
+ * a lo más antiguo y agrupado por día, con filtros por tipo y "Cargar
+ * más". Los datos los
  * arma `get_contact_timeline` (migración 555); aquí solo se ponen en
  * palabras con next-intl.
  */
@@ -193,22 +224,31 @@ export function ContactTimeline({
           {filters.length > 0 ? t('emptyFiltered') : t('empty')}
         </p>
       ) : (
-        <ol className="border-border relative space-y-4 border-l pl-5">
-          {events.map((e) => (
-            <TimelineRow
-              key={e.sort_key}
-              event={e}
-              isAdmin={isAdmin}
-              isMine={!!user && e.actor_user_id === user.id}
-              myUserId={user?.id ?? null}
-              canEdit={canEdit}
-              currency={defaultCurrency}
-              onOpenThread={onOpenThread}
-              onEditInteraction={onEditInteraction}
-              onDelete={deleteEvent}
-            />
+        <div className="space-y-5">
+          {groupTimelineByDay(events).map(({ day, events: dayEvents }) => (
+            <section key={day} aria-label={dayLabel(day, t)}>
+              <h3 className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
+                {dayLabel(day, t)}
+              </h3>
+              <ol className="divide-border/60 divide-y">
+                {dayEvents.map((e) => (
+                  <TimelineRow
+                    key={e.sort_key}
+                    event={e}
+                    isAdmin={isAdmin}
+                    isMine={!!user && e.actor_user_id === user.id}
+                    myUserId={user?.id ?? null}
+                    canEdit={canEdit}
+                    currency={defaultCurrency}
+                    onOpenThread={onOpenThread}
+                    onEditInteraction={onEditInteraction}
+                    onDelete={deleteEvent}
+                  />
+                ))}
+              </ol>
+            </section>
           ))}
-        </ol>
+        </div>
       )}
 
       {cursor && !loading && (
@@ -228,6 +268,16 @@ export function ContactTimeline({
   );
 }
 
+/** "Hoy", "Ayer" o "martes 21 oct" (con el año si no es el actual). */
+function dayLabel(day: string, t: (key: string) => string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (isToday(date)) return t('days.today');
+  if (isYesterday(date)) return t('days.yesterday');
+  const pattern = y === new Date().getFullYear() ? 'EEEE d MMM' : 'EEEE d MMM yyyy';
+  return format(date, pattern, { locale: dateLocale() });
+}
+
 function FilterChip({
   active,
   onClick,
@@ -240,9 +290,10 @@ function FilterChip({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+        'h-8 rounded-full border px-3 text-xs font-medium transition-colors',
         active
           ? 'border-primary bg-primary/10 text-primary'
           : 'border-border text-muted-foreground hover:bg-muted'
@@ -292,7 +343,8 @@ function TimelineRow({
     if (translated[k] === '') translated[k] = t('unassigned');
   }
 
-  const when = format(new Date(e.occurred_at), "d MMM yyyy, h:mm a", { locale: dateLocale() });
+  // El día ya lo dice el título del grupo: aquí basta la hora.
+  const when = format(new Date(e.occurred_at), 'h:mm a', { locale: dateLocale() });
   const details: string[] = [];
   const conversationId = typeof e.link?.conversation_id === 'string' ? e.link.conversation_id : null;
 
@@ -355,23 +407,32 @@ function TimelineRow({
   const canDeleteNote = e.kind === 'note' && canEdit;
 
   return (
-    <li className="relative">
-      <span className="bg-card border-border absolute top-0.5 -left-[31px] flex size-6 items-center justify-center rounded-full border">
-        <Icon className="text-muted-foreground size-3.5" />
+    <li className="flex gap-3 py-3">
+      <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', TONES[TONE_OF[e.kind]])}>
+        <Icon className="size-4" />
       </span>
-      <div className="min-w-0">
-        <p className="text-foreground text-sm font-medium break-words">{t(`events.${key}`, translated)}</p>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          {when}
-          {e.actor_name && ` · ${e.actor_name}`}
-          {details.length > 0 && ` · ${details.join(' · ')}`}
-        </p>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-foreground text-sm font-semibold break-words">{t(`events.${key}`, translated)}</p>
+          <span className="text-muted-foreground shrink-0 text-xs whitespace-nowrap">
+            {when}
+            {e.actor_name && ` · ${e.actor_name}`}
+          </span>
+        </div>
+        {details.length > 0 && <p className="text-muted-foreground mt-0.5 text-sm">{details.join(' · ')}</p>}
         {body && (
-          <p className="bg-muted/50 border-border/50 text-foreground mt-1.5 rounded-lg border p-2.5 text-sm whitespace-pre-wrap">
+          <p
+            className={cn(
+              'text-foreground mt-1.5 rounded-lg border p-2.5 text-sm whitespace-pre-wrap',
+              e.kind === 'note'
+                ? 'border-amber-200 bg-amber-50/60 dark:border-amber-500/30 dark:bg-amber-500/10'
+                : 'bg-muted/50 border-border/50'
+            )}
+          >
             {body}
           </p>
         )}
-        <div className="mt-1 flex flex-wrap gap-3 text-xs">
+        <div className="mt-1 flex flex-wrap gap-4 text-xs font-medium">
           {conversationId && (e.kind === 'conversation' || e.kind === 'assignment') && (
             <button type="button" onClick={() => onOpenThread(conversationId)} className="text-primary hover:underline">
               {t('actions.viewThread')}

@@ -315,7 +315,8 @@
       "contactDetails": "연락처 정보",
       "unassigned": "미배정",
       "markAttended": "처리 완료로 표시",
-      "markAttendedFailed": "처리 완료로 표시하지 못했습니다. 다시 시도하세요."
+      "markAttendedFailed": "처리 완료로 표시하지 못했습니다. 다시 시도하세요.",
+      "dropImagesHere": "여기에 이미지를 놓으세요"
     },
     "sessionTimer": {
       "expired": "만료됨",
@@ -355,7 +356,21 @@
       "actions": "작업",
       "typeMessagePlaceholderShort": "메시지를 입력하세요…",
       "sessionExpiredPlaceholderShort": "세션 만료",
-      "readOnlyPlaceholderShort": "읽기 전용"
+      "readOnlyPlaceholderShort": "읽기 전용",
+      "imageUploadFailed": "{name}을(를) 업로드하지 못했습니다.",
+      "imageUploadError": "업로드 실패. 제거한 후 다시 추가하세요.",
+      "imagesWrongType": "PNG, JPEG, WebP 이미지만 지원됩니다. 무시됨: {names}",
+      "imageTooLarge": "{name}은(는) {max} MB를 초과하여 추가되지 않았습니다.",
+      "imagesOverLimit": "이미지 {count}개가 무시되었습니다: 한 번에 최대 {max}개입니다.",
+      "imagesSkipped": "이미지 {count}개를 업로드하지 못해 전송되지 않습니다.",
+      "sendingBatch": "{total}개 중 {current}개 전송 중…",
+      "selectImage": "이미지 {n}",
+      "removeImage": "이미지 {n} 제거",
+      "addMoreImages": "이미지 더 추가",
+      "discardImages": "모든 이미지 삭제",
+      "imageCount": "이미지 {count}/{max}",
+      "addCaptionFor": "이미지 {n} 캡션…",
+      "waitForUploads": "업로드가 끝날 때까지 기다리세요"
     },
     "bubble": {
       "photo": "사진",
@@ -731,7 +746,11 @@
         "logInteraction": "상호작용 기록",
         "scheduleVisit": "방문 예약",
         "recordSale": "판매 기록",
-        "recordPurchase": "매입 기록"
+        "recordPurchase": "매입 기록",
+        "openChat": "채팅 열기",
+        "logCall": "통화 기록",
+        "more": "더보기",
+        "adminOnly": "관리자"
       },
       "stats": {
         "since": "고객 등록일",
@@ -746,6 +765,50 @@
       "tabs": {
         "timeline": "이력",
         "documents": "문서"
+      },
+      "channelYou": "{channel} · 내가 담당",
+      "channelAgent": "{channel} · {name}",
+      "channelNone": "{channel} · 담당자 없음",
+      "status": {
+        "label": "고객 현황",
+        "pending": "대기 중",
+        "awaitingReply": "{channel}에서 답장하기",
+        "awaitingSince": "{ago} 메시지를 보냈지만 아직 답장이 없습니다",
+        "replyNow": "지금 답장",
+        "nextAppointment": "다음 약속",
+        "noAppointment": "예정된 약속 없음",
+        "confirmed": "고객이 확인함",
+        "openDeal": "진행 중인 거래",
+        "noDeal": "진행 중인 거래 없음",
+        "stageProgress": "{count}단계 중 {index}단계: {stage}",
+        "lastContact": "마지막 연락",
+        "lastMessage": "채팅 메시지",
+        "noContact": "아직 연락 없음",
+        "clientSince": "{date}부터 고객"
+      },
+      "sections": {
+        "history": "고객 이력",
+        "data": "정보",
+        "edit": "편집",
+        "done": "완료",
+        "withUs": "거래 현황",
+        "documents": "문서",
+        "tags": "태그"
+      },
+      "statsAttended": "{count}건 참석",
+      "statsEmptyHint": "트레이드인과 위탁은 있을 때 여기에 표시됩니다.",
+      "mobileTabs": {
+        "history": "이력",
+        "data": "정보",
+        "documents": "문서"
+      },
+      "mobileBar": {
+        "label": "작업",
+        "chat": "채팅",
+        "call": "전화",
+        "log": "기록",
+        "schedule": "예약",
+        "more": "더보기"
       }
     },
     "timeline": {
@@ -758,13 +821,10 @@
       "unassigned": "담당자 없음",
       "filters": {
         "all": "전체",
-        "appointments": "예약",
-        "interactions": "통화 및 상호작용",
-        "conversations": "대화",
-        "deals": "거래",
-        "vehicles": "차량",
-        "documents": "문서",
-        "notes": "메모"
+        "conversations": "메시지",
+        "appointments": "약속 및 통화",
+        "business": "거래 및 차량",
+        "notes": "메모 및 문서"
       },
       "events": {
         "firstContact": "{channel}(으)로 첫 연락",
@@ -819,6 +879,10 @@
         "openDocuments": "문서 보기",
         "edit": "수정",
         "delete": "삭제"
+      },
+      "days": {
+        "today": "오늘",
+        "yesterday": "어제"
       }
     },
     "thread": {
@@ -854,7 +918,11 @@
       "saved": "상호작용이 기록되었습니다",
       "updated": "상호작용이 수정되었습니다",
       "cancel": "취소",
-      "save": "저장"
+      "save": "저장",
+      "nextStep": "다음 단계",
+      "nextStepSchedule": "방문 예약",
+      "nextStepNone": "지금은 없음",
+      "quickMinutes": "{count}분"
     },
     "sell": {
       "title": "판매 기록",
@@ -871,6 +939,19 @@
       "sold": "판매가 기록되었습니다",
       "cancel": "취소",
       "confirm": "판매 기록"
+    },
+    "quickLog": {
+      "label": "기록할 항목",
+      "note": "메모",
+      "call": "통화",
+      "walkIn": "예약 없는 방문",
+      "notePlaceholder": "팀을 위한 메모를 작성하세요…",
+      "callPlaceholder": "통화에서 무슨 일이 있었나요?",
+      "walkInPlaceholder": "무엇 때문에 왔고 무엇을 봤나요?",
+      "outcome": "결과",
+      "save": "저장",
+      "moreDetails": "자세히",
+      "saveFailed": "저장하지 못했습니다"
     }
   },
   "Pipelines": {

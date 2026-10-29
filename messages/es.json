@@ -308,7 +308,8 @@
       "contactDetails": "Ficha del contacto",
       "unassigned": "Sin asignar",
       "markAttended": "Marcar como atendido",
-      "markAttendedFailed": "No se pudo marcar como atendido. Inténtalo de nuevo."
+      "markAttendedFailed": "No se pudo marcar como atendido. Inténtalo de nuevo.",
+      "dropImagesHere": "Suelta las imágenes aquí"
     },
     "sessionTimer": {
       "expired": "Vencida",
@@ -348,7 +349,21 @@
       "actions": "Acciones",
       "typeMessagePlaceholderShort": "Escribe un mensaje…",
       "sessionExpiredPlaceholderShort": "Sesión vencida",
-      "readOnlyPlaceholderShort": "Solo lectura"
+      "readOnlyPlaceholderShort": "Solo lectura",
+      "imageUploadFailed": "No se pudo subir {name}.",
+      "imageUploadError": "No se pudo subir. Quítala y vuelve a agregarla.",
+      "imagesWrongType": "Solo se admiten imágenes PNG, JPEG o WebP. Se ignoró: {names}",
+      "imageTooLarge": "{name} pesa más de {max} MB y no se agregó.",
+      "imagesOverLimit": "{count, plural, one {Se ignoró # imagen} other {Se ignoraron # imágenes}}: el máximo es {max} por envío.",
+      "imagesSkipped": "{count, plural, one {# imagen no se pudo subir y no se enviará} other {# imágenes no se pudieron subir y no se enviarán}}.",
+      "sendingBatch": "Enviando {current} de {total}…",
+      "selectImage": "Imagen {n}",
+      "removeImage": "Quitar la imagen {n}",
+      "addMoreImages": "Agregar más imágenes",
+      "discardImages": "Descartar todas las imágenes",
+      "imageCount": "{count} de {max} imágenes",
+      "addCaptionFor": "Descripción de la imagen {n}…",
+      "waitForUploads": "Espera a que terminen de subir"
     },
     "bubble": {
       "photo": "Foto",
@@ -724,7 +739,11 @@
         "logInteraction": "Registrar interacción",
         "scheduleVisit": "Agendar visita",
         "recordSale": "Registrar venta",
-        "recordPurchase": "Registrar compra"
+        "recordPurchase": "Registrar compra",
+        "openChat": "Abrir chat",
+        "logCall": "Registrar llamada",
+        "more": "Más",
+        "adminOnly": "Admin"
       },
       "stats": {
         "since": "Cliente desde",
@@ -739,6 +758,50 @@
       "tabs": {
         "timeline": "Hoja de vida",
         "documents": "Documentos"
+      },
+      "channelYou": "{channel} · lo atiendes tú",
+      "channelAgent": "{channel} · {name}",
+      "channelNone": "{channel} · sin asesor",
+      "status": {
+        "label": "Cómo va este cliente",
+        "pending": "Pendiente",
+        "awaitingReply": "Responder en {channel}",
+        "awaitingSince": "Escribió {ago} y nadie le ha contestado",
+        "replyNow": "Responder ahora",
+        "nextAppointment": "Próxima cita",
+        "noAppointment": "Sin citas próximas",
+        "confirmed": "Confirmada por el cliente",
+        "openDeal": "Negocio abierto",
+        "noDeal": "Sin negocios abiertos",
+        "stageProgress": "Etapa {index} de {count}: {stage}",
+        "lastContact": "Último contacto",
+        "lastMessage": "Mensaje en el chat",
+        "noContact": "Todavía no hay contacto",
+        "clientSince": "Cliente desde el {date}"
+      },
+      "sections": {
+        "history": "Historia del cliente",
+        "data": "Datos",
+        "edit": "Editar",
+        "done": "Listo",
+        "withUs": "Con nosotros",
+        "documents": "Documentos",
+        "tags": "Etiquetas"
+      },
+      "statsAttended": "{count, plural, =1 {1 asistida} other {# asistidas}}",
+      "statsEmptyHint": "Retomas y consignaciones aparecen aquí cuando las hay.",
+      "mobileTabs": {
+        "history": "Historia",
+        "data": "Datos",
+        "documents": "Documentos"
+      },
+      "mobileBar": {
+        "label": "Acciones",
+        "chat": "Chat",
+        "call": "Llamar",
+        "log": "Registrar",
+        "schedule": "Agendar",
+        "more": "Más"
       }
     },
     "timeline": {
@@ -751,13 +814,10 @@
       "unassigned": "sin asesor",
       "filters": {
         "all": "Todo",
-        "appointments": "Citas",
-        "interactions": "Llamadas e interacciones",
-        "conversations": "Conversaciones",
-        "deals": "Negocios",
-        "vehicles": "Vehículos",
-        "documents": "Documentos",
-        "notes": "Notas"
+        "conversations": "Mensajes",
+        "appointments": "Citas y llamadas",
+        "business": "Negocios y vehículos",
+        "notes": "Notas y documentos"
       },
       "events": {
         "firstContact": "Primer contacto por {channel}",
@@ -812,6 +872,10 @@
         "openDocuments": "Ver documentos",
         "edit": "Corregir",
         "delete": "Eliminar"
+      },
+      "days": {
+        "today": "Hoy",
+        "yesterday": "Ayer"
       }
     },
     "thread": {
@@ -847,7 +911,11 @@
       "saved": "Interacción registrada",
       "updated": "Interacción corregida",
       "cancel": "Cancelar",
-      "save": "Guardar"
+      "save": "Guardar",
+      "nextStep": "Siguiente paso",
+      "nextStepSchedule": "Agendar una visita",
+      "nextStepNone": "Nada por ahora",
+      "quickMinutes": "{count} min"
     },
     "sell": {
       "title": "Registrar venta",
@@ -864,6 +932,19 @@
       "sold": "Venta registrada",
       "cancel": "Cancelar",
       "confirm": "Registrar venta"
+    },
+    "quickLog": {
+      "label": "Qué vas a registrar",
+      "note": "Nota",
+      "call": "Llamada",
+      "walkIn": "Visita sin cita",
+      "notePlaceholder": "Escribe una nota para el equipo…",
+      "callPlaceholder": "¿Qué pasó en la llamada?",
+      "walkInPlaceholder": "¿A qué vino y qué vio?",
+      "outcome": "Resultado",
+      "save": "Guardar",
+      "moreDetails": "Más detalles",
+      "saveFailed": "No se pudo guardar"
     }
   },
   "Pipelines": {

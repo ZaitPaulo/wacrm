@@ -1,5 +1,5 @@
 -- ============================================================
--- Prueba de las migraciones 554 y 555 (cambio hoja-de-vida-contacto):
+-- Prueba de las migraciones 554, 555 y 558 (cambio hoja-de-vida-contacto):
 -- hoja de vida, historial de etapas, interacciones y vendedor.
 --
 -- Corre dentro de una transacción que termina en ROLLBACK: no deja nada.
@@ -102,6 +102,14 @@ INSERT INTO r SELECT 'agent1_msgs_tabla', COUNT(*)::TEXT
 INSERT INTO r SELECT 'agent1_summary',
   (s->>'appointments_total') || ',' || (s->>'vehicles_bought') || ',' || (s->>'vehicles_traded_in') || ',' ||
   (s->>'open_deals') || ',' || (s->>'can_edit')
+  FROM get_contact_summary('00000000-0000-4000-8000-0000000e0001') s;
+-- "Cómo va" (558): negocio en la etapa 2 de 2, el cliente espera
+-- respuesta (el 'buenas' no trae sender_id), sin cita y el último
+-- contacto es el mensaje.
+INSERT INTO r SELECT 'agent1_status',
+  (s->'open_deal'->>'stage_name') || ':' || (s->'open_deal'->>'stage_index') || '/' || (s->'open_deal'->>'stage_count') || ',' ||
+  (s->'awaiting_reply'->>'since' IS NOT NULL)::TEXT || ',' ||
+  COALESCE(s->>'next_appointment', 'null') || ',' || (s->'last_contact'->>'source')
   FROM get_contact_summary('00000000-0000-4000-8000-0000000e0001') s;
 
 -- Paginación de a 1 sobre las tres notas empatadas: ninguna se repite ni se salta.
@@ -237,6 +245,7 @@ DECLARE
     "agent1_msgs": "2",
     "agent1_msgs_tabla": "0",
     "agent1_summary": "0,1,1,1,false",
+    "agent1_status": "Negociación:2/2,true,null,message",
     "agent1_pages": "123",
     "agent1_pages_len": "6",
     "futura": "rechazada",

@@ -56,8 +56,13 @@ import { MessageActions } from './message-actions';
 import { MediaLightbox } from './media-lightbox';
 import { collectMediaGallery } from '@/lib/media/gallery';
 import {
+  isOptimisticId,
+  newOptimisticId,
+} from '@/lib/inbox/optimistic-messages';
+import {
   MessageComposer,
   CHAT_MEDIA_BUCKET,
+  type MessageComposerHandle,
   type SendMediaPayload,
 } from './message-composer';
 import { deleteAccountMedia } from '@/lib/storage/upload-media';
@@ -553,7 +558,7 @@ export function MessageThread({
     async (text: string, replyToId?: string) => {
       if (!conversation) return;
 
-      const tempId = `temp-${Date.now()}`;
+      const tempId = newOptimisticId();
 
       // Optimistic update — shows the message immediately with "sending" status
       const optimisticMsg: Message = {
@@ -607,8 +612,10 @@ export function MessageThread({
   );
 
   const handleSendMedia = useCallback(
-    async (payload: SendMediaPayload) => {
-      if (!conversation) return;
+    // Resolves to whether the send went through, so the composer can
+    // send a batch of images one at a time and in order.
+    async (payload: SendMediaPayload): Promise<boolean> => {
+      if (!conversation) return false;
 
       // Documents show their filename in our own bubble (and to the
       // recipient as the Meta caption when no caption was typed); other
@@ -618,7 +625,7 @@ export function MessageThread({
           ? payload.caption || payload.filename || 'Document'
           : payload.caption;
 
-      const tempId = `temp-${Date.now()}`;
+      const tempId = newOptimisticId();
       const optimisticMsg: Message = {
         id: tempId,
         conversation_id: conversation.id,
@@ -659,10 +666,11 @@ export function MessageThread({
           void deleteAccountMedia(CHAT_MEDIA_BUCKET, payload.path).catch(
             () => {}
           );
-          return;
+          return false;
         }
 
         onUpdateMessage(tempId, { status: 'sent' });
+        return true;
       } catch (err) {
         console.error('Failed to send media:', err);
         const reason = err instanceof Error ? err.message : 'network error';
@@ -671,16 +679,67 @@ export function MessageThread({
         void deleteAccountMedia(CHAT_MEDIA_BUCKET, payload.path).catch(
           () => {}
         );
+        return false;
       }
     },
     [conversation, onNewMessage, onUpdateMessage]
   );
 
+  // ---- Soltar imágenes sobre el hilo --------------------------------
+  //
+  // Todo el panel recibe los archivos, no solo la barra de escritura: es
+  // un blanco más fácil de acertar. La validación y la subida viven en
+  // el composer; acá solo se le pasan los archivos. `dragenter`/
+  // `dragleave` se disparan también al cruzar cada hijo, así que el velo
+  // se gobierna con un contador y no con un booleano.
+  const composerRef = useRef<MessageComposerHandle>(null);
+  const fileDragDepthRef = useRef(0);
+  const [fileDragActive, setFileDragActive] = useState(false);
+  const canDropImages = canSend && !sessionInfo.expired;
+
+  useEffect(() => {
+    fileDragDepthRef.current = 0;
+    setFileDragActive(false);
+  }, [conversationId]);
+
+  const handleFileDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    fileDragDepthRef.current += 1;
+    setFileDragActive(true);
+  }, []);
+
+  const handleFileDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes('Files')) return;
+      // Always preventDefault on a file drag: otherwise the browser
+      // navigates away to open the dropped file.
+      e.preventDefault();
+      e.dataTransfer.dropEffect = canDropImages ? 'copy' : 'none';
+    },
+    [canDropImages]
+  );
+
+  const handleFileDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    fileDragDepthRef.current = Math.max(0, fileDragDepthRef.current - 1);
+    if (fileDragDepthRef.current === 0) setFileDragActive(false);
+  }, []);
+
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    fileDragDepthRef.current = 0;
+    setFileDragActive(false);
+    // The composer re-checks the 24h window and the role itself.
+    composerRef.current?.addImages(Array.from(e.dataTransfer.files));
+  }, []);
+
   const handleSendInteractive = useCallback(
     async (payload: InteractiveMessagePayload, replyToId?: string) => {
       if (!conversation) return;
 
-      const tempId = `temp-${Date.now()}`;
+      const tempId = newOptimisticId();
       // Optimistic bubble — renders the buttons/list immediately via the
       // interactive_payload, same as the persisted row will.
       const optimisticMsg: Message = {
@@ -781,7 +840,7 @@ export function MessageThread({
       if (!conversation) return;
 
       const renderedBody = renderTemplateBody(template.body_text, values.body);
-      const tempId = `temp-${Date.now()}`;
+      const tempId = newOptimisticId();
 
       const optimisticMsg: Message = {
         id: tempId,
@@ -895,7 +954,7 @@ export function MessageThread({
         console.warn('[reactions] missing user or conversation');
         return;
       }
-      if (messageId.startsWith('temp-')) {
+      if (isOptimisticId(messageId)) {
         toast.error('Wait for the message to finish sending');
         return;
       }
@@ -919,7 +978,7 @@ export function MessageThread({
         return [
           ...prev,
           {
-            id: `temp-${Date.now()}`,
+            id: newOptimisticId(),
             message_id: messageId,
             conversation_id: convId,
             actor_type: 'agent',
@@ -1139,7 +1198,22 @@ export function MessageThread({
     // clipped and the hover toolbar overlaps the Tags panel. Letting the
     // root shrink lets the bubbles' break-words / max-w caps apply.
     // Issue #257.
-    <div className={cn('flex min-w-0 flex-1 flex-col', DOODLE_BG_CLASSES)}>
+    <div
+      className={cn('relative flex min-w-0 flex-1 flex-col', DOODLE_BG_CLASSES)}
+      onDragEnter={handleFileDragEnter}
+      onDragOver={handleFileDragOver}
+      onDragLeave={handleFileDragLeave}
+      onDrop={handleFileDrop}
+    >
+      {fileDragActive && canDropImages && (
+        // `pointer-events-none` keeps the veil from stealing the drag
+        // events the counter above depends on.
+        <div className="border-primary bg-background/80 pointer-events-none absolute inset-2 z-40 flex items-center justify-center rounded-xl border-2 border-dashed">
+          <p className="text-foreground text-sm font-medium">
+            {t('dropImagesHere')}
+          </p>
+        </div>
+      )}
       {/* Header — solid card surface sits on top of the doodle so the
           name/avatar/dropdowns stay legible. */}
       {/* Por debajo de lg el header se reparte en dos filas: arriba
@@ -1506,6 +1580,7 @@ export function MessageThread({
 
       {/* Composer */}
       <MessageComposer
+        ref={composerRef}
         conversationId={conversation.id}
         sessionExpired={sessionInfo.expired}
         onSend={handleSend}

@@ -18,6 +18,7 @@ import { ContactSidebar } from "@/components/inbox/contact-sidebar";
 import { toast } from "sonner";
 import { WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { mergeIncomingMessage } from "@/lib/inbox/optimistic-messages";
 
 // Remembers the agent's show/hide choice for the desktop contact panel
 // across reloads and sessions (device-scoped, like the theme prefs).
@@ -252,15 +253,9 @@ function InboxPageInner() {
           activeConversation &&
           newMsg.conversation_id === activeConversation.id
         ) {
-          setMessages((prev) => {
-            // Avoid duplicates
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            // Replace optimistic message if it exists
-            const withoutOptimistic = prev.filter(
-              (m) => !m.id.startsWith("temp-")
-            );
-            return [...withoutOptimistic, newMsg];
-          });
+          // Swaps only the optimistic bubble this row belongs to — see
+          // mergeIncomingMessage for why not every temp- bubble.
+          setMessages((prev) => mergeIncomingMessage(prev, newMsg));
         }
 
         // Update conversation list preview. We need to know *synchronously*

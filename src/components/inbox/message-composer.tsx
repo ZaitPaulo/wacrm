@@ -1,6 +1,14 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
+import {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  KeyboardEvent,
+  type Ref,
+} from 'react';
 import {
   Send,
   LayoutTemplate,
@@ -16,6 +24,7 @@ import {
   Plus,
   MessageSquareDashed,
   Zap,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GatedButton } from '@/components/ui/gated-button';
@@ -50,6 +59,7 @@ import {
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive';
 import type { InteractiveMessagePayload, QuickReply } from '@/types';
 import { QuickReplyPicker } from './quick-reply-picker';
+import { MAX_BATCH_IMAGES, selectBatchImages } from './image-batch';
 
 /** Media content types an agent can send from the composer. */
 export type ComposerMediaKind = 'image' | 'video' | 'document' | 'audio';
@@ -63,6 +73,10 @@ export const MEDIA_CAPTION_MAX = 1024;
 /** Hard cap on a single voice recording so it can't blow the upload/
  *  transcode limits — auto-stops the recorder when reached. */
 const MAX_RECORDING_SECONDS = 5 * 60;
+
+/** Subidas simultáneas de una tanda de imágenes: aprovecha el tiempo en
+ *  que el asesor escribe leyendas sin saturar la conexión. */
+const MAX_PARALLEL_UPLOADS = 3;
 
 export interface SendMediaPayload {
   kind: ComposerMediaKind;
@@ -104,11 +118,58 @@ interface MediaDraft {
   caption: string;
 }
 
+/**
+ * Una imagen de la tanda en preparación.
+ *
+ * Se sube apenas entra a la tira; mientras tanto la miniatura sale de un
+ * object URL local, así se ve al instante. `mediaUrl`/`path` existen solo
+ * cuando `status` es `ready`.
+ */
+interface ImageDraft {
+  localId: string;
+  file: File;
+  previewUrl: string;
+  status: 'uploading' | 'ready' | 'error';
+  mediaUrl?: string;
+  path?: string;
+  caption: string;
+}
+
+/** Progreso del envío de una tanda: va por la imagen `current` de `total`. */
+interface BatchProgress {
+  current: number;
+  total: number;
+}
+
+/** Lo que el hilo puede pedirle al composer: imágenes soltadas sobre él. */
+export interface MessageComposerHandle {
+  addImages: (files: readonly File[]) => void;
+}
+
+/**
+ * Imágenes del portapapeles. Algunos navegadores (Safari) solo las
+ * exponen en `items`, no en `files`, así que se miran los dos.
+ */
+function clipboardImageFiles(data: DataTransfer): File[] {
+  const fromFiles = Array.from(data.files);
+  const files =
+    fromFiles.length > 0
+      ? fromFiles
+      : Array.from(data.items)
+          .filter((item) => item.kind === 'file')
+          .map((item) => item.getAsFile())
+          .filter((file): file is File => file !== null);
+  return files.filter((file) => file.type.startsWith('image/'));
+}
+
 interface MessageComposerProps {
+  ref?: Ref<MessageComposerHandle>;
   conversationId: string;
   sessionExpired: boolean;
   onSend: (text: string, replyToId?: string) => void;
-  onSendMedia: (payload: SendMediaPayload) => void;
+  /** Resuelve si el envío salió bien; una tanda de imágenes lo espera
+   *  para mandarlas de a una y en orden. */
+  onSendMedia: (payload: SendMediaPayload) => Promise<boolean>;
   onSendInteractive: (
     payload: InteractiveMessagePayload,
     replyToId?: string
@@ -157,6 +218,7 @@ const OPUS_ENCODER_PATH = '/opus/encoderWorker.min.js';
  * precisamente cuando las necesita.
  */
 export function MessageComposer({
+  ref,
   conversationId,
   sessionExpired,
   onSend,
@@ -218,6 +280,30 @@ export function MessageComposer({
     draftRef.current = draft;
   }, [draft]);
 
+  // Tanda de imágenes (cambio `envio-multiple-imagenes-chat`). Es
+  // excluyente con `draft`: o hay hasta 10 imágenes, o un único video,
+  // documento o nota de voz. La ref es la fuente de verdad síncrona —
+  // las subidas en curso y la limpieza al desmontar la leen — y
+  // `updateImages` mantiene las dos iguales.
+  const [imageDrafts, setImageDrafts] = useState<ImageDraft[]>([]);
+  const imageDraftsRef = useRef<ImageDraft[]>([]);
+  const [activeImageId, setActiveImageId] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(
+    null
+  );
+  const sendingBatchRef = useRef(false);
+  const uploadQueueRef = useRef<string[]>([]);
+  const activeUploadsRef = useRef(0);
+
+  const updateImages = useCallback(
+    (fn: (prev: ImageDraft[]) => ImageDraft[]) => {
+      const next = fn(imageDraftsRef.current);
+      imageDraftsRef.current = next;
+      setImageDrafts(next);
+    },
+    []
+  );
+
   // Best-effort GC of a staged object the user never sent. Fire-and-forget.
   const removeStaged = useCallback((path: string | undefined) => {
     if (!path) return;
@@ -257,6 +343,14 @@ export function MessageComposer({
       // stop() releases the mic stream + audio context inside opus-recorder.
       void recorderRef.current?.stop().catch(() => {});
       removeStaged(draftRef.current?.path);
+      // Same for a staged image batch. Emptying the ref also makes any
+      // upload still in flight GC its object when it lands.
+      for (const img of imageDraftsRef.current) {
+        removeStaged(img.path);
+        URL.revokeObjectURL(img.previewUrl);
+      }
+      imageDraftsRef.current = [];
+      uploadQueueRef.current = [];
     };
   }, [clearTimer, removeStaged]);
 
@@ -429,6 +523,216 @@ export function MessageComposer({
     [openInteractiveBuilder, adjustHeight]
   );
 
+  // ---- Image batch -------------------------------------------------
+
+  // Drop the whole staged batch: GC what was uploaded, free the previews.
+  const clearImages = useCallback(() => {
+    for (const img of imageDraftsRef.current) {
+      removeStaged(img.path);
+      URL.revokeObjectURL(img.previewUrl);
+    }
+    uploadQueueRef.current = [];
+    updateImages(() => []);
+    setActiveImageId(null);
+  }, [removeStaged, updateImages]);
+
+  const uploadImage = useCallback(
+    async (localId: string) => {
+      const item = imageDraftsRef.current.find((d) => d.localId === localId);
+      if (!item) return; // removed while queued
+      try {
+        const { publicUrl, path } = await uploadAccountMedia(
+          CHAT_MEDIA_BUCKET,
+          item.file
+        );
+        // Removed (or the composer unmounted) mid-upload: nobody will
+        // send this object, so GC it right away.
+        if (!imageDraftsRef.current.some((d) => d.localId === localId)) {
+          removeStaged(path);
+          return;
+        }
+        updateImages((prev) =>
+          prev.map((d) =>
+            d.localId === localId
+              ? { ...d, status: 'ready', mediaUrl: publicUrl, path }
+              : d
+          )
+        );
+      } catch {
+        toast.error(t('imageUploadFailed', { name: item.file.name }));
+        updateImages((prev) =>
+          prev.map((d) =>
+            d.localId === localId ? { ...d, status: 'error' } : d
+          )
+        );
+      }
+    },
+    [removeStaged, updateImages, t]
+  );
+
+  // Each worker drains the shared queue one upload at a time; up to
+  // MAX_PARALLEL_UPLOADS of them run at once.
+  const runUploadWorker = useCallback(async () => {
+    activeUploadsRef.current += 1;
+    try {
+      for (
+        let id = uploadQueueRef.current.shift();
+        id !== undefined;
+        id = uploadQueueRef.current.shift()
+      ) {
+        await uploadImage(id);
+      }
+    } finally {
+      activeUploadsRef.current -= 1;
+    }
+  }, [uploadImage]);
+
+  /**
+   * Entrada única de imágenes a la tanda: selector, soltar sobre el hilo
+   * y pegar. Valida tipo, peso y el tope de 10 antes de subir nada, avisa
+   * lo que quedó afuera y arranca las subidas.
+   */
+  const addImages = useCallback(
+    (files: readonly File[]) => {
+      if (inputsDisabled || sendingBatchRef.current || files.length === 0) {
+        return;
+      }
+      const selection = selectBatchImages(
+        files,
+        imageDraftsRef.current.length,
+        MEDIA_MAX_BYTES_BY_KIND.image
+      );
+      if (selection.wrongType.length > 0) {
+        toast.error(
+          t('imagesWrongType', {
+            names: selection.wrongType.map((f) => f.name).join(', '),
+          })
+        );
+      }
+      for (const file of selection.tooLarge) {
+        toast.error(
+          t('imageTooLarge', {
+            name: file.name,
+            max: Math.round(MEDIA_MAX_BYTES_BY_KIND.image / 1024 / 1024),
+          })
+        );
+      }
+      if (selection.overLimit.length > 0) {
+        toast.error(
+          t('imagesOverLimit', {
+            count: selection.overLimit.length,
+            max: MAX_BATCH_IMAGES,
+          })
+        );
+      }
+      if (selection.accepted.length === 0) return;
+
+      // Images replace a staged video/document/voice note, as picking a
+      // new attachment always has.
+      if (draftRef.current) {
+        removeStaged(draftRef.current.path);
+        draftRef.current = null;
+        setDraft(null);
+      }
+
+      const added: ImageDraft[] = selection.accepted.map((file) => ({
+        localId: crypto.randomUUID(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+        status: 'uploading',
+        caption: '',
+      }));
+      updateImages((prev) => [...prev, ...added]);
+      setActiveImageId((current) => current ?? added[0].localId);
+
+      uploadQueueRef.current.push(...added.map((d) => d.localId));
+      const idle = MAX_PARALLEL_UPLOADS - activeUploadsRef.current;
+      const workers = Math.min(idle, uploadQueueRef.current.length);
+      for (let i = 0; i < workers; i++) {
+        void runUploadWorker();
+      }
+    },
+    [inputsDisabled, removeStaged, runUploadWorker, updateImages, t]
+  );
+
+  useImperativeHandle(ref, () => ({ addImages }), [addImages]);
+
+  const removeImage = useCallback(
+    (localId: string) => {
+      const prev = imageDraftsRef.current;
+      const index = prev.findIndex((d) => d.localId === localId);
+      if (index < 0) return;
+      removeStaged(prev[index].path);
+      URL.revokeObjectURL(prev[index].previewUrl);
+      const next = prev.filter((d) => d.localId !== localId);
+      updateImages(() => next);
+      // Keep the caption field on the neighbour that took its place.
+      setActiveImageId((current) =>
+        current === localId
+          ? (next[Math.min(index, next.length - 1)]?.localId ?? null)
+          : current
+      );
+    },
+    [removeStaged, updateImages]
+  );
+
+  const setImageCaption = useCallback(
+    (localId: string, caption: string) => {
+      updateImages((prev) =>
+        prev.map((d) => (d.localId === localId ? { ...d, caption } : d))
+      );
+    },
+    [updateImages]
+  );
+
+  /**
+   * Envía la tanda en orden, de a una imagen por mensaje.
+   *
+   * Espera cada envío antes del siguiente: en paralelo llegarían a Meta
+   * en cualquier orden. Un fallo no corta la tanda — el hilo ya marca la
+   * burbuja como fallida y borra su objeto. La tira se vacía al empezar:
+   * desde ahí las imágenes son de este ciclo, así que ni quitarlas ni
+   * desmontar el composer las borra a mitad del envío.
+   */
+  const sendImageBatch = useCallback(async () => {
+    const items = imageDraftsRef.current;
+    if (items.length === 0 || sendingBatchRef.current) return;
+    if (items.some((d) => d.status === 'uploading')) return;
+
+    const ready = items.filter(
+      (d): d is ImageDraft & { mediaUrl: string; path: string } =>
+        d.status === 'ready' && !!d.mediaUrl && !!d.path
+    );
+    const failed = items.length - ready.length;
+    if (failed > 0) toast.error(t('imagesSkipped', { count: failed }));
+
+    for (const d of items) URL.revokeObjectURL(d.previewUrl);
+    uploadQueueRef.current = [];
+    updateImages(() => []);
+    setActiveImageId(null);
+    if (ready.length === 0) return;
+
+    sendingBatchRef.current = true;
+    const replyToId = replyTo?.id;
+    onClearReply?.();
+    try {
+      for (const [i, d] of ready.entries()) {
+        setBatchProgress({ current: i + 1, total: ready.length });
+        await onSendMedia({
+          kind: 'image',
+          mediaUrl: d.mediaUrl,
+          path: d.path,
+          caption: d.caption.trim() || undefined,
+          // The quote belongs to the batch, not to every photo.
+          replyToId: i === 0 ? replyToId : undefined,
+        });
+      }
+    } finally {
+      sendingBatchRef.current = false;
+      setBatchProgress(null);
+    }
+  }, [onSendMedia, replyTo?.id, onClearReply, updateImages, t]);
+
   // Upload a captured file to chat-media and stage it as a draft.
   const stageUpload = useCallback(
     async (kind: ComposerMediaKind, file: File) => {
@@ -450,8 +754,9 @@ export function MessageComposer({
           CHAT_MEDIA_BUCKET,
           file
         );
-        // Replacing an existing draft? GC the previous object first.
+        // Replacing an existing draft or image batch? GC it first.
         removeStaged(draftRef.current?.path);
+        clearImages();
         setDraft({
           kind,
           mediaUrl: publicUrl,
@@ -465,14 +770,26 @@ export function MessageComposer({
         setBusy(false);
       }
     },
-    [removeStaged]
+    [removeStaged, clearImages]
   );
 
   const handlePicked = useCallback(
-    (kind: 'image' | 'video' | 'document', file: File | undefined) => {
+    (kind: 'video' | 'document', file: File | undefined) => {
       if (file) void stageUpload(kind, file);
     },
     [stageUpload]
+  );
+
+  // Screenshots / copied photos go into the batch; a plain-text paste
+  // is left alone.
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const files = clipboardImageFiles(e.clipboardData);
+      if (files.length === 0) return;
+      e.preventDefault();
+      addImages(files);
+    },
+    [addImages]
   );
 
   // ---- Voice recording (client-side Ogg/Opus, no server transcode) ---
@@ -502,6 +819,7 @@ export function MessageComposer({
           file
         );
         removeStaged(draftRef.current?.path);
+        clearImages();
         setDraft({
           kind: 'audio',
           mediaUrl: publicUrl,
@@ -515,7 +833,7 @@ export function MessageComposer({
         setBusy(false);
       }
     },
-    [removeStaged]
+    [removeStaged, clearImages]
   );
 
   const startRecording = useCallback(async () => {
@@ -583,7 +901,7 @@ export function MessageComposer({
 
   const sendDraft = useCallback(() => {
     if (!draft || busy) return;
-    onSendMedia({
+    void onSendMedia({
       kind: draft.kind,
       mediaUrl: draft.mediaUrl,
       path: draft.path,
@@ -639,14 +957,28 @@ export function MessageComposer({
         </div>
       )}
 
+      {batchProgress && (
+        <div
+          role="status"
+          className="text-muted-foreground mb-2 flex items-center gap-2 text-xs"
+        >
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {t('sendingBatch', {
+            current: batchProgress.current,
+            total: batchProgress.total,
+          })}
+        </div>
+      )}
+
       {/* Hidden file inputs driven by the attach menu. */}
       <input
         ref={imageInputRef}
         type="file"
         accept={PICKER_ACCEPT.image}
+        multiple
         className="hidden"
         onChange={(e) => {
-          handlePicked('image', e.target.files?.[0]);
+          addImages(Array.from(e.target.files ?? []));
           e.target.value = '';
         }}
       />
@@ -679,6 +1011,19 @@ export function MessageComposer({
           onCaptionChange={setCaption}
           onDiscard={discardDraft}
           onSend={sendDraft}
+          t={t}
+        />
+      ) : imageDrafts.length > 0 ? (
+        <ImageDraftTray
+          images={imageDrafts}
+          activeId={activeImageId}
+          readOnly={readOnly}
+          onSelect={setActiveImageId}
+          onRemove={removeImage}
+          onCaptionChange={setImageCaption}
+          onAddMore={() => imageInputRef.current?.click()}
+          onDiscard={clearImages}
+          onSend={() => void sendImageBatch()}
           t={t}
         />
       ) : recording ? (
@@ -921,6 +1266,7 @@ export function MessageComposer({
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={
               readOnly
                 ? compactPlaceholder
@@ -962,7 +1308,7 @@ export function MessageComposer({
       {/* Hint sits outside the flex row so its height doesn't push
           `items-end` buttons below the textarea. Indented to line up
           under the textarea left edge. */}
-      {!draft && !recording && (
+      {!draft && imageDrafts.length === 0 && !recording && (
         // Oculto por debajo de sm: el `pl-[5.5rem]` está calculado para
         // alinearse bajo el textarea cuando hay cuatro botones de 36px a
         // su izquierda, y con el menú único esa cuenta deja de valer —
@@ -1105,6 +1451,150 @@ function MediaDraftPreview({
             'bg-primary hover:bg-primary/90 h-9 w-9 shrink-0 p-0 disabled:opacity-40',
             draft.kind === 'audio' && 'ml-auto'
           )}
+        >
+          <Send className="h-4 w-4" />
+        </GatedButton>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Tira de la tanda de imágenes: una miniatura por imagen con su estado
+ * de subida y su X, más un campo de leyenda que edita la miniatura
+ * activa. A nivel de módulo por la misma razón que `MediaDraftPreview`:
+ * anidada, el campo se remontaría en cada tecla y perdería el foco.
+ */
+function ImageDraftTray({
+  images,
+  activeId,
+  readOnly,
+  onSelect,
+  onRemove,
+  onCaptionChange,
+  onAddMore,
+  onDiscard,
+  onSend,
+  t,
+}: {
+  images: ImageDraft[];
+  activeId: string | null;
+  readOnly: boolean;
+  onSelect: (localId: string) => void;
+  onRemove: (localId: string) => void;
+  onCaptionChange: (localId: string, caption: string) => void;
+  onAddMore: () => void;
+  onDiscard: () => void;
+  onSend: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const active = images.find((d) => d.localId === activeId) ?? images[0];
+  const uploading = images.some((d) => d.status === 'uploading');
+
+  return (
+    <div className="border-border bg-muted/40 rounded-xl border p-3">
+      <div className="flex items-start gap-2">
+        {/* `min-w-0` + `overflow-x-auto`: on a phone the row scrolls by
+            itself instead of widening the whole page. */}
+        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pt-2 pr-2 pb-1">
+          {images.map((img, i) => (
+            <div key={img.localId} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => onSelect(img.localId)}
+                aria-label={t('selectImage', { n: i + 1 })}
+                aria-pressed={img.localId === active?.localId}
+                className={cn(
+                  'block h-16 w-16 overflow-hidden rounded-lg border-2',
+                  img.localId === active?.localId
+                    ? 'border-primary'
+                    : 'border-transparent'
+                )}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={img.previewUrl}
+                  alt={img.file.name}
+                  className="h-full w-full object-cover"
+                />
+                {img.status === 'uploading' && (
+                  <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40">
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  </span>
+                )}
+                {img.status === 'error' && (
+                  <span
+                    className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50"
+                    title={t('imageUploadError')}
+                  >
+                    <AlertCircle className="h-5 w-5 text-red-400" />
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => onRemove(img.localId)}
+                aria-label={t('removeImage', { n: i + 1 })}
+                className="bg-card text-muted-foreground hover:text-foreground border-border absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border shadow-sm"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          {images.length < MAX_BATCH_IMAGES && (
+            <button
+              type="button"
+              onClick={onAddMore}
+              aria-label={t('addMoreImages')}
+              title={t('addMoreImages')}
+              className="border-border text-muted-foreground hover:text-foreground hover:border-primary/50 flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border-2 border-dashed"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onDiscard}
+          aria-label={t('discardImages')}
+          title={t('discardImages')}
+          className="text-muted-foreground hover:bg-muted hover:text-foreground rounded p-1"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <p className="text-muted-foreground mt-1 text-[11px]">
+        {t('imageCount', { count: images.length, max: MAX_BATCH_IMAGES })}
+      </p>
+
+      <div className="mt-2 flex items-end gap-2">
+        {active && (
+          <input
+            key={active.localId}
+            value={active.caption}
+            maxLength={MEDIA_CAPTION_MAX}
+            onChange={(e) => onCaptionChange(active.localId, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!uploading) onSend();
+              }
+            }}
+            placeholder={t('addCaptionFor', {
+              n: images.indexOf(active) + 1,
+            })}
+            className="border-border bg-muted text-foreground placeholder-muted-foreground focus:border-primary/50 min-w-0 flex-1 rounded-xl border px-4 py-2.5 text-sm transition-colors outline-none"
+          />
+        )}
+        <GatedButton
+          size="sm"
+          canAct={!readOnly}
+          gateReason="send messages"
+          disabled={uploading}
+          title={uploading ? t('waitForUploads') : undefined}
+          onClick={onSend}
+          className="bg-primary hover:bg-primary/90 h-9 w-9 shrink-0 p-0 disabled:opacity-40"
         >
           <Send className="h-4 w-4" />
         </GatedButton>

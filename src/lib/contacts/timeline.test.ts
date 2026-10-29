@@ -6,6 +6,7 @@ import {
   parseTimelineQuery,
   vehicleLabel,
   durationMinutes,
+  groupTimelineByDay,
   TIMELINE_FILTERS,
   TIMELINE_KINDS,
   type TimelineEvent,
@@ -27,12 +28,18 @@ describe('kindsForFilters', () => {
     expect(kindsForFilters([])).toBeNull()
   })
 
-  it('el filtro de citas trae la cita y sus eventos', () => {
-    expect(kindsForFilters(['appointments'])).toEqual(['appointment', 'appointment_event'])
+  it('el filtro de citas trae la cita, sus eventos y las llamadas', () => {
+    expect(kindsForFilters(['appointments'])).toEqual(['appointment', 'appointment_event', 'interaction'])
   })
 
   it('junta varios filtros sin repetir', () => {
-    expect(kindsForFilters(['notes', 'documents', 'notes'])).toEqual(['note', 'document'])
+    expect(kindsForFilters(['notes', 'conversations', 'notes'])).toEqual([
+      'note',
+      'document',
+      'first_contact',
+      'conversation',
+      'assignment',
+    ])
   })
 
   it('cada kind está en exactamente un filtro', () => {
@@ -159,5 +166,25 @@ describe('vehicleLabel y durationMinutes', () => {
     expect(durationMinutes(241)).toBe(5)
     expect(durationMinutes(null)).toBeNull()
     expect(durationMinutes(-3)).toBeNull()
+  })
+})
+
+describe('groupTimelineByDay', () => {
+  const at = (iso: string, id: string): TimelineEvent => ({ ...ev('note'), occurred_at: iso, source_id: id, sort_key: `note:${id}` })
+
+  it('agrupa eventos seguidos del mismo día y respeta el orden', () => {
+    const days = groupTimelineByDay([
+      at('2026-10-28T15:00:00', 'a'),
+      at('2026-10-28T09:00:00', 'b'),
+      at('2026-10-26T12:00:00', 'c'),
+    ])
+    expect(days.map((d) => [d.day, d.events.map((e) => e.source_id)])).toEqual([
+      ['2026-10-28', ['a', 'b']],
+      ['2026-10-26', ['c']],
+    ])
+  })
+
+  it('sin eventos no hay días', () => {
+    expect(groupTimelineByDay([])).toEqual([])
   })
 })

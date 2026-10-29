@@ -315,7 +315,8 @@
       "contactDetails": "Contact details",
       "unassigned": "Unassigned",
       "markAttended": "Mark as attended",
-      "markAttendedFailed": "Couldn't mark as attended. Try again."
+      "markAttendedFailed": "Couldn't mark as attended. Try again.",
+      "dropImagesHere": "Drop images here"
     },
     "sessionTimer": {
       "expired": "Expired",
@@ -355,7 +356,21 @@
       "actions": "Actions",
       "typeMessagePlaceholderShort": "Type a message…",
       "sessionExpiredPlaceholderShort": "Session expired",
-      "readOnlyPlaceholderShort": "Read-only"
+      "readOnlyPlaceholderShort": "Read-only",
+      "imageUploadFailed": "Couldn't upload {name}.",
+      "imageUploadError": "Upload failed. Remove it and add it again.",
+      "imagesWrongType": "Only PNG, JPEG or WebP images are supported. Ignored: {names}",
+      "imageTooLarge": "{name} is over {max} MB and was not added.",
+      "imagesOverLimit": "{count, plural, one {# image was ignored} other {# images were ignored}}: the limit is {max} per send.",
+      "imagesSkipped": "{count, plural, one {# image failed to upload and won't be sent} other {# images failed to upload and won't be sent}}.",
+      "sendingBatch": "Sending {current} of {total}…",
+      "selectImage": "Image {n}",
+      "removeImage": "Remove image {n}",
+      "addMoreImages": "Add more images",
+      "discardImages": "Discard all images",
+      "imageCount": "{count} of {max} images",
+      "addCaptionFor": "Caption for image {n}…",
+      "waitForUploads": "Wait for uploads to finish"
     },
     "bubble": {
       "photo": "Photo",
@@ -731,7 +746,11 @@
         "logInteraction": "Log interaction",
         "scheduleVisit": "Schedule visit",
         "recordSale": "Record sale",
-        "recordPurchase": "Record purchase"
+        "recordPurchase": "Record purchase",
+        "openChat": "Open chat",
+        "logCall": "Log call",
+        "more": "More",
+        "adminOnly": "Admin"
       },
       "stats": {
         "since": "Customer since",
@@ -746,6 +765,50 @@
       "tabs": {
         "timeline": "History",
         "documents": "Documents"
+      },
+      "channelYou": "{channel} · you handle it",
+      "channelAgent": "{channel} · {name}",
+      "channelNone": "{channel} · no agent",
+      "status": {
+        "label": "Where this customer stands",
+        "pending": "Pending",
+        "awaitingReply": "Reply on {channel}",
+        "awaitingSince": "Wrote {ago} and nobody has answered",
+        "replyNow": "Reply now",
+        "nextAppointment": "Next appointment",
+        "noAppointment": "No upcoming appointments",
+        "confirmed": "Confirmed by the customer",
+        "openDeal": "Open deal",
+        "noDeal": "No open deals",
+        "stageProgress": "Stage {index} of {count}: {stage}",
+        "lastContact": "Last contact",
+        "lastMessage": "Chat message",
+        "noContact": "No contact yet",
+        "clientSince": "Customer since {date}"
+      },
+      "sections": {
+        "history": "Customer history",
+        "data": "Details",
+        "edit": "Edit",
+        "done": "Done",
+        "withUs": "With us",
+        "documents": "Documents",
+        "tags": "Tags"
+      },
+      "statsAttended": "{count, plural, =1 {1 attended} other {# attended}}",
+      "statsEmptyHint": "Trade-ins and consignments show up here when there are any.",
+      "mobileTabs": {
+        "history": "History",
+        "data": "Details",
+        "documents": "Documents"
+      },
+      "mobileBar": {
+        "label": "Actions",
+        "chat": "Chat",
+        "call": "Call",
+        "log": "Log",
+        "schedule": "Schedule",
+        "more": "More"
       }
     },
     "timeline": {
@@ -758,13 +821,10 @@
       "unassigned": "unassigned",
       "filters": {
         "all": "All",
-        "appointments": "Appointments",
-        "interactions": "Calls and interactions",
-        "conversations": "Conversations",
-        "deals": "Deals",
-        "vehicles": "Vehicles",
-        "documents": "Documents",
-        "notes": "Notes"
+        "conversations": "Messages",
+        "appointments": "Appointments & calls",
+        "business": "Deals & vehicles",
+        "notes": "Notes & documents"
       },
       "events": {
         "firstContact": "First contact via {channel}",
@@ -819,6 +879,10 @@
         "openDocuments": "View documents",
         "edit": "Edit",
         "delete": "Delete"
+      },
+      "days": {
+        "today": "Today",
+        "yesterday": "Yesterday"
       }
     },
     "thread": {
@@ -854,7 +918,11 @@
       "saved": "Interaction logged",
       "updated": "Interaction updated",
       "cancel": "Cancel",
-      "save": "Save"
+      "save": "Save",
+      "nextStep": "Next step",
+      "nextStepSchedule": "Schedule a visit",
+      "nextStepNone": "Nothing for now",
+      "quickMinutes": "{count} min"
     },
     "sell": {
       "title": "Record sale",
@@ -871,6 +939,19 @@
       "sold": "Sale recorded",
       "cancel": "Cancel",
       "confirm": "Record sale"
+    },
+    "quickLog": {
+      "label": "What are you logging",
+      "note": "Note",
+      "call": "Call",
+      "walkIn": "Walk-in",
+      "notePlaceholder": "Write a note for the team…",
+      "callPlaceholder": "What happened on the call?",
+      "walkInPlaceholder": "What did they come for and what did they see?",
+      "outcome": "Outcome",
+      "save": "Save",
+      "moreDetails": "More details",
+      "saveFailed": "Could not save"
     }
   },
   "Pipelines": {

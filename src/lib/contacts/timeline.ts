@@ -45,16 +45,14 @@ export interface TimelineEvent {
 
 /**
  * Filtros de la hoja de vida. Cada uno agrupa varios `kind`: el usuario
- * piensa en "citas", no en "cita" y "evento de cita".
+ * piensa en "citas y llamadas", no en "cita", "evento de cita" e
+ * "interacción". Son pocos a propósito: con siete, el asesor no los usaba.
  */
 export const TIMELINE_FILTERS = {
-  appointments: ['appointment', 'appointment_event'],
-  interactions: ['interaction'],
   conversations: ['first_contact', 'conversation', 'assignment'],
-  deals: ['deal_created', 'deal_stage', 'deal_closed'],
-  vehicles: ['inquiry', 'sale', 'consignment', 'acquisition'],
-  documents: ['document'],
-  notes: ['note'],
+  appointments: ['appointment', 'appointment_event', 'interaction'],
+  business: ['deal_created', 'deal_stage', 'deal_closed', 'inquiry', 'sale', 'consignment', 'acquisition'],
+  notes: ['note', 'document'],
 } as const satisfies Record<string, readonly TimelineKind[]>
 
 export type TimelineFilter = keyof typeof TIMELINE_FILTERS
@@ -115,6 +113,36 @@ export function nextPageParams(
   if (events.length < pageSize) return null
   const last = events[events.length - 1]
   return { before: last.occurred_at, before_key: last.sort_key }
+}
+
+/** Un día de la hoja de vida con sus eventos, en el orden recibido. */
+export interface TimelineDay {
+  /** `yyyy-MM-dd` en la hora local de quien mira. */
+  day: string
+  events: TimelineEvent[]
+}
+
+function localDayKey(iso: string): string {
+  const d = new Date(iso)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+/**
+ * Agrupa por día los eventos que ya vienen ordenados del más reciente al
+ * más antiguo. Al "Cargar más", el primer día de la página nueva puede ser
+ * el mismo que el último de la anterior: se une, no se repite el título.
+ */
+export function groupTimelineByDay(events: readonly TimelineEvent[]): TimelineDay[] {
+  const days: TimelineDay[] = []
+  for (const e of events) {
+    const day = localDayKey(e.occurred_at)
+    const last = days[days.length - 1]
+    if (last && last.day === day) last.events.push(e)
+    else days.push({ day, events: [e] })
+  }
+  return days
 }
 
 // ------------------------------------------------------------

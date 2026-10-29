@@ -75,5 +75,5 @@
   - recorrer la ficha, la hoja de vida, el hilo en solo lectura, la interacción, la venta y la compra;
   - confirmar que la bandeja, el embudo y la Agenda de cada asesor no cambiaron
 - [ ] 6.3 Prueba en el celular (vista de la ficha y del diálogo de interacción)
-- [ ] 6.4 Desplegar cuando el usuario lo indique: migraciones 553–555 en el VPS en orden y un solo despliegue `develop` → `main`. Actualizar la memoria de despliegue
+- [x] 6.4 Desplegar cuando el usuario lo indique: migraciones 553–555 en el VPS en orden y un solo despliegue `develop` → `main`. Actualizar la memoria de despliegue
 - [ ] 6.5 Avisar a los dueños que la hoja de vida solo muestra ventas, compras y llamadas si el equipo las registra
