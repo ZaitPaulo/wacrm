@@ -799,8 +799,11 @@ export function MessageThread({
         .eq('id', conversation.id);
 
       onStatusChange(conversation.id, status);
+      // Cerrar limpia la espera en la base (migración 559): la lista lo
+      // refleja de una vez, sin esperar al realtime.
+      if (status === 'closed') onAwaitingReplyChange?.(conversation.id, null);
     },
-    [conversation, onStatusChange]
+    [conversation, onAwaitingReplyChange, onStatusChange]
   );
 
   // Cierra la espera sin enviar nada (p. ej. el cliente solo dijo

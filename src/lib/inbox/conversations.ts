@@ -92,8 +92,8 @@ export function matchesAssigneeFilter(
 
 /**
  * Si la conversación espera respuesta de un asesor humano (migración
- * 551). Leer el chat no la cambia: solo responder o "Marcar como
- * atendido".
+ * 551). Leer el chat no la cambia: solo responder, "Marcar como
+ * atendido" o cerrarla (migración 559).
  */
 export function isAwaitingReply(conversation: Conversation): boolean {
   return conversation.awaiting_reply_since != null;
